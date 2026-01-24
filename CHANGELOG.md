@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.6]
+
+### 🔧 Signing Fix (Environment Variable)
+- **Explicitly set `TAURI_SIGNING_PRIVATE_KEY`** in release workflow
+- The Tauri CLI specifically demands `TAURI_SIGNING_PRIVATE_KEY` when a pubkey is present
+- Set both `TAURI_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY` to be absolutely sure
+- **Clean version bump to 0.3.6**
+
+### 📊 Technical Details
+- Modified `.github/workflows/release.yml` env vars
+- All 501 tests passing
+
+### 🎯 Impact
+This fixes the `A public key has been found, but no private key` error during the signing phase.
+
+---
+
 ## [0.3.5]
 
 ### 🔧 Fixed Release Workflow & JSON Syntax
