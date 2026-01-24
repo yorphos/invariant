@@ -207,6 +207,14 @@ export class PersistenceService {
     );
   }
 
+  async getJournalEntries(limit: number = 100): Promise<JournalEntry[]> {
+    const db = await getDatabase();
+    return await db.select<JournalEntry[]>(
+      'SELECT * FROM journal_entry ORDER BY entry_date DESC, id DESC LIMIT ?',
+      [limit]
+    );
+  }
+
   // Contact operations
   async getContacts(type?: 'customer' | 'vendor' | 'both'): Promise<Contact[]> {
     const db = await getDatabase();

@@ -17,6 +17,7 @@
   import BankImportView from './lib/views/BankImportView.svelte';
   import InventoryView from './lib/views/InventoryView.svelte';
   import PayrollView from './lib/views/PayrollView.svelte';
+  import JournalEntryView from './lib/views/JournalEntryView.svelte';
   import { backupDatabase, restoreDatabase } from './lib/services/backup';
   import { 
     getFiscalYears, 
@@ -29,7 +30,7 @@
   let mode: PolicyMode = 'beginner';
   let dbReady = false;
   let error = '';
-  let activeView: 'dashboard' | 'accounts' | 'contacts' | 'invoices' | 'payments' | 'bills' | 'expenses' | 'reports' | 'reconciliation' | 'batch' | 'bank-import' | 'inventory' | 'payroll' | 'settings' = 'dashboard';
+  let activeView: 'dashboard' | 'accounts' | 'contacts' | 'invoices' | 'payments' | 'bills' | 'expenses' | 'reports' | 'reconciliation' | 'batch' | 'bank-import' | 'inventory' | 'payroll' | 'journal' | 'settings' = 'dashboard';
   
   // Period close state
   let fiscalYears: FiscalYear[] = [];
@@ -245,6 +246,12 @@
           Payroll
         </button>
         <button 
+          class:active={activeView === 'journal'}
+          onclick={() => setView('journal')}
+        >
+          Journal Entries
+        </button>
+        <button 
           class:active={activeView === 'settings'}
           onclick={() => setView('settings')}
         >
@@ -285,6 +292,8 @@
         <InventoryView {mode} />
       {:else if activeView === 'payroll'}
         <PayrollView {mode} />
+      {:else if activeView === 'journal'}
+        <JournalEntryView {mode} />
       {:else if activeView === 'settings'}
         <div class="view">
           <h2>Settings</h2>
