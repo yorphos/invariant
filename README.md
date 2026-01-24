@@ -36,6 +36,10 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 - Line-item detail with quantity, unit price, and revenue account coding
 - Automatic tax calculation (13% HST/GST - Canadian defaults)
 - Real-time status tracking (draft → sent → partial → paid → overdue)
+- **Invoice voiding** with automatic reversal journal entries
+- **Invoice editing** (void-and-recreate pattern for audit trail)
+- **Detailed invoice view** with line items, journal entries, and payment history
+- **PDF generation** for professional invoice documents
 - Automatic journal posting on creation:
   - **DR** Accounts Receivable
   - **CR** Revenue (by line item)
@@ -46,6 +50,7 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 - Automatic payment numbering (PAY-0001, PAY-0002, ...)
 - Smart invoice allocation with visual selection
 - Automatic invoice status updates
+- **Detailed payment view** with allocation breakdown and journal entries
 - Automatic journal posting:
   - **DR** Cash/Bank Account
   - **CR** Accounts Receivable
@@ -140,7 +145,11 @@ invariant/
 │   │   │   ├── Select.svelte
 │   │   │   ├── Card.svelte
 │   │   │   ├── Modal.svelte
-│   │   │   └── Table.svelte
+│   │   │   ├── Table.svelte
+│   │   │   ├── InvoiceDetailModal.svelte
+│   │   │   └── PaymentDetailModal.svelte
+│   │   ├── utils/               # Utility functions
+│   │   │   └── pdf-generator.ts # PDF generation
 │   │   └── views/               # Application screens
 │   │       ├── DashboardView.svelte
 │   │       ├── ContactsView.svelte
@@ -388,10 +397,15 @@ All business logic belongs in `src/lib/domain/`:
 
 ## 🗺️ Roadmap
 
+### ✅ Tier 1: Essential UX Improvements (COMPLETED)
+- [x] Invoice editing and voiding workflows
+- [x] Invoice and payment detail views
+- [x] PDF generation for invoices
+
 ### Phase 2: Enhanced Features
+- [ ] Test suite expansion (70+ tests)
+- [ ] Data export and backup functionality
 - [ ] Advanced payment allocation UI (FIFO, heuristic matching)
-- [ ] Invoice editing and voiding workflows
-- [ ] PDF generation for invoices and reports
 - [ ] Date range filtering for reports
 - [ ] Custom report builder
 - [ ] Batch operations (bulk payments, invoice generation)
@@ -419,12 +433,11 @@ All business logic belongs in `src/lib/domain/`:
 
 ## 🐛 Known Limitations
 
-1. **Invoice Editing**: Invoices cannot be edited after creation (workaround: void and recreate)
-2. **Single Currency**: Only CAD supported in MVP (architecture supports multi-currency)
-3. **Report Date Ranges**: Reports show all-time data (period filtering coming in Phase 2)
-4. **Manual Allocation**: Payment allocation is manual (advanced strategies exist but not in UI)
-5. **No PDF Export**: Cannot generate printable invoices yet
-6. **Single Entity**: Supports one business entity per database
+1. **Single Currency**: Only CAD supported in MVP (architecture supports multi-currency)
+2. **Report Date Ranges**: Reports show all-time data (period filtering coming in Phase 2)
+3. **Manual Allocation**: Payment allocation is manual (advanced strategies exist but not in UI)
+4. **Default Company Info**: PDF invoices use default company info (settings UI planned)
+5. **Single Entity**: Supports one business entity per database
 
 ---
 

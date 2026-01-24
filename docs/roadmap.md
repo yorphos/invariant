@@ -31,6 +31,68 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
+## Phase 1.5: Tier 1 UX Improvements ✅ (COMPLETED - January 2026)
+
+**Goal**: Essential user experience features to make the MVP production-ready.
+
+### 1.5.1 Invoice Voiding & Editing
+**Priority**: High | **Effort**: 2 days | **Status**: ✅ Complete
+
+- [x] `voidInvoice()` function with reversal journal entries
+- [x] `editInvoice()` function (void-and-recreate pattern)
+- [x] Prevent voiding invoices with payments
+- [x] Validation to maintain accounting integrity
+- [x] Comprehensive test coverage (9 new tests)
+
+**Acceptance Criteria:** ✅
+- User can void unpaid invoices
+- Void creates proper reversal entries (CR A/R, DR Revenue, DR Tax)
+- User can edit invoices (automatically voids and recreates)
+- Complete audit trail preserved
+- Double-entry balance maintained
+
+---
+
+### 1.5.2 Invoice & Payment Detail Views
+**Priority**: High | **Effort**: 3 days | **Status**: ✅ Complete
+
+- [x] `InvoiceDetailModal` component with full details
+- [x] `PaymentDetailModal` component with allocation breakdown
+- [x] Clickable table rows in invoice/payment lists
+- [x] Display line items, journal entries, payment history
+- [x] Modal size variants (small, medium, large, xlarge)
+- [x] Integrated edit and void workflows
+- [x] Status badges and professional styling
+
+**Acceptance Criteria:** ✅
+- User can click any invoice to see full details
+- User can click any payment to see allocations
+- Details include journal entries for verification
+- Edit and void actions accessible from detail view
+- Clean, professional UI presentation
+
+---
+
+### 1.5.3 PDF Invoice Generation
+**Priority**: High | **Effort**: 2 days | **Status**: ✅ Complete
+
+- [x] Install jsPDF library
+- [x] Create `pdf-generator.ts` utility
+- [x] Professional invoice layout with company header
+- [x] Line items table with calculations
+- [x] Status badges (VOID, PAID)
+- [x] Download PDF button in invoice detail modal
+- [x] Handle long invoices with page breaks
+
+**Acceptance Criteria:** ✅
+- User can download any invoice as PDF
+- PDF includes company info, customer info, line items
+- Professional appearance suitable for emailing
+- Voided invoices clearly marked
+- Works offline (client-side generation)
+
+---
+
 ## Phase 2: Core Workflows 🚧 (NEXT UP)
 
 **Goal**: Implement the most common small business accounting tasks.
@@ -330,20 +392,29 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ## Milestones
 
-### Milestone 1: MVP (Current Status: 70%)
-- [x] Foundation
-- [ ] Core Workflows (Phase 2)
-- [ ] Basic testing
+### Milestone 1: MVP Foundation ✅ (COMPLETED - January 2026)
+- [x] Foundation infrastructure
+- [x] Database schema and migrations
+- [x] Core domain logic
+- [x] Basic UI shell
+- [x] Essential workflows (invoices, payments, expenses)
+- [x] **Tier 1 UX improvements (void/edit, details, PDF)**
+
+### Milestone 2: Enhanced MVP (In Progress)
+- [ ] Test suite expansion (70+ tests)
+- [ ] Data export and backup
+- [ ] Date range filtering
+- [ ] Phase 3.1, 3.2 features
 - **Target**: Q2 2026
 
-### Milestone 2: Beta Release
+### Milestone 3: Beta Release
 - [ ] All Phase 2 complete
 - [ ] Phase 3.1, 3.2 complete
 - [ ] Testing suite
 - [ ] Documentation
 - **Target**: Q3 2026
 
-### Milestone 3: Production Release v1.0
+### Milestone 4: Production Release v1.0
 - [ ] All core features
 - [ ] Full testing
 - [ ] Polish
@@ -402,3 +473,8 @@ If you're looking to contribute, high-impact areas:
 
 ## Last Updated
 January 24, 2026
+
+**Recent Milestones:**
+- ✅ January 24, 2026: Completed Tier 1 UX improvements (invoice void/edit, detail views, PDF generation)
+- ✅ Tests: 37/37 passing
+- ✅ Commit: 7138752 - "feat: Implement Tier 1 features"
