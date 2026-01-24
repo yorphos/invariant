@@ -13,16 +13,13 @@
     type BankStatementTransaction,
     type CategorizationRule
   } from '../services/bank-import';
-  import type { Account, PolicyMode, BankTransactionType } from '../domain/types';
+  import type { Account, BankTransactionType } from '../domain/types';
   import Button from '../ui/Button.svelte';
   import Input from '../ui/Input.svelte';
   import Select from '../ui/Select.svelte';
   import Card from '../ui/Card.svelte';
   import Table from '../ui/Table.svelte';
   import Modal from '../ui/Modal.svelte';
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  export let mode: PolicyMode;
 
   type ViewState = 'list' | 'import' | 'transactions' | 'rules';
 

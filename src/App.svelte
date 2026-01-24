@@ -378,7 +378,7 @@
       {:else if activeView === 'batch'}
         <BatchOperationsView {mode} />
       {:else if activeView === 'bank-import'}
-        <BankImportView {mode} />
+        <BankImportView />
       {:else if activeView === 'inventory'}
         <InventoryView {mode} />
       {:else if activeView === 'payroll'}
