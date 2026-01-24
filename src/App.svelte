@@ -3,11 +3,18 @@
   import { getDatabase } from './lib/services/database';
   import { persistenceService } from './lib/services/persistence';
   import type { PolicyMode } from './lib/domain/types';
+  
+  import ContactsView from './lib/views/ContactsView.svelte';
+  import InvoicesView from './lib/views/InvoicesView.svelte';
+  import PaymentsView from './lib/views/PaymentsView.svelte';
+  import ExpensesView from './lib/views/ExpensesView.svelte';
+  import ReportsView from './lib/views/ReportsView.svelte';
+  import DashboardView from './lib/views/DashboardView.svelte';
 
   let mode: PolicyMode = 'beginner';
   let dbReady = false;
   let error = '';
-  let activeView: 'dashboard' | 'invoices' | 'payments' | 'expenses' | 'settings' = 'dashboard';
+  let activeView: 'dashboard' | 'contacts' | 'invoices' | 'payments' | 'expenses' | 'reports' | 'settings' = 'dashboard';
 
   onMount(async () => {
     try {
@@ -53,6 +60,12 @@
           Dashboard
         </button>
         <button 
+          class:active={activeView === 'contacts'}
+          onclick={() => setView('contacts')}
+        >
+          Contacts
+        </button>
+        <button 
           class:active={activeView === 'invoices'}
           onclick={() => setView('invoices')}
         >
@@ -71,6 +84,12 @@
           Expenses
         </button>
         <button 
+          class:active={activeView === 'reports'}
+          onclick={() => setView('reports')}
+        >
+          Reports
+        </button>
+        <button 
           class:active={activeView === 'settings'}
           onclick={() => setView('settings')}
         >
@@ -86,60 +105,17 @@
 
     <main>
       {#if activeView === 'dashboard'}
-        <div class="view">
-          <h2>Dashboard</h2>
-          <div class="welcome">
-            <h3>Welcome to Invariant Accounting</h3>
-            <p>
-              {#if mode === 'beginner'}
-                You're in <strong>Beginner Mode</strong>. The app will guide you through
-                recommended workflows and prevent common mistakes.
-              {:else}
-                You're in <strong>Pro Mode</strong>. You have full control over all
-                accounting operations.
-              {/if}
-            </p>
-          </div>
-
-          <div class="quick-actions">
-            <h3>Quick Actions</h3>
-            <div class="action-grid">
-              <button class="action-btn" onclick={() => setView('invoices')}>
-                Create Invoice
-              </button>
-              <button class="action-btn" onclick={() => setView('expenses')}>
-                Record Expense
-              </button>
-              <button class="action-btn" onclick={() => setView('payments')}>
-                Record Payment
-              </button>
-            </div>
-          </div>
-        </div>
+        <DashboardView {mode} onNavigate={setView} />
+      {:else if activeView === 'contacts'}
+        <ContactsView />
       {:else if activeView === 'invoices'}
-        <div class="view">
-          <h2>Invoices</h2>
-          <p>Invoice management will be implemented here.</p>
-          <p class="info">
-            Features: Create invoices, track A/R, send to customers, record payments.
-          </p>
-        </div>
+        <InvoicesView {mode} />
       {:else if activeView === 'payments'}
-        <div class="view">
-          <h2>Payments</h2>
-          <p>Payment tracking and allocation will be implemented here.</p>
-          <p class="info">
-            Features: Record payments, smart allocation with FIFO, reconciliation.
-          </p>
-        </div>
+        <PaymentsView {mode} />
       {:else if activeView === 'expenses'}
-        <div class="view">
-          <h2>Expenses</h2>
-          <p>Expense recording will be implemented here.</p>
-          <p class="info">
-            Features: Record expenses, categorize, attach receipts, track vendors.
-          </p>
-        </div>
+        <ExpensesView {mode} />
+      {:else if activeView === 'reports'}
+        <ReportsView />
       {:else if activeView === 'settings'}
         <div class="view">
           <h2>Settings</h2>
@@ -262,60 +238,6 @@
     margin: 0 0 24px 0;
     color: #2c3e50;
     font-size: 28px;
-  }
-
-  .welcome {
-    background: white;
-    padding: 24px;
-    border-radius: 8px;
-    margin-bottom: 24px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  }
-
-  .welcome h3 {
-    margin: 0 0 12px 0;
-    color: #2c3e50;
-  }
-
-  .welcome p {
-    margin: 0;
-    line-height: 1.6;
-    color: #555;
-  }
-
-  .quick-actions {
-    background: white;
-    padding: 24px;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  }
-
-  .quick-actions h3 {
-    margin: 0 0 16px 0;
-    color: #2c3e50;
-  }
-
-  .action-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px;
-  }
-
-  .action-btn {
-    background: #3498db;
-    color: white;
-    border: none;
-    padding: 16px 24px;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .action-btn:hover {
-    background: #2980b9;
-    transform: translateY(-1px);
   }
 
   .info {

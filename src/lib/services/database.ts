@@ -19,6 +19,7 @@ export async function getDatabase(): Promise<Database> {
   
   await initializeMigrations();
   await runMigrations();
+  await seedDefaultData();
   
   return dbInstance;
 }
@@ -67,6 +68,11 @@ async function runMigrations(): Promise<void> {
       console.log(`Migration ${migration.id} applied successfully`);
     }
   }
+}
+
+async function seedDefaultData(): Promise<void> {
+  const { seedDefaultAccounts } = await import('./seed');
+  await seedDefaultAccounts();
 }
 
 export async function closeDatabase(): Promise<void> {

@@ -61,6 +61,14 @@ export class PersistenceService {
     return results.length > 0 ? results[0] : null;
   }
 
+  async getAccountsByType(type: string): Promise<Account[]> {
+    const db = await getDatabase();
+    return await db.select<Account[]>(
+      'SELECT * FROM account WHERE type = ? AND is_active = 1 ORDER BY code',
+      [type]
+    );
+  }
+
   async createAccount(account: Omit<Account, 'id' | 'created_at' | 'updated_at'>): Promise<number> {
     const db = await getDatabase();
     const result = await db.execute(
