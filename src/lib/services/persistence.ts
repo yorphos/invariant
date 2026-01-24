@@ -97,11 +97,12 @@ export class PersistenceService {
   ): Promise<number> {
     const db = await getDatabase();
 
-    // Insert journal entry
+    // IMPORTANT: Insert journal entry as 'draft' first
+    // We cannot add lines to a posted entry due to the prevent_modify_posted_lines_insert trigger
     const entryResult = await db.execute(
       `INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
        VALUES (?, ?, ?, ?, ?)`,
-      [entry.event_id, entry.entry_date, entry.description, entry.reference, entry.status]
+      [entry.event_id, entry.entry_date, entry.description, entry.reference, 'draft']
     );
     const journalEntryId = entryResult.lastInsertId ?? 0;
 
@@ -111,6 +112,15 @@ export class PersistenceService {
         `INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount, description)
          VALUES (?, ?, ?, ?, ?)`,
         [journalEntryId, line.account_id, line.debit_amount, line.credit_amount, line.description]
+      );
+    }
+
+    // Now update to posted status if requested
+    // This will trigger the balance validation
+    if (entry.status === 'posted') {
+      await db.execute(
+        `UPDATE journal_entry SET status = 'posted', posted_at = datetime('now'), posted_by = 'system' WHERE id = ?`,
+        [journalEntryId]
       );
     }
 
