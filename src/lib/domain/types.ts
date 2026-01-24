@@ -7,6 +7,7 @@ export type PaymentStatus = 'pending' | 'allocated' | 'partial' | 'reconciled';
 export type PaymentMethod = 'cash' | 'check' | 'transfer' | 'card' | 'other';
 export type AllocationMethod = 'exact' | 'fifo' | 'manual' | 'heuristic';
 export type PolicyMode = 'beginner' | 'pro';
+export type ReconciliationStatus = 'in_progress' | 'completed' | 'cancelled';
 
 export interface Account {
   id: number;
@@ -159,4 +160,38 @@ export interface PostingResult {
   event_id?: number;
   warnings: ValidationWarning[];
   postings?: JournalLine[];
+}
+
+export interface BankReconciliation {
+  id?: number;
+  account_id: number;
+  statement_date: string;
+  statement_balance: number;
+  book_balance: number;
+  status: ReconciliationStatus;
+  completed_at?: string;
+  completed_by?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BankReconciliationItem {
+  id?: number;
+  reconciliation_id: number;
+  journal_line_id: number;
+  is_cleared: boolean;
+  notes?: string;
+  created_at?: string;
+}
+
+export interface UnreconciledTransaction {
+  journal_line_id: number;
+  journal_entry_id: number;
+  entry_date: string;
+  description: string;
+  reference?: string;
+  debit_amount: number;
+  credit_amount: number;
+  running_balance: number;
 }
