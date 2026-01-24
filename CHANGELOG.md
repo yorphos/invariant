@@ -11,6 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.5]
+
+### 🔧 Fixed Release Workflow & JSON Syntax
+- **Fixed critical JSON syntax error** in `tauri.conf.json` (missing closing brace)
+- **Restored v0.2.0-style release workflow** with proper version checking
+- **Fixed signing environment variable** (`TAURI_PRIVATE_KEY`)
+- **Clean version bump to 0.3.5** to ensure fresh release
+
+### 📊 Technical Details
+- Reverted to proven release workflow pattern
+- Fixed malformed JSON that was causing parser errors
+- All 501 tests passing
+
+### 🎯 Impact
+Release system should now be fully functional again.
+
+---
+
 ## [0.3.4]
 
 ### 🔧 Signing Fix and Version Bump
