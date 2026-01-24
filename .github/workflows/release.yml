@@ -1,22 +1,97 @@
 # Release Build - Creates distributable installers for all platforms
-# Triggered when a version tag (v*) is pushed
-# Creates a draft GitHub Release with all platform installers attached
+# Automatically triggered when version is bumped in tauri.conf.json
+# Creates a GitHub Release with all platform installers attached
 
 name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+    paths:
+      # Only run when version-related files change
+      - 'src-tauri/tauri.conf.json'
+      - 'package.json'
+      - 'src-tauri/Cargo.toml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # Run tests first to ensure we're releasing quality code
+  # Check if this is actually a version bump that needs a release
+  check-version:
+    name: Check Version Change
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.check.outputs.version }}
+      versions_synced: ${{ steps.check.outputs.versions_synced }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need previous commit to compare
+
+      - name: Check for version change
+        id: check
+        run: |
+          # Get current version from tauri.conf.json (source of truth)
+          CURRENT_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "Current version: $CURRENT_VERSION"
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+          # Get version from package.json
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "package.json version: $PKG_VERSION"
+
+          # Get version from Cargo.toml
+          CARGO_VERSION=$(grep '^version = ' src-tauri/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "Cargo.toml version: $CARGO_VERSION"
+
+          # Check if all versions are in sync
+          if [ "$CURRENT_VERSION" = "$PKG_VERSION" ] && [ "$CURRENT_VERSION" = "$CARGO_VERSION" ]; then
+            echo "versions_synced=true" >> $GITHUB_OUTPUT
+            echo "All versions are in sync: $CURRENT_VERSION"
+          else
+            echo "versions_synced=false" >> $GITHUB_OUTPUT
+            echo "::error::Version mismatch! tauri.conf.json=$CURRENT_VERSION, package.json=$PKG_VERSION, Cargo.toml=$CARGO_VERSION"
+            exit 1
+          fi
+
+          # Get previous version from tauri.conf.json
+          git show HEAD~1:src-tauri/tauri.conf.json > /tmp/old-tauri.conf.json 2>/dev/null || echo '{"version":"0.0.0"}' > /tmp/old-tauri.conf.json
+          OLD_VERSION=$(node -p "require('/tmp/old-tauri.conf.json').version" 2>/dev/null || echo "0.0.0")
+          echo "Previous version: $OLD_VERSION"
+
+          # Check if version actually changed
+          if [ "$CURRENT_VERSION" != "$OLD_VERSION" ]; then
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "Version changed from $OLD_VERSION to $CURRENT_VERSION - will create release"
+          else
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "Version unchanged ($CURRENT_VERSION) - skipping release"
+          fi
+
+      - name: Check if release already exists
+        if: steps.check.outputs.should_release == 'true'
+        id: check_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ steps.check.outputs.version }}
+          # Check if tag already exists
+          if git ls-remote --tags origin | grep -q "refs/tags/v$VERSION"; then
+            echo "Release v$VERSION already exists - skipping"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Run tests before building release
   test:
     name: Test & Lint
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -41,7 +116,8 @@ jobs:
   # Build and release for all platforms
   build-release:
     name: Build (${{ matrix.name }})
-    needs: test
+    needs: [check-version, test]
+    if: needs.check-version.outputs.should_release == 'true'
     permissions:
       contents: write
     strategy:
@@ -104,22 +180,48 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Invariant Accounting ${{ github.ref_name }}'
+          tagName: v${{ needs.check-version.outputs.version }}
+          releaseName: 'Invariant Accounting v${{ needs.check-version.outputs.version }}'
           releaseBody: |
-            ## Invariant Accounting ${{ github.ref_name }}
-            
+            ## Invariant Accounting v${{ needs.check-version.outputs.version }}
+
             Download the installer for your platform below.
-            
+
             ### Installation
             - **Windows**: Download `.msi` (recommended) or `.exe` installer
             - **macOS (Apple Silicon)**: Download `aarch64.dmg` for M1/M2/M3 Macs
             - **macOS (Intel)**: Download `x64.dmg` for Intel Macs
             - **Linux**: Download `.AppImage` (portable) or `.deb`/`.rpm` for your distro
-            
+
             ### Notes
-            - This is a pre-release build. Please backup your data before upgrading.
-            - See the [changelog](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
-          releaseDraft: true
+            - See the [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for what's new.
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+  # Create git tag after successful release
+  create-tag:
+    name: Create Git Tag
+    needs: [check-version, build-release]
+    if: needs.check-version.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create and push tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ needs.check-version.outputs.version }}
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Create annotated tag
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+          
+          echo "Created and pushed tag v$VERSION"

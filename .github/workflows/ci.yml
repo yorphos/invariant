@@ -1,4 +1,4 @@
-# Continuous Integration - Tests and type checking on every push/PR
+# Continuous Integration - Tests, type checking, and version sync on every push/PR
 # This workflow runs quickly to catch issues early without building full installers
 
 name: CI
@@ -7,9 +7,6 @@ on:
   push:
     branches:
       - main
-    # Don't run CI on version tags (release workflow handles those)
-    tags-ignore:
-      - 'v*'
   pull_request:
     branches:
       - main
@@ -19,6 +16,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Check that all version numbers are in sync
+  version-check:
+    name: Version Sync Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify versions are in sync
+        run: |
+          # Get version from tauri.conf.json (source of truth for Tauri)
+          TAURI_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "tauri.conf.json version: $TAURI_VERSION"
+
+          # Get version from package.json
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "package.json version: $PKG_VERSION"
+
+          # Get version from Cargo.toml
+          CARGO_VERSION=$(grep '^version = ' src-tauri/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "Cargo.toml version: $CARGO_VERSION"
+
+          # Check if all versions match
+          if [ "$TAURI_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Version mismatch: tauri.conf.json ($TAURI_VERSION) != package.json ($PKG_VERSION)"
+            exit 1
+          fi
+
+          if [ "$TAURI_VERSION" != "$CARGO_VERSION" ]; then
+            echo "::error::Version mismatch: tauri.conf.json ($TAURI_VERSION) != Cargo.toml ($CARGO_VERSION)"
+            exit 1
+          fi
+
+          echo "All versions are in sync: $TAURI_VERSION"
+
   # Run tests and type checking (fast feedback)
   test:
     name: Test & Lint
@@ -49,7 +82,7 @@ jobs:
   # Verify Tauri builds work on all platforms (without creating installers)
   build-check:
     name: Build Check (${{ matrix.platform }})
-    needs: test
+    needs: [version-check, test]
     strategy:
       fail-fast: false
       matrix:
