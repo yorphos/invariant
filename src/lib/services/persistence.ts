@@ -9,6 +9,10 @@ import type {
   InvoiceLine,
   Payment,
   Allocation,
+  Bill,
+  BillLine,
+  VendorPayment,
+  BillAllocation,
   PolicyMode
 } from '../domain/types';
 
@@ -548,6 +552,137 @@ export class PersistenceService {
       );
     }
     return await db.select<Allocation[]>('SELECT * FROM allocation');
+  }
+
+  // Bill operations (Accounts Payable)
+  async createBill(
+    bill: Omit<Bill, 'id' | 'created_at' | 'updated_at'>,
+    lines: Omit<BillLine, 'id' | 'bill_id'>[]
+  ): Promise<number> {
+    const db = await getDatabase();
+
+    const billResult = await db.execute(
+      `INSERT INTO bill (bill_number, vendor_id, event_id, bill_date, due_date, status, subtotal, tax_amount, total_amount, paid_amount, reference, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [bill.bill_number, bill.vendor_id, bill.event_id, bill.bill_date, bill.due_date, 
+       bill.status, bill.subtotal, bill.tax_amount, bill.total_amount, bill.paid_amount, bill.reference, bill.notes]
+    );
+    const billId = billResult.lastInsertId ?? 0;
+
+    for (const line of lines) {
+      await db.execute(
+        `INSERT INTO bill_line (bill_id, line_number, description, quantity, unit_price, amount, account_id, item_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [billId, line.line_number, line.description, line.quantity, line.unit_price, line.amount, line.account_id, line.item_id]
+      );
+    }
+
+    return billId;
+  }
+
+  async getBills(vendorId?: number): Promise<Bill[]> {
+    const db = await getDatabase();
+    if (vendorId) {
+      return await db.select<Bill[]>(
+        'SELECT * FROM bill WHERE vendor_id = ? ORDER BY bill_date DESC',
+        [vendorId]
+      );
+    }
+    return await db.select<Bill[]>(
+      'SELECT * FROM bill ORDER BY bill_date DESC'
+    );
+  }
+
+  async getOpenBills(vendorId?: number): Promise<Bill[]> {
+    const db = await getDatabase();
+    if (vendorId) {
+      return await db.select<Bill[]>(
+        'SELECT * FROM bill WHERE vendor_id = ? AND status IN ("pending", "partial", "overdue") ORDER BY bill_date',
+        [vendorId]
+      );
+    }
+    return await db.select<Bill[]>(
+      'SELECT * FROM bill WHERE status IN ("pending", "partial", "overdue") ORDER BY bill_date'
+    );
+  }
+
+  async getBillById(id: number): Promise<Bill | null> {
+    const db = await getDatabase();
+    const results = await db.select<Bill[]>(
+      'SELECT * FROM bill WHERE id = ?',
+      [id]
+    );
+    return results.length > 0 ? results[0] : null;
+  }
+
+  async getBillLines(billId: number): Promise<BillLine[]> {
+    const db = await getDatabase();
+    return await db.select<BillLine[]>(
+      'SELECT * FROM bill_line WHERE bill_id = ? ORDER BY line_number',
+      [billId]
+    );
+  }
+
+  // Vendor payment operations
+  async createVendorPayment(payment: Omit<VendorPayment, 'id' | 'created_at' | 'updated_at'>): Promise<number> {
+    const db = await getDatabase();
+    const result = await db.execute(
+      `INSERT INTO vendor_payment (payment_number, vendor_id, event_id, payment_date, amount, payment_method, check_number, reference, notes, allocated_amount, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [payment.payment_number, payment.vendor_id, payment.event_id, payment.payment_date, payment.amount, 
+       payment.payment_method, payment.check_number, payment.reference, payment.notes, payment.allocated_amount, payment.status]
+    );
+    return result.lastInsertId ?? 0;
+  }
+
+  async getVendorPayments(vendorId?: number): Promise<VendorPayment[]> {
+    const db = await getDatabase();
+    if (vendorId) {
+      return await db.select<VendorPayment[]>(
+        'SELECT * FROM vendor_payment WHERE vendor_id = ? ORDER BY payment_date DESC',
+        [vendorId]
+      );
+    }
+    return await db.select<VendorPayment[]>(
+      'SELECT * FROM vendor_payment ORDER BY payment_date DESC'
+    );
+  }
+
+  async getVendorPaymentById(id: number): Promise<VendorPayment | null> {
+    const db = await getDatabase();
+    const results = await db.select<VendorPayment[]>(
+      'SELECT * FROM vendor_payment WHERE id = ?',
+      [id]
+    );
+    return results.length > 0 ? results[0] : null;
+  }
+
+  // Bill allocation operations
+  async createBillAllocation(allocation: Omit<BillAllocation, 'id' | 'created_at'>): Promise<number> {
+    const db = await getDatabase();
+    const result = await db.execute(
+      `INSERT INTO bill_allocation (vendor_payment_id, bill_id, amount, allocation_date, notes)
+       VALUES (?, ?, ?, ?, ?)`,
+      [allocation.vendor_payment_id, allocation.bill_id, allocation.amount, allocation.allocation_date, allocation.notes]
+    );
+    return result.lastInsertId ?? 0;
+  }
+
+  async getBillAllocations(vendorPaymentId?: number, billId?: number): Promise<BillAllocation[]> {
+    const db = await getDatabase();
+    if (vendorPaymentId) {
+      return await db.select<BillAllocation[]>(
+        'SELECT * FROM bill_allocation WHERE vendor_payment_id = ?',
+        [vendorPaymentId]
+      );
+    }
+    if (billId) {
+      return await db.select<BillAllocation[]>(
+        'SELECT * FROM bill_allocation WHERE bill_id = ?',
+        [billId]
+      );
+    }
+    return await db.select<BillAllocation[]>('SELECT * FROM bill_allocation');
   }
 }
 

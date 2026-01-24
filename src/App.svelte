@@ -7,6 +7,7 @@
   import ContactsView from './lib/views/ContactsView.svelte';
   import InvoicesView from './lib/views/InvoicesView.svelte';
   import PaymentsView from './lib/views/PaymentsView.svelte';
+  import BillsView from './lib/views/BillsView.svelte';
   import ExpensesView from './lib/views/ExpensesView.svelte';
   import ReportsView from './lib/views/ReportsView.svelte';
   import DashboardView from './lib/views/DashboardView.svelte';
@@ -25,7 +26,7 @@
   let mode: PolicyMode = 'beginner';
   let dbReady = false;
   let error = '';
-  let activeView: 'dashboard' | 'accounts' | 'contacts' | 'invoices' | 'payments' | 'expenses' | 'reports' | 'reconciliation' | 'batch' | 'settings' = 'dashboard';
+  let activeView: 'dashboard' | 'accounts' | 'contacts' | 'invoices' | 'payments' | 'bills' | 'expenses' | 'reports' | 'reconciliation' | 'batch' | 'settings' = 'dashboard';
   
   // Period close state
   let fiscalYears: FiscalYear[] = [];
@@ -193,6 +194,12 @@
           Payments
         </button>
         <button 
+          class:active={activeView === 'bills'}
+          onclick={() => setView('bills')}
+        >
+          Bills
+        </button>
+        <button 
           class:active={activeView === 'expenses'}
           onclick={() => setView('expenses')}
         >
@@ -241,6 +248,8 @@
         <InvoicesView {mode} />
       {:else if activeView === 'payments'}
         <PaymentsView {mode} />
+      {:else if activeView === 'bills'}
+        <BillsView {mode} />
       {:else if activeView === 'expenses'}
         <ExpensesView {mode} />
       {:else if activeView === 'reports'}
