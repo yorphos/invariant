@@ -17,6 +17,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.2]
 
+### 🔄 Simplified Release Workflow
+- **Reverted to simple, working release workflow** from v0.3.0
+  - Removed all complex two-workflow logic
+  - Removed manual release workflow (was broken)
+  - Back to simple trigger: `push` with version file paths
+  - **Version bump to 0.3.2**
+  - Back to what actually worked
+
+### 📊 Technical Details
+- Reverted `.github/workflows/release.yml` to v0.2.0 simple version
+- Updated version files: package.json, tauri.conf.json, Cargo.toml
+- All 501 tests passing
+- No migration changes
+- No code changes (workflow only)
+
+### 🎯 Impact
+Back to simple, proven release workflow that worked for v0.2.0. Ready for v0.3.2 release.
+
+---
+
+## [0.3.1]
+
 ### 🔧 Release Workflow Fix
 - **Fixed bash condition** in release workflow for proper tag push detection
   - Changed from GitHub Actions expression syntax to bash pattern matching
