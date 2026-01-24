@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { persistenceService } from '../services/persistence';
+  import { getDatabase } from '../services/database';
   import { createExpense } from '../domain/expense-operations';
   import type { Account, Contact, JournalEntry, PolicyMode } from '../domain/types';
   import Button from '../ui/Button.svelte';
@@ -47,8 +48,8 @@
       ]);
 
       // Get recent expense entries
-      const db = await import('../services/database').then(m => m.getDatabase());
-      expenses = await (await db).select<JournalEntry[]>(
+      const db = await getDatabase();
+      expenses = await db.select<JournalEntry[]>(
         `SELECT * FROM journal_entry 
          WHERE description LIKE 'Expense:%' OR event_id IN (
            SELECT id FROM transaction_event WHERE event_type = 'expense_recorded'

@@ -1,6 +1,7 @@
 import { persistenceService } from '../services/persistence';
+import { getDatabase } from '../services/database';
 import { PostingEngine } from '../domain/posting-engine';
-import { calculateTax } from '../services/tax';
+import { calculateTax, getTaxRate } from '../services/tax';
 import { getSystemAccount } from '../services/system-accounts';
 import type { Invoice, InvoiceLine, PolicyContext } from '../domain/types';
 
@@ -284,15 +285,15 @@ export async function voidInvoice(
     // Get tax account from invoice's tax code
     let taxAccount = null;
     if (invoice.tax_code_id && invoice.tax_amount > 0) {
-      const taxRate = await import('../services/tax').then(m => m.getTaxRate(invoice.tax_code_id!, invoice.issue_date));
+      const taxRate = await getTaxRate(invoice.tax_code_id!, invoice.issue_date);
       if (taxRate && taxRate.account_id) {
         taxAccount = accounts.find(a => a.id === taxRate.account_id);
       }
     }
     
     // Get invoice lines from database
-    const db = await import('../services/database').then(m => m.getDatabase());
-    const invoiceLines = await (await db).select<InvoiceLine[]>(
+    const db = await getDatabase();
+    const invoiceLines = await db.select<InvoiceLine[]>(
       'SELECT * FROM invoice_line WHERE invoice_id = ? ORDER BY line_number',
       [invoiceId]
     );

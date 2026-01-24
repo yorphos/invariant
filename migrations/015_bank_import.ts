@@ -1,9 +1,9 @@
 import type { Migration } from '../src/lib/services/database';
 
-// Migration 016: Bank Import
+// Migration 015: Bank Import
 // Adds support for importing bank statements from CSV and QBO files
-export const migration016: Migration = {
-  id: '016',
+export const migration015: Migration = {
+  id: '015',
   name: 'bank_import',
   up: `
     -- Bank statement import table

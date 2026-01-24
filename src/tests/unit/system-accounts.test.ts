@@ -68,7 +68,7 @@ describe('System Account Role Types', () => {
     expect(payrollRoles.length).toBe(4);
   });
 
-  it('should have 6 future expansion roles', () => {
+  it('should have 5 future expansion roles', () => {
     const futureRoles = ALL_ROLES.filter(r => 
       ['inventory_asset', 'cogs_expense', 'fx_gain_loss', 
        'default_revenue', 'default_expense'].includes(r)
@@ -466,6 +466,8 @@ describe('Default Account Codes Mapping', () => {
     default_expense: '6000',
     // Inventory
     inventory_asset: '1200',
+    // Foreign Exchange
+    fx_gain_loss: '7400',
   };
 
   it('should have correct default code for cash accounts', () => {
@@ -511,6 +513,11 @@ describe('Default Account Codes Mapping', () => {
     expect(defaultCodes['cogs_expense'].startsWith('5')).toBe(true);
     expect(defaultCodes['salary_expense'].startsWith('6')).toBe(true);
     expect(defaultCodes['default_expense'].startsWith('6')).toBe(true);
+  });
+
+  it('should have fx_gain_loss code starting with 7xxx', () => {
+    expect(defaultCodes['fx_gain_loss']).toBe('7400');
+    expect(defaultCodes['fx_gain_loss'].startsWith('7')).toBe(true);
   });
 });
 

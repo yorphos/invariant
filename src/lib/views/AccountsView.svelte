@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { persistenceService } from '../services/persistence';
-  import { seedDefaultAccounts } from '../services/seed';
   import { getSystemAccountRolesMap, type SystemAccountRole } from '../services/system-accounts';
   import type { Account, PolicyMode, AccountType } from '../domain/types';
   import { toasts } from '../stores/toast';
@@ -52,6 +51,7 @@
 
   async function handleInitialize() {
     try {
+      const { seedDefaultAccounts } = await import('../services/seed');
       await seedDefaultAccounts();
       await loadAccounts();
       showInitModal = false;

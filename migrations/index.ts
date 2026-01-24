@@ -11,12 +11,10 @@ import { migration009 } from './009_bank_reconciliation';
 import { migration010 } from './010_vendor_bills';
 import { migration011 } from './011_multi_currency';
 import { migration012 } from './012_closed_period_enforcement';
-import { migration013 } from './013_system_account_fixes';
-import { migration014 } from './014_invoice_line_tax_inclusive';
-import { migration015 } from './015_invoice_total_triggers';
-import { migration016 } from './016_bank_import';
-import { migration017 } from './017_document_attachments';
-import { migration018 } from './018_additional_system_accounts';
+import { migration013 } from './013_invoice_line_tax_inclusive';
+import { migration014 } from './014_invoice_total_triggers';
+import { migration015 } from './015_bank_import';
+import { migration016 } from './016_document_attachments';
 
 export const allMigrations: Migration[] = [
   migration001,
@@ -35,6 +33,4 @@ export const allMigrations: Migration[] = [
   migration014,
   migration015,
   migration016,
-  migration017,
-  migration018,
 ];

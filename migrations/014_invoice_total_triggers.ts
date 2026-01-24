@@ -1,8 +1,8 @@
 import type { Migration } from '../src/lib/services/database';
 
-// Migration 015: Update invoice total triggers for tax inclusive pricing
-export const migration015: Migration = {
-  id: '015',
+// Migration 014: Update invoice total triggers for tax inclusive pricing
+export const migration014: Migration = {
+  id: '014',
   name: 'invoice_total_triggers',
   up: `
     DROP TRIGGER IF EXISTS update_invoice_totals_insert;

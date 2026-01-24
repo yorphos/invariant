@@ -1,9 +1,9 @@
 import type { Migration } from '../src/lib/services/database';
 
-// Migration 017: Document Attachments
+// Migration 016: Document Attachments
 // Adds support for attaching receipts and documents to transactions
-export const migration017: Migration = {
-  id: '017',
+export const migration016: Migration = {
+  id: '016',
   name: 'document_attachments',
   up: `
     -- Document storage table

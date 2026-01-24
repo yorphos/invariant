@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { persistenceService } from '../services/persistence';
+  import { getDatabase } from '../services/database';
   import type { Payment, Allocation, Invoice, Contact, JournalEntry, JournalLine, Account } from '../domain/types';
   import Modal from './Modal.svelte';
   import Button from './Button.svelte';
@@ -46,8 +47,8 @@
 
       // Get journal entry if exists
       if (payment.event_id) {
-        const db = await import('../services/database').then(m => m.getDatabase());
-        const entries = await (await db).select<JournalEntry[]>(
+        const db = await getDatabase();
+        const entries = await db.select<JournalEntry[]>(
           'SELECT * FROM journal_entry WHERE event_id = ?',
           [payment.event_id]
         );

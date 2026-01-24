@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { persistenceService } from '../services/persistence';
+  import { getDatabase } from '../services/database';
   import { voidInvoice } from '../domain/invoice-operations';
   import { generateInvoicePDF } from '../utils/pdf-generator';
   import type { Invoice, InvoiceLine, Contact, Allocation, Payment, JournalEntry, JournalLine, Account, PolicyMode } from '../domain/types';
@@ -55,8 +56,8 @@
 
       // Get journal entry if exists
       if (invoice.event_id) {
-        const db = await import('../services/database').then(m => m.getDatabase());
-        const entries = await (await db).select<JournalEntry[]>(
+        const db = await getDatabase();
+        const entries = await db.select<JournalEntry[]>(
           'SELECT * FROM journal_entry WHERE event_id = ?',
           [invoice.event_id]
         );
