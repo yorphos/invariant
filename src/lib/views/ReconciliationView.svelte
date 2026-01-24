@@ -19,11 +19,13 @@
     UnreconciledTransaction,
     PolicyMode
   } from '../domain/types';
+  import { toasts } from '../stores/toast';
   import Button from '../ui/Button.svelte';
   import Input from '../ui/Input.svelte';
   import Select from '../ui/Select.svelte';
   import Card from '../ui/Card.svelte';
   import Table from '../ui/Table.svelte';
+  import Modal from '../ui/Modal.svelte';
 
   export let mode: PolicyMode;
 
@@ -56,7 +58,14 @@
     isBalanced: boolean;
   } | null = null;
 
+  // Adjustment modal state
+  let showAdjustmentModal = false;
+  let adjustmentAccountId: number | '' = '';
+  let adjustmentDescription = 'Bank reconciliation adjustment';
+  let creatingAdjustment = false;
+
   $: bankAccounts = accounts.filter(a => a.type === 'asset' && a.is_active);
+  $: expenseAccounts = accounts.filter(a => a.type === 'expense' && a.is_active);
   $: bankAccountOptions = [
     { value: '', label: 'Select account...' },
     ...bankAccounts.map(acc => ({ value: acc.id, label: `${acc.code} - ${acc.name}` }))
@@ -111,7 +120,7 @@
 
   async function startNewReconciliation() {
     if (!selectedAccountId || typeof selectedAccountId === 'number' === false) {
-      alert('Please select a bank account');
+      toasts.warning('Please select a bank account');
       return;
     }
     
@@ -129,7 +138,7 @@
       view = 'create';
     } catch (e) {
       console.error('Failed to start reconciliation:', e);
-      alert(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   }
 
@@ -144,12 +153,12 @@
 
   async function saveReconciliation() {
     if (!selectedAccountId || typeof selectedAccountId !== 'number') {
-      alert('Please select a bank account');
+      toasts.warning('Please select a bank account');
       return;
     }
     
     if (statementBalance === 0) {
-      alert('Please enter the statement balance');
+      toasts.warning('Please enter the statement balance');
       return;
     }
     
@@ -178,7 +187,7 @@
       await updateReconciliationDifference();
     } catch (e) {
       console.error('Failed to save reconciliation:', e);
-      alert(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   }
 
@@ -205,7 +214,7 @@
     
     try {
       await completeReconciliation(currentReconciliationId, { mode });
-      alert('Reconciliation completed successfully!');
+      toasts.success('Reconciliation completed successfully!');
       
       // Reset and reload
       currentReconciliationId = null;
@@ -216,7 +225,7 @@
       await loadSummary();
     } catch (e) {
       console.error('Failed to complete reconciliation:', e);
-      alert(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   }
 
@@ -244,6 +253,97 @@
 
   function formatDate(dateStr: string): string {
     return new Date(dateStr).toLocaleDateString('en-CA');
+  }
+
+  async function createAdjustmentEntry() {
+    if (!selectedAccountId || typeof selectedAccountId !== 'number') {
+      toasts.error('Please select a bank account');
+      return;
+    }
+    
+    if (!adjustmentAccountId || typeof adjustmentAccountId !== 'number') {
+      toasts.error('Please select an adjustment account');
+      return;
+    }
+    
+    const diff = reconDifference?.difference ?? difference;
+    if (Math.abs(diff) < 0.01) {
+      toasts.warning('No adjustment needed - reconciliation is already balanced');
+      return;
+    }
+    
+    creatingAdjustment = true;
+    
+    try {
+      // Create transaction event for audit trail
+      const eventId = await persistenceService.createTransactionEvent({
+        event_type: 'reconciliation_adjustment',
+        description: adjustmentDescription,
+        reference: `Recon-${statementDate}`,
+        created_by: 'user',
+        metadata: JSON.stringify({
+          bank_account_id: selectedAccountId,
+          statement_date: statementDate,
+          adjustment_amount: diff
+        })
+      });
+      
+      // Create journal entry with lines
+      // If diff > 0: cleared balance exceeds statement, so we need to CREDIT the bank (reduce it)
+      // If diff < 0: statement exceeds cleared, so we need to DEBIT the bank (increase it)
+      const absAmount = Math.abs(diff);
+      const bankDebit = diff < 0 ? absAmount : 0;
+      const bankCredit = diff > 0 ? absAmount : 0;
+      const expenseDebit = diff > 0 ? absAmount : 0;
+      const expenseCredit = diff < 0 ? absAmount : 0;
+      
+      await persistenceService.createJournalEntry(
+        {
+          event_id: eventId,
+          entry_date: statementDate,
+          description: adjustmentDescription,
+          reference: `Recon-Adj-${statementDate}`,
+          status: 'posted'
+        },
+        [
+          { 
+            account_id: selectedAccountId, 
+            debit_amount: bankDebit, 
+            credit_amount: bankCredit, 
+            description: `Bank adjustment - ${adjustmentDescription}` 
+          },
+          { 
+            account_id: adjustmentAccountId, 
+            debit_amount: expenseDebit, 
+            credit_amount: expenseCredit, 
+            description: `Adjustment expense - ${adjustmentDescription}` 
+          }
+        ]
+      );
+      
+      toasts.success(`Adjustment entry created for ${formatCurrency(absAmount)}`);
+      showAdjustmentModal = false;
+      
+      // Reload transactions and recalculate
+      unreconciledTransactions = await getUnreconciledTransactions(
+        selectedAccountId,
+        statementDate
+      );
+      
+      // If we're in reconcile view, update the difference
+      if (currentReconciliationId) {
+        await updateReconciliationDifference();
+      }
+      
+      // Reset adjustment form
+      adjustmentAccountId = '';
+      adjustmentDescription = 'Bank reconciliation adjustment';
+    } catch (e) {
+      console.error('Failed to create adjustment entry:', e);
+      toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      creatingAdjustment = false;
+    }
   }
 </script>
 
@@ -455,6 +555,11 @@
               ⚠ Warning: Reconciliation has a difference of {formatCurrency(Math.abs(reconDifference.difference))}.
               <br />
               This may indicate missing or incorrect transactions.
+              <div class="adjustment-action">
+                <Button variant="secondary" on:click={() => showAdjustmentModal = true}>
+                  Create Adjustment Entry
+                </Button>
+              </div>
             </div>
           {/if}
         </div>
@@ -472,6 +577,67 @@
     </Card>
   {/if}
 </div>
+
+<!-- Adjustment Modal -->
+<Modal bind:open={showAdjustmentModal} title="Create Reconciliation Adjustment">
+  <div class="adjustment-form">
+    <p class="adjustment-explanation">
+      Create a journal entry to adjust for the difference between your bank statement 
+      and book balance. This will create a balanced entry affecting your bank account 
+      and an adjustment expense account.
+    </p>
+    
+    <div class="adjustment-amount">
+      <span class="label">Adjustment Amount:</span>
+      <span class="value" class:positive={difference > 0} class:negative={difference < 0}>
+        {formatCurrency(Math.abs(reconDifference?.difference ?? difference))}
+      </span>
+    </div>
+    
+    <div class="adjustment-direction">
+      {#if (reconDifference?.difference ?? difference) > 0}
+        <p>The cleared balance exceeds the statement balance. This adjustment will:</p>
+        <ul>
+          <li>Credit (decrease) your bank account</li>
+          <li>Debit (increase) the adjustment expense account</li>
+        </ul>
+      {:else}
+        <p>The statement balance exceeds the cleared balance. This adjustment will:</p>
+        <ul>
+          <li>Debit (increase) your bank account</li>
+          <li>Credit (decrease) the adjustment expense account</li>
+        </ul>
+      {/if}
+    </div>
+    
+    <Select
+      label="Adjustment Expense Account"
+      bind:value={adjustmentAccountId}
+      options={[
+        { value: '', label: 'Select an expense account...' },
+        ...expenseAccounts.map(acc => ({ value: acc.id, label: `${acc.code} - ${acc.name}` }))
+      ]}
+    />
+    
+    <Input
+      label="Description"
+      bind:value={adjustmentDescription}
+      placeholder="Reason for adjustment"
+    />
+    
+    <div class="modal-actions">
+      <Button variant="secondary" on:click={() => showAdjustmentModal = false}>
+        Cancel
+      </Button>
+      <Button 
+        on:click={createAdjustmentEntry}
+        disabled={creatingAdjustment || !adjustmentAccountId}
+      >
+        {creatingAdjustment ? 'Creating...' : 'Create Adjustment'}
+      </Button>
+    </div>
+  </div>
+</Modal>
 
 <style>
   .reconciliation-view {
@@ -670,5 +836,70 @@
     gap: 1rem;
     justify-content: flex-end;
     margin-top: 2rem;
+  }
+
+  .adjustment-action {
+    margin-top: 1rem;
+  }
+
+  .adjustment-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .adjustment-explanation {
+    color: #666;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .adjustment-amount {
+    display: flex;
+    justify-content: space-between;
+    padding: 1rem;
+    background: #f5f5f5;
+    border-radius: 4px;
+    font-size: 1.1rem;
+  }
+
+  .adjustment-amount .value {
+    font-weight: 600;
+  }
+
+  .adjustment-amount .value.positive {
+    color: #d32f2f;
+  }
+
+  .adjustment-amount .value.negative {
+    color: #2e7d32;
+  }
+
+  .adjustment-direction {
+    background: #e3f2fd;
+    padding: 1rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+
+  .adjustment-direction p {
+    margin: 0 0 0.5rem 0;
+    font-weight: 500;
+  }
+
+  .adjustment-direction ul {
+    margin: 0;
+    padding-left: 1.5rem;
+  }
+
+  .adjustment-direction li {
+    margin: 0.25rem 0;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
   }
 </style>
