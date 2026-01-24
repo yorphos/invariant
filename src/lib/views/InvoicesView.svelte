@@ -9,7 +9,10 @@
   import Card from '../ui/Card.svelte';
   import Modal from '../ui/Modal.svelte';
   import Table from '../ui/Table.svelte';
+  import FileUpload from '../ui/FileUpload.svelte';
   import InvoiceDetailModal from '../ui/InvoiceDetailModal.svelte';
+  import { storeDocument, attachDocument, getEntityDocuments, deleteDocument } from '../services/document-storage';
+  import type { DocumentWithAttachment } from '../domain/types';
 
   export let mode: PolicyMode;
 
@@ -38,6 +41,9 @@
   }> = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
 
   let taxInclusivePricing = false;
+  let attachedFiles: File[] = [];
+  let existingDocuments: DocumentWithAttachment[] = [];
+  let uploadError = '';
 
   $: subtotal = formLines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
   $: taxAmount = taxInclusivePricing
@@ -160,6 +166,36 @@
         alert(result.warnings.map((w: ValidationWarning) => w.message).join('\n'));
       }
 
+      // Handle file uploads if there are any
+      if (attachedFiles.length > 0 && result.ok && 'invoice_id' in result && result.invoice_id) {
+        try {
+          for (const file of attachedFiles) {
+            // Read file as ArrayBuffer
+            const arrayBuffer = await file.arrayBuffer();
+            const content = new Uint8Array(arrayBuffer);
+            
+            // Store document
+            const documentId = await storeDocument(
+              content,
+              file.name,
+              file.type || 'application/octet-stream',
+              'receipt'
+            );
+            
+            // Attach to invoice
+            await attachDocument(
+              documentId,
+              'invoice',
+              result.invoice_id,
+              'supporting'
+            );
+          }
+        } catch (e) {
+          console.error('Failed to upload attachments:', e);
+          alert('Invoice created but failed to upload some attachments: ' + e);
+        }
+      }
+
       await loadData();
       view = 'list';
       resetForm();
@@ -175,6 +211,36 @@
     formNotes = '';
     formLines = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
     taxInclusivePricing = false;
+    attachedFiles = [];
+    existingDocuments = [];
+    uploadError = '';
+  }
+
+  function handleFilesSelected(files: File[]) {
+    attachedFiles = files;
+    uploadError = '';
+  }
+
+  async function loadExistingDocuments(invoiceId: number) {
+    try {
+      existingDocuments = await getEntityDocuments('invoice', invoiceId);
+    } catch (e) {
+      console.error('Failed to load documents:', e);
+    }
+  }
+
+  async function handleDeleteDocument(documentId: number) {
+    if (!confirm('Are you sure you want to delete this document?')) return;
+    
+    try {
+      await deleteDocument(documentId);
+      // Reload existing documents
+      if (editingInvoiceId) {
+        await loadExistingDocuments(editingInvoiceId);
+      }
+    } catch (e) {
+      alert('Failed to delete document: ' + e);
+    }
   }
 
   function handleRowClick(invoice: Invoice) {
@@ -208,6 +274,9 @@
     }));
     const firstLine = lines[0] as InvoiceLine & { is_tax_inclusive?: boolean } | undefined;
     taxInclusivePricing = firstLine ? Boolean(firstLine.is_tax_inclusive) : false;
+    
+    // Load existing documents
+    await loadExistingDocuments(selectedInvoice.id!);
     
     showDetailModal = false;
     view = 'edit';
@@ -407,6 +476,43 @@
         </div>
       </Card>
 
+      <Card title="Attachments">
+        <FileUpload
+          label="Upload supporting documents or receipts"
+          accept="image/*,application/pdf,.doc,.docx"
+          multiple={true}
+          maxSizeMB={10}
+          onFilesSelected={handleFilesSelected}
+          error={uploadError}
+        />
+        
+        {#if existingDocuments.length > 0}
+          <div class="existing-documents">
+            <h4>Existing Documents:</h4>
+            <ul class="document-list">
+              {#each existingDocuments as doc}
+                <li class="document-item">
+                  <div class="document-info">
+                    <span class="document-name">{doc.original_file_name}</span>
+                    <span class="document-meta">
+                      {(doc.file_size / 1024).toFixed(1)} KB • 
+                      {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'Unknown'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    class="delete-doc-btn"
+                    on:click={() => handleDeleteDocument(doc.id!)}
+                  >
+                    Delete
+                  </button>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+      </Card>
+
       <div class="form-actions">
         <Button variant="ghost" on:click={() => { view = 'list'; resetForm(); }}>
           Cancel
@@ -589,5 +695,69 @@
 
   .clickable-row:hover {
     background-color: #f8f9fa !important;
+  }
+
+  .existing-documents {
+    margin-top: 24px;
+  }
+
+  .existing-documents h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: #2c3e50;
+  }
+
+  .document-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .document-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+  }
+
+  .document-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+  }
+
+  .document-name {
+    font-size: 14px;
+    color: #2c3e50;
+    font-weight: 500;
+  }
+
+  .document-meta {
+    font-size: 12px;
+    color: #7f8c8d;
+  }
+
+  .delete-doc-btn {
+    background: transparent;
+    border: 1px solid #e74c3c;
+    color: #e74c3c;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .delete-doc-btn:hover {
+    background: #e74c3c;
+    color: white;
   }
 </style>

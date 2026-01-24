@@ -401,3 +401,120 @@ export interface MultiCurrencyTransaction {
   exchange_rate: number;
   home_amount: number; // foreign_amount × exchange_rate
 }
+
+// Bank Import Types
+export type BankFileFormat = 'csv' | 'qbo' | 'ofx';
+export type BankImportStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type BankTransactionType = 'debit' | 'credit' | 'check' | 'deposit' | 'fee' | 'interest' | 'withdrawal' | 'transfer' | 'other';
+export type MatchStatus = 'unmatched' | 'auto_matched' | 'manual_matched' | 'imported' | 'ignored';
+
+export interface BankStatementImport {
+  id?: number;
+  account_id: number;
+  import_date?: string;
+  file_name: string;
+  file_format: BankFileFormat;
+  statement_start_date?: string;
+  statement_end_date?: string;
+  opening_balance?: number;
+  closing_balance?: number;
+  total_transactions: number;
+  imported_transactions: number;
+  matched_transactions: number;
+  status: BankImportStatus;
+  error_message?: string;
+  imported_by?: string;
+  created_at?: string;
+}
+
+export interface BankStatementTransaction {
+  id?: number;
+  import_id: number;
+  transaction_date: string;
+  post_date?: string;
+  description: string;
+  reference_number?: string;
+  check_number?: string;
+  payee?: string;
+  amount: number;
+  balance?: number;
+  transaction_type?: BankTransactionType;
+  category?: string;
+  memo?: string;
+  match_status: MatchStatus;
+  matched_journal_entry_id?: number;
+  matched_confidence?: number;
+  suggested_account_id?: number;
+  suggested_contact_id?: number;
+  suggestion_confidence?: number;
+  imported_as_journal_entry_id?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CategorizationRule {
+  id?: number;
+  rule_name: string;
+  priority: number;
+  is_active: boolean;
+  description_pattern?: string;
+  payee_pattern?: string;
+  amount_min?: number;
+  amount_max?: number;
+  transaction_type?: BankTransactionType;
+  assign_account_id?: number;
+  assign_contact_id?: number;
+  assign_category?: string;
+  notes_template?: string;
+  times_applied: number;
+  last_applied_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface RuleApplicationLog {
+  id?: number;
+  rule_id: number;
+  bank_transaction_id: number;
+  applied_at?: string;
+}
+
+// Document Storage Types
+export type DocumentType = 'receipt' | 'invoice' | 'bill' | 'contract' | 'statement' | 'other';
+export type EntityType = 'invoice' | 'payment' | 'expense' | 'bill' | 'vendor_payment' | 'journal_entry' | 'contact' | 'other';
+export type AttachmentType = 'primary' | 'supporting' | 'related';
+
+export interface Document {
+  id?: number;
+  file_name: string;
+  original_file_name: string;
+  file_size: number;
+  mime_type: string;
+  content_hash: string;
+  file_path: string;
+  document_type?: DocumentType;
+  description?: string;
+  tags?: string;
+  uploaded_by?: string;
+  uploaded_at?: string;
+  created_at?: string;
+}
+
+export interface DocumentAttachment {
+  id?: number;
+  document_id: number;
+  entity_type: EntityType;
+  entity_id: number;
+  attachment_type: AttachmentType;
+  notes?: string;
+  attached_by?: string;
+  attached_at?: string;
+}
+
+export interface DocumentWithAttachment extends Document {
+  attachment_id?: number;
+  entity_type?: EntityType;
+  entity_id?: number;
+  attachment_type?: AttachmentType;
+  attachment_notes?: string;
+}

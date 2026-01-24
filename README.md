@@ -4,11 +4,11 @@
 
 Invariant Accounting is a desktop application that brings enterprise-grade double-entry bookkeeping to your local machine. Built with modern web technologies wrapped in a native desktop shell, it provides the power of traditional accounting software without the complexity, cost, or cloud dependency.
 
-[![Status](https://img.shields.io/badge/Status-Phase%204%20Complete-brightgreen)]()
+[![Status](https://img.shields.io/badge/Status-Phase%205%20Complete-brightgreen)]()
 [![License](https://img.shields.io/badge/License-TBD-blue)]()
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
-[![Tests](https://img.shields.io/badge/Tests-351%20Passing-success)]()
-[![Migrations](https://img.shields.io/badge/Migrations-15-blue)]()
+[![Tests](https://img.shields.io/badge/Tests-372%20Passing-success)]()
+[![Migrations](https://img.shields.io/badge/Migrations-17-blue)]()
 
 ---
 
@@ -24,9 +24,34 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 
 ## ✨ Features
 
-### Current Release (MVP v0.1.1 - Phase 4 Complete)
+### Current Release (MVP v0.1.2 - Phase 5 Complete)
 
-#### 🔒 Audit Hardening & Compliance (Phase 4 - NEW!)
+#### 🏦 Bank Import & Receipt Management (Phase 5 - NEW!)
+- **CSV bank statement import** with flexible column mapping (Migrations 016, 017)
+- **Auto-matching** of imported transactions to existing journal entries
+  - Amount matching with ±$0.01 tolerance
+  - Date matching within ±3 days window
+  - Description similarity scoring (Jaccard algorithm)
+  - Confidence score calculation
+- **Categorization rules** engine for automatic transaction categorization
+  - Regex pattern matching on description and payee
+  - Amount range filters
+  - Transaction type filters
+  - Priority-based rule evaluation
+  - Audit trail of rule applications
+- **Transaction import workflow** to create journal entries from bank transactions
+  - One-click import of unmatched transactions
+  - Automatic journal entry creation with proper debits/credits
+  - Smart detection of money in vs. money out
+- **Receipt attachment** for invoices and expenses
+  - Drag-and-drop file upload (images, PDFs, documents)
+  - SHA-256 content-hash deduplication (same file uploaded twice = one copy)
+  - Attach multiple documents to any entity
+  - View and delete attachments
+  - 10MB file size limit per document
+- Bank Import view accessible from main navigation
+
+#### 🔒 Audit Hardening & Compliance (Phase 4)
 - **Closed period enforcement** with database triggers (Migration 012)
 - **Tax-inclusive pricing** support for retail scenarios (Migrations 014, 015)
 - **System account integrity** fixes for A/P and equity accounts (Migrations 007, 013)
@@ -51,6 +76,7 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 - **Invoice editing** (void-and-recreate pattern for audit trail)
 - **Detailed invoice view** with line items, journal entries, and payment history
 - **PDF generation** for professional invoice documents
+- **Receipt attachments** with drag-and-drop file upload (Phase 5)
 - Automatic journal posting on creation:
   - **DR** Accounts Receivable
   - **CR** Revenue (by line item)
@@ -70,6 +96,7 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 - Quick expense entry with minimal friction
 - Link expenses to vendors
 - Categorize by expense account
+- **Receipt attachments** with drag-and-drop file upload (Phase 5)
 - Automatic journal posting:
   - **DR** Expense Account
   - **CR** Cash/Bank Account

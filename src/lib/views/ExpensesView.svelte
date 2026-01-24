@@ -8,6 +8,9 @@
   import Select from '../ui/Select.svelte';
   import Card from '../ui/Card.svelte';
   import Table from '../ui/Table.svelte';
+  import FileUpload from '../ui/FileUpload.svelte';
+  import { storeDocument, attachDocument, getEntityDocuments, deleteDocument } from '../services/document-storage';
+  import type { DocumentWithAttachment } from '../domain/types';
 
   export let mode: PolicyMode;
 
@@ -27,6 +30,8 @@
   let formPaymentAccountId: number | '' = '';
   let formReference = '';
   let formNotes = '';
+  let attachedFiles: File[] = [];
+  let uploadError = '';
 
   onMount(async () => {
     await loadData();
@@ -84,6 +89,36 @@
         return;
       }
 
+      // Handle file uploads if there are any
+      if (attachedFiles.length > 0 && result.ok && 'journal_entry_id' in result && result.journal_entry_id) {
+        try {
+          for (const file of attachedFiles) {
+            // Read file as ArrayBuffer
+            const arrayBuffer = await file.arrayBuffer();
+            const content = new Uint8Array(arrayBuffer);
+            
+            // Store document
+            const documentId = await storeDocument(
+              content,
+              file.name,
+              file.type || 'application/octet-stream',
+              'receipt'
+            );
+            
+            // Attach to journal entry (since expenses don't have separate entity table)
+            await attachDocument(
+              documentId,
+              'journal_entry',
+              result.journal_entry_id,
+              'supporting'
+            );
+          }
+        } catch (e) {
+          console.error('Failed to upload attachments:', e);
+          alert('Expense recorded but failed to upload some attachments: ' + e);
+        }
+      }
+
       await loadData();
       view = 'list';
       resetForm();
@@ -101,6 +136,13 @@
     formPaymentAccountId = '';
     formReference = '';
     formNotes = '';
+    attachedFiles = [];
+    uploadError = '';
+  }
+
+  function handleFilesSelected(files: File[]) {
+    attachedFiles = files;
+    uploadError = '';
   }
 
   function formatCurrency(amount: number): string {
@@ -224,6 +266,17 @@
           label="Notes"
           bind:value={formNotes}
           placeholder="Optional notes"
+        />
+      </Card>
+
+      <Card title="Attachments">
+        <FileUpload
+          label="Upload receipt or supporting documents"
+          accept="image/*,application/pdf,.doc,.docx"
+          multiple={true}
+          maxSizeMB={10}
+          onFilesSelected={handleFilesSelected}
+          error={uploadError}
         />
       </Card>
 

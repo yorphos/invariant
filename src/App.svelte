@@ -14,6 +14,7 @@
   import AccountsView from './lib/views/AccountsView.svelte';
   import ReconciliationView from './lib/views/ReconciliationView.svelte';
   import BatchOperationsView from './lib/views/BatchOperationsView.svelte';
+  import BankImportView from './lib/views/BankImportView.svelte';
   import InventoryView from './lib/views/InventoryView.svelte';
   import PayrollView from './lib/views/PayrollView.svelte';
   import { backupDatabase, restoreDatabase } from './lib/services/backup';
@@ -28,7 +29,7 @@
   let mode: PolicyMode = 'beginner';
   let dbReady = false;
   let error = '';
-  let activeView: 'dashboard' | 'accounts' | 'contacts' | 'invoices' | 'payments' | 'bills' | 'expenses' | 'reports' | 'reconciliation' | 'batch' | 'inventory' | 'payroll' | 'settings' = 'dashboard';
+  let activeView: 'dashboard' | 'accounts' | 'contacts' | 'invoices' | 'payments' | 'bills' | 'expenses' | 'reports' | 'reconciliation' | 'batch' | 'bank-import' | 'inventory' | 'payroll' | 'settings' = 'dashboard';
   
   // Period close state
   let fiscalYears: FiscalYear[] = [];
@@ -226,6 +227,12 @@
           Batch Operations
         </button>
         <button 
+          class:active={activeView === 'bank-import'}
+          onclick={() => setView('bank-import')}
+        >
+          Bank Import
+        </button>
+        <button 
           class:active={activeView === 'inventory'}
           onclick={() => setView('inventory')}
         >
@@ -272,6 +279,8 @@
         <ReconciliationView {mode} />
       {:else if activeView === 'batch'}
         <BatchOperationsView {mode} />
+      {:else if activeView === 'bank-import'}
+        <BankImportView {mode} />
       {:else if activeView === 'inventory'}
         <InventoryView {mode} />
       {:else if activeView === 'payroll'}
