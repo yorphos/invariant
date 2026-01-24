@@ -11,11 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
- ## [Unreleased]
+## [0.3.4]
+
+### 🔧 Signing Fix and Version Bump
+- **Fixed Tauri signing environment variable name**
+  - Changed from TAURI_SIGNING_PRIVATE_KEY to TAURI_PRIVATE_KEY
+  - tauri-action expects TAURI_PRIVATE_KEY
+- **Version bump to 0.3.4**
+  - All 3 version files updated
+  - Ready for new release
+
+### 📊 Technical Details
+- Fixed environment variable name in release workflow
+- Version bump: 0.3.3 → 0.3.4
+- All 501 tests passing
+- No migration changes
+- No code changes (workflow and version only)
+
+### 🎯 Impact
+Signing will now work with correct environment variable. New release should trigger and build all platform installers successfully.
 
 ---
 
-## [0.3.2]
+## [0.3.3]
 
 ### 🔄 Simplified Release Workflow
 - **Reverted to simple, working release workflow** from v0.3.0
