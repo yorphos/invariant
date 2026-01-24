@@ -29,6 +29,27 @@
   let incomeStatementBalances: AccountBalance[] = [];
   let trialBalances: AccountBalance[] = [];
   
+  // Integrity check
+  interface IntegrityCheck {
+    subledgerTotal: number;
+    glBalance: number;
+    difference: number;
+    isBalanced: boolean;
+  }
+  let arIntegrityCheck: IntegrityCheck | null = null;
+  
+  // A/R Aging
+  interface AgingBucket {
+    customer_name: string;
+    current: number;
+    days_1_30: number;
+    days_31_60: number;
+    days_61_90: number;
+    days_over_90: number;
+    total: number;
+  }
+  let arAging: AgingBucket[] = [];
+  
   onMount(async () => {
     // Set default dates
     const today = new Date();
@@ -45,7 +66,9 @@
     await Promise.all([
       loadBalanceSheet(),
       loadIncomeStatement(),
-      loadTrialBalance()
+      loadTrialBalance(),
+      loadARIntegrityCheck(),
+      loadARAging()
     ]);
   }
 
@@ -213,10 +236,136 @@
     loading = false;
   }
 
+  async function loadARIntegrityCheck() {
+    loading = true;
+    try {
+      const db = await getDatabase();
+      
+      // Get total from invoice subledger (total_amount - paid_amount)
+      const subledgerResult = await db.select<Array<{ total: number }>>(
+        `SELECT COALESCE(SUM(total_amount - paid_amount), 0) as total
+         FROM invoice
+         WHERE status NOT IN ('void', 'paid')
+         AND DATE(issue_date) <= ?`,
+        [asOfDate]
+      );
+      
+      const subledgerTotal = subledgerResult[0]?.total || 0;
+      
+      // Get A/R balance from general ledger
+      const accounts = await db.select<Account[]>(
+        `SELECT * FROM account WHERE code = '1100' LIMIT 1`
+      );
+      
+      if (accounts[0]) {
+        const glResult = await db.select<Array<{ debit_total: number; credit_total: number }>>(
+          `SELECT 
+            COALESCE(SUM(debit_amount), 0) as debit_total,
+            COALESCE(SUM(credit_amount), 0) as credit_total
+          FROM journal_line jl
+          JOIN journal_entry je ON jl.journal_entry_id = je.id
+          WHERE jl.account_id = ? 
+            AND je.status = 'posted'
+            AND DATE(je.entry_date) <= ?`,
+          [accounts[0].id, asOfDate]
+        );
+        
+        const debitTotal = glResult[0]?.debit_total || 0;
+        const creditTotal = glResult[0]?.credit_total || 0;
+        const glBalance = debitTotal - creditTotal;
+        
+        const difference = Math.abs(subledgerTotal - glBalance);
+        const isBalanced = difference < 0.01;
+        
+        arIntegrityCheck = {
+          subledgerTotal,
+          glBalance,
+          difference,
+          isBalanced,
+        };
+      }
+    } catch (e) {
+      console.error('Failed to load A/R integrity check:', e);
+    }
+    loading = false;
+  }
+
+  async function loadARAging() {
+    loading = true;
+    try {
+      const db = await getDatabase();
+      
+      const invoices = await db.select<Array<{
+        contact_id: number;
+        customer_name: string;
+        due_date: string;
+        outstanding: number;
+      }>>(
+        `SELECT 
+          i.contact_id,
+          c.name as customer_name,
+          i.due_date,
+          (i.total_amount - i.paid_amount) as outstanding
+        FROM invoice i
+        JOIN contact c ON c.id = i.contact_id
+        WHERE i.status NOT IN ('void', 'paid')
+          AND (i.total_amount - i.paid_amount) > 0.01
+          AND DATE(i.issue_date) <= ?
+        ORDER BY c.name, i.due_date`,
+        [asOfDate]
+      );
+      
+      // Group by customer and age buckets
+      const customerMap = new Map<string, AgingBucket>();
+      
+      for (const inv of invoices) {
+        const dueDate = new Date(inv.due_date);
+        const asOf = new Date(asOfDate);
+        const daysOverdue = Math.floor((asOf.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        let bucket = customerMap.get(inv.customer_name);
+        if (!bucket) {
+          bucket = {
+            customer_name: inv.customer_name,
+            current: 0,
+            days_1_30: 0,
+            days_31_60: 0,
+            days_61_90: 0,
+            days_over_90: 0,
+            total: 0,
+          };
+          customerMap.set(inv.customer_name, bucket);
+        }
+        
+        if (daysOverdue <= 0) {
+          bucket.current += inv.outstanding;
+        } else if (daysOverdue <= 30) {
+          bucket.days_1_30 += inv.outstanding;
+        } else if (daysOverdue <= 60) {
+          bucket.days_31_60 += inv.outstanding;
+        } else if (daysOverdue <= 90) {
+          bucket.days_61_90 += inv.outstanding;
+        } else {
+          bucket.days_over_90 += inv.outstanding;
+        }
+        
+        bucket.total += inv.outstanding;
+      }
+      
+      arAging = Array.from(customerMap.values())
+        .sort((a, b) => b.total - a.total); // Sort by total descending
+    } catch (e) {
+      console.error('Failed to load A/R aging:', e);
+    }
+    loading = false;
+  }
+
   // Automatically reload reports when dates change
   $: if (asOfDate) {
     loadBalanceSheet();
     loadTrialBalance();
+    loadARIntegrityCheck();
+    loadARAging();
   }
   
   $: if (incomeStartDate && incomeEndDate) {
@@ -608,6 +757,100 @@
         </Table>
       {/if}
     </Card>
+
+    <!-- A/R Subledger Integrity Check -->
+    <Card title="A/R Subledger Integrity Check" padding={false}>
+      <div class="report-header">
+        <h3>As of {new Date(asOfDate).toLocaleDateString('en-CA')}</h3>
+      </div>
+
+      {#if arIntegrityCheck}
+        <div class="section">
+          <div class="integrity-grid">
+            <div class="integrity-item">
+              <span class="label">Subledger (Invoice) Total:</span>
+              <strong>{formatCurrency(arIntegrityCheck.subledgerTotal)}</strong>
+            </div>
+            <div class="integrity-item">
+              <span class="label">G/L A/R Account Balance:</span>
+              <strong>{formatCurrency(arIntegrityCheck.glBalance)}</strong>
+            </div>
+            <div class="integrity-item">
+              <span class="label">Difference:</span>
+              <strong class:warning={!arIntegrityCheck.isBalanced}>
+                {formatCurrency(arIntegrityCheck.difference)}
+              </strong>
+            </div>
+            <div class="integrity-result" class:balanced={arIntegrityCheck.isBalanced} class:unbalanced={!arIntegrityCheck.isBalanced}>
+              {#if arIntegrityCheck.isBalanced}
+                <span class="success-icon">✓</span>
+                <strong>Balanced</strong>
+                <p>Subledger matches General Ledger</p>
+              {:else}
+                <span class="error-icon">⚠️</span>
+                <strong>Out of Balance</strong>
+                <p>Manual journal entries may have bypassed the invoice module. Review A/R account transactions.</p>
+              {/if}
+            </div>
+          </div>
+        </div>
+      {:else}
+        <div class="section">
+          <p>Integrity check data not available.</p>
+        </div>
+      {/if}
+    </Card>
+
+    <!-- A/R Aging Report -->
+    <Card title="Accounts Receivable Aging" padding={false}>
+      <div class="report-header">
+        <h3>As of {new Date(asOfDate).toLocaleDateString('en-CA')}</h3>
+      </div>
+
+      {#if arAging.length === 0}
+        <div class="section">
+          <p>No outstanding invoices.</p>
+        </div>
+      {:else}
+        <div class="aging-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th class="amount">Current</th>
+                <th class="amount">1-30 Days</th>
+                <th class="amount">31-60 Days</th>
+                <th class="amount">61-90 Days</th>
+                <th class="amount">Over 90 Days</th>
+                <th class="amount">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each arAging as aging}
+                <tr>
+                  <td><strong>{aging.customer_name}</strong></td>
+                  <td class="amount">{aging.current > 0 ? formatCurrency(aging.current) : '-'}</td>
+                  <td class="amount" class:warning={aging.days_1_30 > 0}>{aging.days_1_30 > 0 ? formatCurrency(aging.days_1_30) : '-'}</td>
+                  <td class="amount" class:warning={aging.days_31_60 > 0}>{aging.days_31_60 > 0 ? formatCurrency(aging.days_31_60) : '-'}</td>
+                  <td class="amount" class:danger={aging.days_61_90 > 0}>{aging.days_61_90 > 0 ? formatCurrency(aging.days_61_90) : '-'}</td>
+                  <td class="amount" class:danger={aging.days_over_90 > 0}>{aging.days_over_90 > 0 ? formatCurrency(aging.days_over_90) : '-'}</td>
+                  <td class="amount"><strong>{formatCurrency(aging.total)}</strong></td>
+                </tr>
+              {/each}
+              <tr class="total-row">
+                <td><strong>Totals</strong></td>
+                <td class="amount"><strong>{formatCurrency(arAging.reduce((sum, a) => sum + a.current, 0))}</strong></td>
+                <td class="amount"><strong>{formatCurrency(arAging.reduce((sum, a) => sum + a.days_1_30, 0))}</strong></td>
+                <td class="amount"><strong>{formatCurrency(arAging.reduce((sum, a) => sum + a.days_31_60, 0))}</strong></td>
+                <td class="amount"><strong>{formatCurrency(arAging.reduce((sum, a) => sum + a.days_61_90, 0))}</strong></td>
+                <td class="amount"><strong>{formatCurrency(arAging.reduce((sum, a) => sum + a.days_over_90, 0))}</strong></td>
+                <td class="amount"><strong>{formatCurrency(arAging.reduce((sum, a) => sum + a.total, 0))}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      {/if}
+    </Card>
   {/if}
 </div>
 
@@ -725,5 +968,100 @@
   .net-income.loss {
     background: #fadbd8;
     color: #e74c3c;
+  }
+
+  .integrity-grid {
+    display: grid;
+    gap: 16px;
+    padding: 24px;
+  }
+
+  .integrity-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+  }
+
+  .integrity-item .label {
+    color: #666;
+  }
+
+  .integrity-result {
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  .integrity-result.balanced {
+    background: #d5f4e6;
+    border: 2px solid #27ae60;
+  }
+
+  .integrity-result.unbalanced {
+    background: #fadbd8;
+    border: 2px solid #e74c3c;
+  }
+
+  .success-icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 8px;
+    color: #27ae60;
+  }
+
+  .error-icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .integrity-result strong {
+    display: block;
+    font-size: 18px;
+    margin-bottom: 8px;
+  }
+
+  .integrity-result p {
+    margin: 0;
+    color: #555;
+    font-size: 14px;
+  }
+
+  .aging-table {
+    overflow-x: auto;
+  }
+
+  .aging-table table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .aging-table th {
+    background: #2c3e50;
+    color: white;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .aging-table td {
+    padding: 12px;
+    border-bottom: 1px solid #ecf0f1;
+    font-size: 14px;
+  }
+
+  .aging-table td.danger {
+    background: #fadbd8;
+    font-weight: 600;
+  }
+
+  .aging-table .total-row {
+    background: #f8f9fa;
+    border-top: 3px double #2c3e50;
   }
 </style>
