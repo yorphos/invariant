@@ -339,10 +339,10 @@
   {:else}
     <!-- Navigation buttons -->
     <div class="toolbar">
-      <Button on:click={() => view = 'list'} variant={view === 'list' ? 'primary' : 'secondary'}>
+      <Button onclick={() => view = 'list'} variant={view === 'list' ? 'primary' : 'secondary'}>
         Payroll Runs
       </Button>
-      <Button on:click={() => view = 'create'} variant={view === 'create' ? 'primary' : 'secondary'}>
+      <Button onclick={() => view = 'create'} variant={view === 'create' ? 'primary' : 'secondary'}>
         + New Payroll Run
       </Button>
     </div>
@@ -364,7 +364,7 @@
           </thead>
           <tbody>
             {#each payrollRuns as run (run.id)}
-              <tr on:click={() => viewRunDetail(run)} class="clickable">
+              <tr onclick={() => viewRunDetail(run)} class="clickable">
                 <td>{run.run_number}</td>
                 <td>{run.period_start} to {run.period_end}</td>
                 <td>{run.pay_date}</td>
@@ -377,7 +377,7 @@
                 <td class="amount">{formatCurrency(run.total_deductions)}</td>
                 <td class="amount">{formatCurrency(run.total_net)}</td>
                 <td>
-                  <Button size="sm" on:click={(e) => { e.stopPropagation(); viewRunDetail(run); }}>
+                  <Button size="sm" onclick={(e) => { e.stopPropagation(); viewRunDetail(run); }}>
                     View
                   </Button>
                 </td>
@@ -394,7 +394,7 @@
 
     {#if view === 'create'}
       <Card title="Create Payroll Run">
-        <form on:submit|preventDefault={handleCreatePayrollRun}>
+        <form onsubmit={(e) => { e.preventDefault(); handleCreatePayrollRun(); }}>
           <div class="form-row">
             <Input label="Run Number" bind:value={formRunNumber} required />
             <Input label="Pay Date" type="date" bind:value={formPayDate} required />
@@ -439,7 +439,7 @@
                   <Button 
                     type="button" 
                     variant="secondary" 
-                    on:click={() => removeEmployee(index)}
+                    onclick={() => removeEmployee(index)}
                     disabled={formEmployees.length === 1}
                   >
                     Remove
@@ -449,7 +449,7 @@
             </div>
           {/each}
 
-          <Button type="button" variant="secondary" on:click={addEmployee}>
+          <Button type="button" variant="secondary" onclick={addEmployee}>
             + Add Employee
           </Button>
 
@@ -497,7 +497,7 @@
 
           <div class="button-group">
             <Button type="submit">Create Payroll Run (Draft)</Button>
-            <Button type="button" variant="secondary" on:click={() => view = 'list'}>Cancel</Button>
+            <Button type="button" variant="secondary" onclick={() => view = 'list'}>Cancel</Button>
           </div>
         </form>
       </Card>
@@ -507,8 +507,8 @@
 
 <!-- Payroll Run Detail Modal -->
 {#if showDetailModal && selectedRun}
-  <div class="modal-overlay" on:click={closeDetailModal} on:keydown={(e) => e.key === 'Escape' && closeDetailModal()} role="button" tabindex="-1">
-    <div class="modal-content" on:click={(e) => e.stopPropagation()} on:keydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
+  <div class="modal-overlay" onclick={closeDetailModal} onkeydown={(e) => e.key === 'Escape' && closeDetailModal()} role="button" tabindex="-1">
+    <div class="modal-content" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
       <Card title={`Payroll Run: ${selectedRun.run_number}`}>
         <div class="detail-section">
           <p><strong>Period:</strong> {selectedRun.period_start} to {selectedRun.period_end}</p>
@@ -602,12 +602,12 @@
 
         <div class="button-group">
           {#if selectedRun.status === 'draft'}
-            <Button on:click={() => selectedRun && handleApproveRun(selectedRun)}>Approve & Post</Button>
+            <Button onclick={() => selectedRun && handleApproveRun(selectedRun)}>Approve & Post</Button>
           {/if}
           {#if selectedRun.status !== 'void' && selectedRun.status !== 'paid'}
-            <Button variant="secondary" on:click={() => selectedRun && handleVoidRun(selectedRun)}>Void</Button>
+            <Button variant="secondary" onclick={() => selectedRun && handleVoidRun(selectedRun)}>Void</Button>
           {/if}
-          <Button variant="secondary" on:click={closeDetailModal}>Close</Button>
+          <Button variant="secondary" onclick={closeDetailModal}>Close</Button>
         </div>
       </Card>
     </div>

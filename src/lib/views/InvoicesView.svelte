@@ -304,7 +304,7 @@
   {#if view === 'list'}
     <div class="header">
       <h2>Invoices</h2>
-      <Button on:click={() => view = 'create'}>
+      <Button onclick={() => view = 'create'}>
         + New Invoice
       </Button>
     </div>
@@ -321,7 +321,7 @@
       <Card padding={false}>
         <Table headers={['Invoice #', 'Customer', 'Date', 'Due Date', 'Amount', 'Status']}>
           {#each invoices as invoice}
-            <tr class="clickable-row" on:click={() => handleRowClick(invoice)}>
+            <tr class="clickable-row" onclick={() => handleRowClick(invoice)}>
               <td><strong>{invoice.invoice_number}</strong></td>
               <td>{contacts.find(c => c.id === invoice.contact_id)?.name || 'Unknown'}</td>
               <td>{formatDate(invoice.issue_date)}</td>
@@ -338,12 +338,12 @@
   {:else}
     <div class="header">
       <h2>{view === 'create' ? 'Create' : 'Edit'} Invoice</h2>
-      <Button variant="ghost" on:click={() => { view = 'list'; resetForm(); }}>
+      <Button variant="ghost" onclick={() => { view = 'list'; resetForm(); }}>
         Cancel
       </Button>
     </div>
 
-    <form on:submit|preventDefault={handleSubmit}>
+    <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
       <Card title="Invoice Details">
         <div class="form-row">
           <Input
@@ -446,7 +446,7 @@
               <Button
                 variant="danger"
                 size="sm"
-                on:click={() => removeLine(index)}
+                onclick={() => removeLine(index)}
               >
                 Remove
               </Button>
@@ -454,7 +454,7 @@
           </div>
         {/each}
 
-        <Button variant="ghost" on:click={addLine}>
+        <Button variant="ghost" onclick={addLine}>
           + Add Line
         </Button>
       </Card>
@@ -502,7 +502,7 @@
                   <button
                     type="button"
                     class="delete-doc-btn"
-                    on:click={() => handleDeleteDocument(doc.id!)}
+                    onclick={() => handleDeleteDocument(doc.id!)}
                   >
                     Delete
                   </button>
@@ -514,7 +514,7 @@
       </Card>
 
       <div class="form-actions">
-        <Button variant="ghost" on:click={() => { view = 'list'; resetForm(); }}>
+        <Button variant="ghost" onclick={() => { view = 'list'; resetForm(); }}>
           Cancel
         </Button>
         <Button type="submit">
@@ -529,7 +529,7 @@
 {#if showDetailModal && selectedInvoice}
   <InvoiceDetailModal
     invoice={selectedInvoice}
-    onClose={closeDetailModal}
+    onclose={closeDetailModal}
     onEdit={handleEditFromDetail}
     onVoid={handleVoidFromDetail}
     {mode}

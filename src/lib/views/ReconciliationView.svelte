@@ -355,7 +355,7 @@
         label="Bank Account"
         bind:value={selectedAccountId}
         options={bankAccountOptions}
-        on:change={handleAccountChange}
+        onchange={handleAccountChange}
         disabled={view !== 'list'}
       />
     </div>
@@ -392,7 +392,7 @@
           </div>
         {/if}
         <div class="actions">
-          <Button on:click={startNewReconciliation}>Start New Reconciliation</Button>
+          <Button onclick={startNewReconciliation}>Start New Reconciliation</Button>
         </div>
       </Card>
 
@@ -481,7 +481,7 @@
                     <input
                       type="checkbox"
                       checked={clearedTransactionIds.has(txn.journal_line_id)}
-                      on:change={() => toggleTransaction(txn)}
+                      onchange={() => toggleTransaction(txn)}
                     />
                   </td>
                   <td>{formatDate(txn.entry_date)}</td>
@@ -523,8 +523,8 @@
       {/if}
 
       <div class="actions">
-        <Button variant="secondary" on:click={handleCancel}>Cancel</Button>
-        <Button on:click={saveReconciliation}>Save & Continue</Button>
+        <Button variant="secondary" onclick={handleCancel}>Cancel</Button>
+        <Button onclick={saveReconciliation}>Save & Continue</Button>
       </div>
     </Card>
   {:else if view === 'reconcile'}
@@ -556,7 +556,7 @@
               <br />
               This may indicate missing or incorrect transactions.
               <div class="adjustment-action">
-                <Button variant="secondary" on:click={() => showAdjustmentModal = true}>
+                <Button variant="secondary" onclick={() => showAdjustmentModal = true}>
                   Create Adjustment Entry
                 </Button>
               </div>
@@ -566,9 +566,9 @@
       {/if}
 
       <div class="actions">
-        <Button variant="secondary" on:click={handleCancel}>Cancel</Button>
+        <Button variant="secondary" onclick={handleCancel}>Cancel</Button>
         <Button 
-          on:click={handleComplete}
+          onclick={handleComplete}
           disabled={!reconDifference?.isBalanced}
         >
           Complete Reconciliation
@@ -626,11 +626,11 @@
     />
     
     <div class="modal-actions">
-      <Button variant="secondary" on:click={() => showAdjustmentModal = false}>
+      <Button variant="secondary" onclick={() => showAdjustmentModal = false}>
         Cancel
       </Button>
       <Button 
-        on:click={createAdjustmentEntry}
+        onclick={createAdjustmentEntry}
         disabled={creatingAdjustment || !adjustmentAccountId}
       >
         {creatingAdjustment ? 'Creating...' : 'Create Adjustment'}

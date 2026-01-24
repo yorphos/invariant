@@ -2,25 +2,30 @@
   export let open = false;
   export let title = '';
   export let size: 'small' | 'medium' | 'large' | 'xlarge' = 'medium';
-  export let onClose: () => void = () => {};
-  // Alias for Svelte 5 style naming
-  export let onclose: (() => void) | undefined = undefined;
-
-  $: closeHandler = onclose || onClose;
+  export let onclose: () => void = () => {};
 
   function handleBackdropClick(e: MouseEvent) {
     if (e.target === e.currentTarget) {
-      closeHandler();
+      onclose();
+    }
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      onclose();
     }
   }
 </script>
 
+<svelte:window onkeydown={open ? handleKeydown : undefined} />
+
 {#if open}
-  <div class="modal-backdrop" on:click={handleBackdropClick} role="presentation">
-    <div class="modal {size}">
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <div class="modal-backdrop" onclick={handleBackdropClick} role="presentation">
+    <div class="modal {size}" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-header">
-        <h2>{title}</h2>
-        <button class="close-btn" on:click={closeHandler} aria-label="Close">
+        <h2 id="modal-title">{title}</h2>
+        <button class="close-btn" onclick={onclose} aria-label="Close">
           &times;
         </button>
       </div>

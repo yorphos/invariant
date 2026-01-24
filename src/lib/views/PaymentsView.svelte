@@ -228,7 +228,7 @@
   {#if view === 'list'}
     <div class="header">
       <h2>Payments</h2>
-      <Button on:click={() => view = 'create'}>
+      <Button onclick={() => view = 'create'}>
         + Record Payment
       </Button>
     </div>
@@ -245,7 +245,7 @@
       <Card padding={false}>
         <Table headers={['Payment #', 'Customer', 'Date', 'Amount', 'Method', 'Status']}>
           {#each payments as payment}
-            <tr class="clickable-row" on:click={() => handleRowClick(payment)}>
+            <tr class="clickable-row" onclick={() => handleRowClick(payment)}>
               <td><strong>{payment.payment_number}</strong></td>
               <td>{contacts.find(c => c.id === payment.contact_id)?.name || '-'}</td>
               <td>{formatDate(payment.payment_date)}</td>
@@ -262,12 +262,12 @@
   {:else}
     <div class="header">
       <h2>Record Payment</h2>
-      <Button variant="ghost" on:click={() => view = 'list'}>
+      <Button variant="ghost" onclick={() => view = 'list'}>
         Cancel
       </Button>
     </div>
 
-    <form on:submit|preventDefault={handleSubmit}>
+    <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
       <Card title="Payment Details">
         <div class="form-row">
           <Input
@@ -364,14 +364,14 @@
 
           <!-- Smart Allocation Buttons -->
           <div class="allocation-actions">
-            <Button variant="secondary" on:click={applyFIFO} disabled={!formContactId || formAmount <= 0}>
+            <Button variant="secondary" onclick={applyFIFO} disabled={!formContactId || formAmount <= 0}>
               Apply FIFO (Oldest First)
             </Button>
-            <Button variant="secondary" on:click={generateSuggestions} disabled={!formContactId || formAmount <= 0}>
+            <Button variant="secondary" onclick={generateSuggestions} disabled={!formContactId || formAmount <= 0}>
               Get Smart Suggestions
             </Button>
             {#if selectedInvoices.length > 0}
-              <Button variant="ghost" on:click={clearAllocations}>
+              <Button variant="ghost" onclick={clearAllocations}>
                 Clear All
               </Button>
             {/if}
@@ -394,8 +394,8 @@
                 </div>
               {/each}
               <div class="suggestion-actions">
-                <Button on:click={applySuggestions}>Apply These Suggestions</Button>
-                <Button variant="ghost" on:click={() => showSuggestions = false}>Dismiss</Button>
+                <Button onclick={applySuggestions}>Apply These Suggestions</Button>
+                <Button variant="ghost" onclick={() => showSuggestions = false}>Dismiss</Button>
               </div>
             </div>
           {/if}
@@ -410,7 +410,7 @@
                 <input
                   type="checkbox"
                   checked={isSelected}
-                  on:change={() => toggleInvoice(invoice)}
+                  onchange={() => toggleInvoice(invoice)}
                 />
                 <div class="invoice-info">
                   <div>
@@ -426,7 +426,7 @@
                       type="number"
                       label="Allocate"
                       bind:value={selectedItem.amount}
-                      on:input={() => updateAllocationAmount(invoice.id!, selectedItem.amount)}
+                      oninput={() => updateAllocationAmount(invoice.id!, selectedItem.amount)}
                       min="0.01"
                       max={outstandingAmount}
                       step="0.01"
@@ -440,7 +440,7 @@
       {/if}
 
       <div class="form-actions">
-        <Button variant="ghost" on:click={() => view = 'list'}>
+        <Button variant="ghost" onclick={() => view = 'list'}>
           Cancel
         </Button>
         <Button type="submit">
@@ -720,6 +720,6 @@
 {#if showDetailModal && selectedPayment}
   <PaymentDetailModal
     payment={selectedPayment}
-    onClose={closeDetailModal}
+    onclose={closeDetailModal}
   />
 {/if}

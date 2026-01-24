@@ -278,7 +278,7 @@
   {:else if view === 'list'}
     <div class="header">
       <h2>Journal Entries</h2>
-      <Button on:click={() => view = 'create'}>+ New Journal Entry</Button>
+      <Button onclick={() => view = 'create'}>+ New Journal Entry</Button>
     </div>
 
     <Card>
@@ -322,7 +322,7 @@
                   </span>
                 </td>
                 <td>
-                  <Button variant="ghost" on:click={() => viewEntryDetails(entry)}>View</Button>
+                  <Button variant="ghost" onclick={() => viewEntryDetails(entry)}>View</Button>
                 </td>
               </tr>
             {/each}
@@ -334,7 +334,7 @@
   {:else if view === 'create'}
     <div class="header">
       <h2>New Journal Entry</h2>
-      <Button variant="ghost" on:click={handleCancel}>Cancel</Button>
+      <Button variant="ghost" onclick={handleCancel}>Cancel</Button>
     </div>
 
     {#if validationErrors.length > 0}
@@ -348,7 +348,7 @@
       </div>
     {/if}
 
-    <form on:submit|preventDefault={handleSubmit}>
+    <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
       <Card title="Entry Details">
         <div class="form-row">
           <Input 
@@ -403,7 +403,7 @@
                 step="0.01"
                 min="0"
                 value={line.debit_amount || ''}
-                on:input={(e) => handleDebitChange(index, parseFloat(e.currentTarget.value) || 0)}
+                oninput={(e) => handleDebitChange(index, parseFloat(e.currentTarget.value) || 0)}
                 class="line-input amount-input"
                 placeholder="0.00"
               />
@@ -414,14 +414,14 @@
                 step="0.01"
                 min="0"
                 value={line.credit_amount || ''}
-                on:input={(e) => handleCreditChange(index, parseFloat(e.currentTarget.value) || 0)}
+                oninput={(e) => handleCreditChange(index, parseFloat(e.currentTarget.value) || 0)}
                 class="line-input amount-input"
                 placeholder="0.00"
               />
             </div>
             <div class="col-actions">
               {#if formLines.length > 2}
-                <button type="button" class="remove-btn" on:click={() => removeLine(index)}>
+                <button type="button" class="remove-btn" onclick={() => removeLine(index)}>
                   &times;
                 </button>
               {/if}
@@ -430,7 +430,7 @@
         {/each}
 
         <div class="add-line-row">
-          <Button type="button" variant="ghost" on:click={addLine}>+ Add Line</Button>
+          <Button type="button" variant="ghost" onclick={addLine}>+ Add Line</Button>
         </div>
 
         <div class="totals-row" class:balanced={isBalanced} class:unbalanced={!isBalanced}>
@@ -450,7 +450,7 @@
       </Card>
 
       <div class="form-actions">
-        <Button type="button" variant="ghost" on:click={handleCancel}>Cancel</Button>
+        <Button type="button" variant="ghost" onclick={handleCancel}>Cancel</Button>
         <Button type="submit" disabled={submitting || !isBalanced}>
           {submitting ? 'Posting...' : 'Post Journal Entry'}
         </Button>
@@ -463,7 +463,7 @@
     open={showDetailModal} 
     title="Journal Entry Details" 
     size="large"
-    onClose={closeDetailModal}
+    onclose={closeDetailModal}
   >
     {#if selectedEntry}
       <div class="detail-section">
@@ -533,7 +533,7 @@
       </div>
 
       <div class="modal-actions">
-        <Button on:click={closeDetailModal}>Close</Button>
+        <Button onclick={closeDetailModal}>Close</Button>
       </div>
     {/if}
   </Modal>

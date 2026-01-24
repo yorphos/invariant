@@ -284,13 +284,13 @@
   <div class="header">
     <h1>Bank Import</h1>
     <div class="actions">
-      <Button on:click={() => currentView = 'list'} variant={currentView === 'list' ? 'primary' : 'secondary'}>
+      <Button onclick={() => currentView = 'list'} variant={currentView === 'list' ? 'primary' : 'secondary'}>
         Imports
       </Button>
-      <Button on:click={() => currentView = 'import'} variant={currentView === 'import' ? 'primary' : 'secondary'}>
+      <Button onclick={() => currentView = 'import'} variant={currentView === 'import' ? 'primary' : 'secondary'}>
         New Import
       </Button>
-      <Button on:click={() => currentView = 'rules'} variant={currentView === 'rules' ? 'primary' : 'secondary'}>
+      <Button onclick={() => currentView = 'rules'} variant={currentView === 'rules' ? 'primary' : 'secondary'}>
         Rules
       </Button>
     </div>
@@ -306,7 +306,7 @@
             { value: 0, label: 'Select Account' },
             ...bankAccounts.map(a => ({ value: a.id!, label: `${a.name} (${a.code})` }))
           ]}
-          on:change={handleAccountChange}
+          onchange={handleAccountChange}
         />
       </div>
 
@@ -324,7 +324,7 @@
               <td>{imp.matched_transactions}</td>
               <td><span class={getStatusBadgeClass(imp.status)}>{imp.status}</span></td>
               <td>
-                <Button size="sm" on:click={() => viewImportTransactions(imp)}>View</Button>
+                <Button size="sm" onclick={() => viewImportTransactions(imp)}>View</Button>
               </td>
             </tr>
           {/each}
@@ -351,7 +351,7 @@
             id="csv-file"
             type="file"
             accept=".csv"
-            on:change={handleFileSelect}
+            onchange={handleFileSelect}
           />
           {#if importFileName}
             <p class="file-name">Selected: {importFileName}</p>
@@ -370,12 +370,12 @@
 
         <div class="button-group">
           <Button
-            on:click={handleImport}
+            onclick={handleImport}
             disabled={importing || selectedAccountId === 0 || !csvFileText}
           >
             {importing ? 'Importing...' : 'Import'}
           </Button>
-          <Button variant="secondary" on:click={() => currentView = 'list'}>
+          <Button variant="secondary" onclick={() => currentView = 'list'}>
             Cancel
           </Button>
         </div>
@@ -427,7 +427,7 @@
       {/if}
 
       <div class="button-group">
-        <Button on:click={() => currentView = 'list'}>
+        <Button onclick={() => currentView = 'list'}>
           Back to Imports
         </Button>
       </div>
@@ -437,7 +437,7 @@
   {#if currentView === 'rules'}
     <Card title="Auto-Categorization Rules">
       <div class="button-group">
-        <Button on:click={() => openRuleModal()}>
+        <Button onclick={() => openRuleModal()}>
           Add New Rule
         </Button>
       </div>
@@ -456,8 +456,8 @@
               <td>{rule.description_pattern || rule.payee_pattern || '-'}</td>
               <td>{rule.times_applied}</td>
               <td class="action-buttons">
-                <Button size="sm" on:click={() => openRuleModal(rule)}>Edit</Button>
-                <Button size="sm" variant="danger" on:click={() => deleteRule(rule.id!)}>Delete</Button>
+                <Button size="sm" onclick={() => openRuleModal(rule)}>Edit</Button>
+                <Button size="sm" variant="danger" onclick={() => deleteRule(rule.id!)}>Delete</Button>
               </td>
             </tr>
           {/each}
@@ -471,7 +471,7 @@
   <Modal
     open={showRuleModal}
     title={editingRule ? 'Edit Rule' : 'New Rule'}
-    onClose={() => showRuleModal = false}
+    onclose={() => showRuleModal = false}
     size="large"
   >
     <div class="rule-form">
@@ -537,7 +537,7 @@
           { value: 'transfer', label: 'Transfer' },
           { value: 'other', label: 'Other' }
         ]}
-        on:change={handleTransactionTypeChange}
+        onchange={handleTransactionTypeChange}
       />
 
       <h3>Actions</h3>
@@ -549,7 +549,7 @@
           { value: 0, label: 'None' },
           ...accounts.map(a => ({ value: a.id!, label: `${a.name} (${a.code})` }))
         ]}
-        on:change={handleAssignAccountChange}
+        onchange={handleAssignAccountChange}
       />
 
       <Input
@@ -563,10 +563,10 @@
       />
 
       <div class="button-group">
-        <Button on:click={saveRule} disabled={loading}>
+        <Button onclick={saveRule} disabled={loading}>
           {loading ? 'Saving...' : 'Save Rule'}
         </Button>
-        <Button variant="secondary" on:click={() => showRuleModal = false}>
+        <Button variant="secondary" onclick={() => showRuleModal = false}>
           Cancel
         </Button>
       </div>

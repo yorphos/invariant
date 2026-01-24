@@ -24,8 +24,7 @@
     bind:value
     {disabled}
     {required}
-    on:change
-    on:change={onchange}
+    {onchange}
     class:error={error}
   >
     {#if placeholder}

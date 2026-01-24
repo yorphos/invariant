@@ -322,19 +322,19 @@
   {:else}
     <!-- Navigation buttons -->
     <div class="toolbar">
-      <Button on:click={() => view = 'list'} variant={view === 'list' ? 'primary' : 'secondary'}>
+      <Button onclick={() => view = 'list'} variant={view === 'list' ? 'primary' : 'secondary'}>
         Inventory List
       </Button>
-      <Button on:click={() => view = 'create-item'} variant={view === 'create-item' ? 'primary' : 'secondary'}>
+      <Button onclick={() => view = 'create-item'} variant={view === 'create-item' ? 'primary' : 'secondary'}>
         + New Item
       </Button>
-      <Button on:click={() => view = 'record-purchase'} variant={view === 'record-purchase' ? 'primary' : 'secondary'}>
+      <Button onclick={() => view = 'record-purchase'} variant={view === 'record-purchase' ? 'primary' : 'secondary'}>
         Record Purchase
       </Button>
-      <Button on:click={() => view = 'record-sale'} variant={view === 'record-sale' ? 'primary' : 'secondary'}>
+      <Button onclick={() => view = 'record-sale'} variant={view === 'record-sale' ? 'primary' : 'secondary'}>
         Record Sale
       </Button>
-      <Button on:click={() => view = 'record-adjustment'} variant={view === 'record-adjustment' ? 'primary' : 'secondary'}>
+      <Button onclick={() => view = 'record-adjustment'} variant={view === 'record-adjustment' ? 'primary' : 'secondary'}>
         Record Adjustment
       </Button>
     </div>
@@ -357,7 +357,7 @@
           <tbody>
             {#each items as item (item.id)}
               {@const balance = getItemBalance(item.id)}
-              <tr on:click={() => viewItemDetail(item)} class="clickable">
+              <tr onclick={() => viewItemDetail(item)} class="clickable">
                 <td>{item.sku}</td>
                 <td>{item.name}</td>
                 <td>{item.type}</td>
@@ -366,7 +366,7 @@
                 <td class="number">${balance.quantity > 0 ? (balance.value / balance.quantity).toFixed(2) : '0.00'}</td>
                 <td class="number">${balance.value.toFixed(2)}</td>
                 <td>
-                  <Button size="sm" on:click={(e) => { e.stopPropagation(); viewItemDetail(item); }}>
+                  <Button size="sm" onclick={(e) => { e.stopPropagation(); viewItemDetail(item); }}>
                     View
                   </Button>
                 </td>
@@ -383,7 +383,7 @@
 
     {#if view === 'create-item'}
       <Card title="Create New Inventory Item">
-        <form on:submit|preventDefault={handleCreateItem}>
+        <form onsubmit={(e) => { e.preventDefault(); handleCreateItem(); }}>
           <div class="form-row">
             <Input label="SKU" bind:value={formSku} required />
             <Input label="Name" bind:value={formName} required />
@@ -431,7 +431,7 @@
 
           <div class="button-group">
             <Button type="submit">Create Item</Button>
-            <Button type="button" variant="secondary" on:click={() => view = 'list'}>Cancel</Button>
+            <Button type="button" variant="secondary" onclick={() => view = 'list'}>Cancel</Button>
           </div>
         </form>
       </Card>
@@ -439,7 +439,7 @@
 
     {#if view === 'record-purchase'}
       <Card title="Record Inventory Purchase">
-        <form on:submit|preventDefault={handleRecordPurchase}>
+        <form onsubmit={(e) => { e.preventDefault(); handleRecordPurchase(); }}>
           <Select label="Item" bind:value={purchaseItemId} required>
             <option value="">-- Select Item --</option>
             {#each items as item}
@@ -473,7 +473,7 @@
 
           <div class="button-group">
             <Button type="submit">Record Purchase</Button>
-            <Button type="button" variant="secondary" on:click={() => view = 'list'}>Cancel</Button>
+            <Button type="button" variant="secondary" onclick={() => view = 'list'}>Cancel</Button>
           </div>
         </form>
       </Card>
@@ -481,7 +481,7 @@
 
     {#if view === 'record-sale'}
       <Card title="Record Inventory Sale">
-        <form on:submit|preventDefault={handleRecordSale}>
+        <form onsubmit={(e) => { e.preventDefault(); handleRecordSale(); }}>
           <Select label="Item" bind:value={saleItemId} required>
             <option value="">-- Select Item --</option>
             {#each items as item}
@@ -504,7 +504,7 @@
 
           <div class="button-group">
             <Button type="submit">Record Sale</Button>
-            <Button type="button" variant="secondary" on:click={() => view = 'list'}>Cancel</Button>
+            <Button type="button" variant="secondary" onclick={() => view = 'list'}>Cancel</Button>
           </div>
         </form>
       </Card>
@@ -512,7 +512,7 @@
 
     {#if view === 'record-adjustment'}
       <Card title="Record Inventory Adjustment">
-        <form on:submit|preventDefault={handleRecordAdjustment}>
+        <form onsubmit={(e) => { e.preventDefault(); handleRecordAdjustment(); }}>
           <Select label="Item" bind:value={adjustmentItemId} required>
             <option value="">-- Select Item --</option>
             {#each items as item}
@@ -560,7 +560,7 @@
 
           <div class="button-group">
             <Button type="submit">Record Adjustment</Button>
-            <Button type="button" variant="secondary" on:click={() => view = 'list'}>Cancel</Button>
+            <Button type="button" variant="secondary" onclick={() => view = 'list'}>Cancel</Button>
           </div>
         </form>
       </Card>
@@ -570,8 +570,8 @@
 
 <!-- Item Detail Modal -->
 {#if showDetailModal && selectedItem}
-  <div class="modal-overlay" on:click={closeDetailModal} on:keydown={(e) => e.key === 'Escape' && closeDetailModal()} role="button" tabindex="-1">
-    <div class="modal-content" on:click={(e) => e.stopPropagation()} on:keydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
+  <div class="modal-overlay" onclick={closeDetailModal} onkeydown={(e) => e.key === 'Escape' && closeDetailModal()} role="button" tabindex="-1">
+    <div class="modal-content" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
       <Card title={`Item: ${selectedItem.name}`}>
         <div class="detail-section">
           <p><strong>SKU:</strong> {selectedItem.sku}</p>
@@ -625,7 +625,7 @@
         {/if}
 
         <div class="button-group">
-          <Button on:click={closeDetailModal}>Close</Button>
+          <Button onclick={closeDetailModal}>Close</Button>
         </div>
       </Card>
     </div>

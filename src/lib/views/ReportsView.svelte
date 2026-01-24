@@ -584,7 +584,7 @@
     <Card title="Balance Sheet" padding={false}>
       <div class="report-header">
         <h3>As of {new Date(asOfDate).toLocaleDateString('en-CA')}</h3>
-        <Button variant="secondary" on:click={exportBalanceSheet}>Export CSV</Button>
+        <Button variant="secondary" onclick={exportBalanceSheet}>Export CSV</Button>
       </div>
 
       {#if balanceSheetBalances.length === 0}
@@ -676,15 +676,15 @@
               />
             </div>
             <div class="quick-buttons">
-              <Button variant="secondary" size="sm" on:click={() => setDateRange('this-month')}>This Month</Button>
-              <Button variant="secondary" size="sm" on:click={() => setDateRange('last-month')}>Last Month</Button>
-              <Button variant="secondary" size="sm" on:click={() => setDateRange('this-quarter')}>This Quarter</Button>
-              <Button variant="secondary" size="sm" on:click={() => setDateRange('ytd')}>YTD</Button>
-              <Button variant="secondary" size="sm" on:click={() => setDateRange('last-year')}>Last Year</Button>
+              <Button variant="secondary" size="sm" onclick={() => setDateRange('this-month')}>This Month</Button>
+              <Button variant="secondary" size="sm" onclick={() => setDateRange('last-month')}>Last Month</Button>
+              <Button variant="secondary" size="sm" onclick={() => setDateRange('this-quarter')}>This Quarter</Button>
+              <Button variant="secondary" size="sm" onclick={() => setDateRange('ytd')}>YTD</Button>
+              <Button variant="secondary" size="sm" onclick={() => setDateRange('last-year')}>Last Year</Button>
             </div>
           </div>
         </div>
-        <Button variant="secondary" on:click={exportProfitLoss}>Export CSV</Button>
+        <Button variant="secondary" onclick={exportProfitLoss}>Export CSV</Button>
       </div>
 
       {#if incomeStatementBalances.length === 0}
@@ -737,7 +737,7 @@
     <Card title="Trial Balance" padding={false}>
       <div class="report-header">
         <h3>As of {new Date(asOfDate).toLocaleDateString('en-CA')}</h3>
-        <Button variant="secondary" on:click={exportTrialBalance}>Export CSV</Button>
+        <Button variant="secondary" onclick={exportTrialBalance}>Export CSV</Button>
       </div>
 
       {#if trialBalances.length === 0}
@@ -927,7 +927,7 @@
         </div>
         <Button 
           size="sm" 
-          on:click={() => {
+          onclick={() => {
             const csv = toCSV(
               inventoryValuation.map(item => ({
                 SKU: item.sku,
@@ -990,7 +990,7 @@
         </div>
         <Button 
           size="sm" 
-          on:click={() => {
+          onclick={() => {
             const csv = toCSV(
               inventoryMovements.map(mov => ({
                 Date: mov.movement_date,

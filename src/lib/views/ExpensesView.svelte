@@ -161,7 +161,7 @@
   {#if view === 'list'}
     <div class="header">
       <h2>Expenses</h2>
-      <Button on:click={() => view = 'create'}>
+      <Button onclick={() => view = 'create'}>
         + Record Expense
       </Button>
     </div>
@@ -193,12 +193,12 @@
   {:else}
     <div class="header">
       <h2>Record Expense</h2>
-      <Button variant="ghost" on:click={() => view = 'list'}>
+      <Button variant="ghost" onclick={() => view = 'list'}>
         Cancel
       </Button>
     </div>
 
-    <form on:submit|preventDefault={handleSubmit}>
+    <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
       <Card title="Expense Details">
         <Input
           label="Description"
@@ -281,7 +281,7 @@
       </Card>
 
       <div class="form-actions">
-        <Button variant="ghost" on:click={() => view = 'list'}>
+        <Button variant="ghost" onclick={() => view = 'list'}>
           Cancel
         </Button>
         <Button type="submit">

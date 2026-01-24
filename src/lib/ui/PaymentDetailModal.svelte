@@ -8,7 +8,7 @@
   import Table from './Table.svelte';
 
   export let payment: Payment;
-  export let onClose: () => void;
+  export let onclose: () => void;
 
   let loading = true;
   let allocations: Allocation[] = [];
@@ -89,7 +89,7 @@
   }
 </script>
 
-<Modal open={true} {onClose} size="large" title="Payment Details">
+<Modal open={true} {onclose} size="large" title="Payment Details">
   {#if loading}
     <div class="loading">Loading payment details...</div>
   {:else}
@@ -210,7 +210,7 @@
 
       <!-- Actions -->
       <div class="actions">
-        <Button variant="ghost" on:click={onClose}>Close</Button>
+        <Button variant="ghost" onclick={onclose}>Close</Button>
       </div>
     </div>
   {/if}

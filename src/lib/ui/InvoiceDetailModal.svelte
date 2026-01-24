@@ -10,7 +10,7 @@
   import Table from './Table.svelte';
 
   export let invoice: Invoice;
-  export let onClose: () => void;
+  export let onclose: () => void;
   export let onEdit: (() => void) | null = null;
   export let onVoid: (() => void) | null = null;
   export let mode: PolicyMode;
@@ -103,7 +103,7 @@
       }
 
       if (onVoid) onVoid();
-      onClose();
+      onclose();
     } catch (e) {
       console.error('Failed to void invoice:', e);
       alert('Failed to void invoice: ' + e);
@@ -146,7 +146,7 @@
   }
 </script>
 
-<Modal open={true} {onClose} size="large" title="Invoice Details">
+<Modal open={true} {onclose} size="large" title="Invoice Details">
   {#if loading}
     <div class="loading">Loading invoice details...</div>
   {:else}
@@ -275,25 +275,25 @@
 
       <!-- Actions -->
       <div class="actions">
-        <Button variant="ghost" on:click={onClose}>Close</Button>
+        <Button variant="ghost" onclick={onclose}>Close</Button>
         
-        <Button on:click={handleDownloadPDF} disabled={pdfDownloading}>
+        <Button onclick={handleDownloadPDF} disabled={pdfDownloading}>
           {pdfDownloading ? 'Generating...' : 'Download PDF'}
         </Button>
         
         {#if invoice.status !== 'void' && onEdit}
-          <Button on:click={handleEdit}>Edit Invoice</Button>
+          <Button onclick={handleEdit}>Edit Invoice</Button>
         {/if}
         
         {#if invoice.status !== 'void' && invoice.paid_amount === 0 && onVoid}
-          <Button variant="danger" on:click={() => showVoidConfirm = true}>Void Invoice</Button>
+          <Button variant="danger" onclick={() => showVoidConfirm = true}>Void Invoice</Button>
         {/if}
       </div>
     </div>
 
     <!-- Void Confirmation Modal -->
     {#if showVoidConfirm}
-      <Modal open={true} onClose={() => showVoidConfirm = false} title="Void Invoice" size="medium">
+      <Modal open={true} onclose={() => showVoidConfirm = false} title="Void Invoice" size="medium">
         <Card>
           <p><strong>Warning:</strong> Voiding this invoice will create reversal journal entries and cannot be undone.</p>
           <p>Invoice <strong>{invoice.invoice_number}</strong> for {formatCurrency(invoice.total_amount)} will be marked as void.</p>
@@ -311,10 +311,10 @@
           </div>
 
           <div class="modal-actions">
-            <Button variant="ghost" on:click={() => showVoidConfirm = false} disabled={voidLoading}>
+            <Button variant="ghost" onclick={() => showVoidConfirm = false} disabled={voidLoading}>
               Cancel
             </Button>
-            <Button variant="danger" on:click={handleVoid} disabled={voidLoading}>
+            <Button variant="danger" onclick={handleVoid} disabled={voidLoading}>
               {voidLoading ? 'Voiding...' : 'Confirm Void'}
             </Button>
           </div>

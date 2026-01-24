@@ -142,19 +142,19 @@
     <div class="quick-actions">
       <h3>Quick Actions</h3>
       <div class="action-grid">
-        <button class="action-btn" on:click={() => onNavigate('contacts')}>
+        <button class="action-btn" onclick={() => onNavigate('contacts')}>
           Add Contact
         </button>
-        <button class="action-btn" on:click={() => onNavigate('invoices')}>
+        <button class="action-btn" onclick={() => onNavigate('invoices')}>
           Create Invoice
         </button>
-        <button class="action-btn" on:click={() => onNavigate('expenses')}>
+        <button class="action-btn" onclick={() => onNavigate('expenses')}>
           Record Expense
         </button>
-        <button class="action-btn" on:click={() => onNavigate('payments')}>
+        <button class="action-btn" onclick={() => onNavigate('payments')}>
           Record Payment
         </button>
-        <button class="action-btn" on:click={() => onNavigate('reports')}>
+        <button class="action-btn" onclick={() => onNavigate('reports')}>
           View Reports
         </button>
       </div>

@@ -252,7 +252,7 @@ PAY-0002,Beta Inc,2026-01-24,2500.00,check,CHK456,Payment for invoices,INV-0002;
       </div>
       
       {#if currentOperation !== 'batch-invoices'}
-        <Button on:click={() => currentOperation = 'batch-invoices'}>
+        <Button onclick={() => currentOperation = 'batch-invoices'}>
           Start Batch Invoice Creation
         </Button>
       {:else}
@@ -264,7 +264,7 @@ PAY-0002,Beta Inc,2026-01-24,2500.00,check,CHK456,Payment for invoices,INV-0002;
                 <input
                   type="checkbox"
                   checked={selectedCustomers.includes(contact.id!)}
-                  on:change={() => {
+                  onchange={() => {
                     if (selectedCustomers.includes(contact.id!)) {
                       selectedCustomers = selectedCustomers.filter(id => id !== contact.id!);
                     } else {
@@ -316,10 +316,10 @@ PAY-0002,Beta Inc,2026-01-24,2500.00,check,CHK456,Payment for invoices,INV-0002;
           </div>
 
           <div class="form-actions">
-            <Button variant="ghost" on:click={() => { currentOperation = 'none'; selectedCustomers = []; }}>
+            <Button variant="ghost" onclick={() => { currentOperation = 'none'; selectedCustomers = []; }}>
               Cancel
             </Button>
-            <Button on:click={handleBatchInvoices} disabled={loading || selectedCustomers.length === 0}>
+            <Button onclick={handleBatchInvoices} disabled={loading || selectedCustomers.length === 0}>
               {loading ? 'Creating...' : `Create ${selectedCustomers.length} Invoices`}
             </Button>
           </div>
@@ -335,14 +335,14 @@ PAY-0002,Beta Inc,2026-01-24,2500.00,check,CHK456,Payment for invoices,INV-0002;
       </div>
       
       {#if currentOperation !== 'import-payments'}
-        <Button on:click={() => currentOperation = 'import-payments'}>
+        <Button onclick={() => currentOperation = 'import-payments'}>
           Start Payment Import
         </Button>
       {:else}
         <div class="operation-form">
           <div class="csv-instructions">
             <p><strong>CSV Format:</strong> Payment Number, Customer Name, Date, Amount, Method, Reference, Notes, Invoice Numbers</p>
-            <Button variant="secondary" size="sm" on:click={downloadCSVTemplate}>
+            <Button variant="secondary" size="sm" onclick={downloadCSVTemplate}>
               Download Template
             </Button>
           </div>
@@ -358,7 +358,7 @@ PAY-0002,Beta Inc,2026-01-24,2500.00,check,CHK456,Payment for invoices,INV-0002;
           </label>
 
           <div class="form-actions">
-            <Button variant="secondary" on:click={handleCSVParse}>
+            <Button variant="secondary" onclick={handleCSVParse}>
               Parse CSV
             </Button>
           </div>
@@ -392,10 +392,10 @@ PAY-0002,Beta Inc,2026-01-24,2500.00,check,CHK456,Payment for invoices,INV-0002;
           {/if}
 
           <div class="form-actions">
-            <Button variant="ghost" on:click={() => { currentOperation = 'none'; csvText = ''; parsedPayments = []; }}>
+            <Button variant="ghost" onclick={() => { currentOperation = 'none'; csvText = ''; parsedPayments = []; }}>
               Cancel
             </Button>
-            <Button on:click={handleImportPayments} disabled={loading || parsedPayments.length === 0}>
+            <Button onclick={handleImportPayments} disabled={loading || parsedPayments.length === 0}>
               {loading ? 'Importing...' : `Import ${parsedPayments.length} Payments`}
             </Button>
           </div>
@@ -411,7 +411,7 @@ PAY-0002,Beta Inc,2026-01-24,2500.00,check,CHK456,Payment for invoices,INV-0002;
       </div>
       
       {#if currentOperation !== 'bulk-status'}
-        <Button on:click={() => currentOperation = 'bulk-status'}>
+        <Button onclick={() => currentOperation = 'bulk-status'}>
           Start Bulk Status Change
         </Button>
       {:else}
@@ -442,10 +442,10 @@ PAY-0002,Beta Inc,2026-01-24,2500.00,check,CHK456,Payment for invoices,INV-0002;
           </div>
 
           <div class="selection-actions">
-            <Button variant="secondary" size="sm" on:click={selectAllInvoices}>
+            <Button variant="secondary" size="sm" onclick={selectAllInvoices}>
               Select All ({filteredInvoices.length})
             </Button>
-            <Button variant="ghost" size="sm" on:click={clearSelection}>
+            <Button variant="ghost" size="sm" onclick={clearSelection}>
               Clear Selection
             </Button>
             <span class="selection-count">{selectedInvoiceIds.length} selected</span>
@@ -457,7 +457,7 @@ PAY-0002,Beta Inc,2026-01-24,2500.00,check,CHK456,Payment for invoices,INV-0002;
                 <input
                   type="checkbox"
                   checked={selectedInvoiceIds.includes(invoice.id!)}
-                  on:change={() => toggleInvoiceSelection(invoice.id!)}
+                  onchange={() => toggleInvoiceSelection(invoice.id!)}
                 />
                 <div class="invoice-info-compact">
                   <span class="invoice-number">{invoice.invoice_number}</span>
@@ -473,10 +473,10 @@ PAY-0002,Beta Inc,2026-01-24,2500.00,check,CHK456,Payment for invoices,INV-0002;
           </div>
 
           <div class="form-actions">
-            <Button variant="ghost" on:click={() => { currentOperation = 'none'; selectedInvoiceIds = []; }}>
+            <Button variant="ghost" onclick={() => { currentOperation = 'none'; selectedInvoiceIds = []; }}>
               Cancel
             </Button>
-            <Button on:click={handleBulkStatusChange} disabled={loading || selectedInvoiceIds.length === 0} variant={bulkNewStatus === 'void' ? 'danger' : 'primary'}>
+            <Button onclick={handleBulkStatusChange} disabled={loading || selectedInvoiceIds.length === 0} variant={bulkNewStatus === 'void' ? 'danger' : 'primary'}>
               {loading ? 'Processing...' : `Update ${selectedInvoiceIds.length} Invoices to "${bulkNewStatus}"`}
             </Button>
           </div>
@@ -488,11 +488,11 @@ PAY-0002,Beta Inc,2026-01-24,2500.00,check,CHK456,Payment for invoices,INV-0002;
 
 <!-- Operation Result Modal -->
 {#if showResult && operationResult}
-  <div class="modal-overlay" on:click={closeResultModal} on:keydown={(e) => e.key === 'Escape' && closeResultModal()} role="button" tabindex="-1">
-    <div class="modal-content" on:click|stopPropagation on:keydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
+  <div class="modal-overlay" onclick={closeResultModal} onkeydown={(e) => e.key === 'Escape' && closeResultModal()} role="button" tabindex="-1">
+    <div class="modal-content" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
       <div class="modal-header">
         <h3>Batch Operation Results</h3>
-        <button class="close-button" on:click={closeResultModal}>✕</button>
+        <button class="close-button" onclick={closeResultModal}>✕</button>
       </div>
 
       <div class="result-summary" class:has-failures={operationResult.failureCount > 0}>
@@ -535,7 +535,7 @@ PAY-0002,Beta Inc,2026-01-24,2500.00,check,CHK456,Payment for invoices,INV-0002;
       </div>
 
       <div class="modal-actions">
-        <Button on:click={closeResultModal}>Close</Button>
+        <Button onclick={closeResultModal}>Close</Button>
       </div>
     </div>
   </div>

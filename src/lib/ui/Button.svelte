@@ -10,8 +10,7 @@
   class="btn {variant} {size}"
   {type}
   {disabled}
-  on:click
-  on:click={onclick}
+  {onclick}
 >
   <slot />
 </button>

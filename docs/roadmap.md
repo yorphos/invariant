@@ -1128,7 +1128,8 @@ These items were identified in comprehensive financial and technical audits but 
 ### 8.6 Accessibility
 **Priority**: Medium
 
-- [x] Keyboard navigation (FileUpload)
+- [x] Keyboard navigation (FileUpload, Modal escape key)
+- [ ] Keyboard navigation for clickable table rows
 - [ ] Screen reader support
 - [ ] High contrast mode
 - [ ] Accessible error messages

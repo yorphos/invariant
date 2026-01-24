@@ -198,7 +198,7 @@
   {#if view === 'list'}
     <div class="header">
       <h2>Vendor Bills</h2>
-      <Button on:click={() => view = 'create'}>
+      <Button onclick={() => view = 'create'}>
         + New Bill
       </Button>
     </div>
@@ -215,7 +215,7 @@
       <Card padding={false}>
         <Table headers={['Bill #', 'Vendor', 'Date', 'Due Date', 'Amount', 'Status']}>
           {#each bills as bill}
-            <tr class="clickable-row" on:click={() => handleRowClick(bill)}>
+            <tr class="clickable-row" onclick={() => handleRowClick(bill)}>
               <td><strong>{bill.bill_number}</strong></td>
               <td>{vendors.find(v => v.id === bill.vendor_id)?.name || 'Unknown'}</td>
               <td>{formatDate(bill.bill_date)}</td>
@@ -232,12 +232,12 @@
   {:else}
     <div class="header">
       <h2>Create Bill</h2>
-      <Button variant="ghost" on:click={() => { view = 'list'; resetForm(); }}>
+      <Button variant="ghost" onclick={() => { view = 'list'; resetForm(); }}>
         Cancel
       </Button>
     </div>
 
-    <form on:submit|preventDefault={handleSubmit}>
+    <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
       <Card title="Bill Details">
         <div class="form-row">
           <Input
@@ -338,7 +338,7 @@
               <Button
                 variant="danger"
                 size="sm"
-                on:click={() => removeLine(index)}
+                onclick={() => removeLine(index)}
               >
                 Remove
               </Button>
@@ -346,7 +346,7 @@
           </div>
         {/each}
 
-        <Button variant="ghost" on:click={addLine}>
+        <Button variant="ghost" onclick={addLine}>
           + Add Line
         </Button>
       </Card>
@@ -369,7 +369,7 @@
       </Card>
 
       <div class="form-actions">
-        <Button variant="ghost" on:click={() => { view = 'list'; resetForm(); }}>
+        <Button variant="ghost" onclick={() => { view = 'list'; resetForm(); }}>
           Cancel
         </Button>
         <Button type="submit">
@@ -382,11 +382,11 @@
 
 <!-- Bill Detail Modal -->
 {#if showDetailModal && selectedBill}
-  <div class="modal-overlay" on:click={closeDetailModal} on:keydown={(e) => e.key === 'Escape' && closeDetailModal()} role="button" tabindex="-1">
-    <div class="modal-content" on:click|stopPropagation on:keydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
+  <div class="modal-overlay" onclick={closeDetailModal} onkeydown={(e) => e.key === 'Escape' && closeDetailModal()} role="button" tabindex="-1">
+    <div class="modal-content" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
       <div class="modal-header">
         <h3>Bill Details</h3>
-        <button class="close-btn" on:click={closeDetailModal}>&times;</button>
+        <button class="close-btn" onclick={closeDetailModal}>&times;</button>
       </div>
 
       <div class="modal-body">
@@ -435,7 +435,7 @@
 
         {#if selectedBill.status !== 'void' && selectedBill.paid_amount === 0}
           <div class="modal-actions">
-            <Button variant="danger" on:click={() => handleVoid(selectedBill!.id!)}>
+            <Button variant="danger" onclick={() => handleVoid(selectedBill!.id!)}>
               Void Bill
             </Button>
           </div>

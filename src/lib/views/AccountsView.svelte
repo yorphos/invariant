@@ -182,10 +182,10 @@
   <div class="header">
     <h2>Chart of Accounts</h2>
     <div class="header-actions">
-      <Button variant="ghost" on:click={() => showInactive = !showInactive}>
+      <Button variant="ghost" onclick={() => showInactive = !showInactive}>
         {showInactive ? 'Hide' : 'Show'} Inactive
       </Button>
-      <Button on:click={openCreateModal} disabled={mode === 'beginner'}>
+      <Button onclick={openCreateModal} disabled={mode === 'beginner'}>
         + New Account
       </Button>
     </div>
@@ -249,7 +249,7 @@
                   <Button 
                     size="sm" 
                     variant="ghost" 
-                    on:click={() => openEditModal(account)}
+                    onclick={() => openEditModal(account)}
                     disabled={mode === 'beginner'}
                   >
                     Edit
@@ -257,7 +257,7 @@
                   <Button 
                     size="sm" 
                     variant={account.is_active ? 'ghost' : 'primary'}
-                    on:click={() => toggleAccountStatus(account)}
+                    onclick={() => toggleAccountStatus(account)}
                     disabled={mode === 'beginner'}
                   >
                     {account.is_active ? 'Deactivate' : 'Activate'}
@@ -273,7 +273,7 @@
 </div>
 
 <!-- Initialize Chart of Accounts Modal -->
-<Modal open={showInitModal} title="Initialize Chart of Accounts" onClose={() => showInitModal = false} size="medium">
+<Modal open={showInitModal} title="Initialize Chart of Accounts" onclose={() => showInitModal = false} size="medium">
   <div class="init-modal-content">
     <p class="intro">Welcome to Invariant Accounting! Before you can start tracking your finances, you need to set up your Chart of Accounts.</p>
     
@@ -291,10 +291,10 @@
     </div>
 
     <div class="modal-actions">
-      <Button variant="ghost" on:click={() => showInitModal = false}>
+      <Button variant="ghost" onclick={() => showInitModal = false}>
         Maybe Later
       </Button>
-      <Button on:click={handleInitialize}>
+      <Button onclick={handleInitialize}>
         Initialize Chart of Accounts
       </Button>
     </div>
@@ -302,8 +302,8 @@
 </Modal>
 
 <!-- Create/Edit Account Modal -->
-<Modal open={showModal} title={editingAccount ? "Edit Account" : "New Account"} onClose={closeModal}>
-  <form on:submit|preventDefault={handleSubmit}>
+<Modal open={showModal} title={editingAccount ? "Edit Account" : "New Account"} onclose={closeModal}>
+  <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
     <div class="form-row">
       <Input
         label="Account Code"
@@ -358,7 +358,7 @@
     {/if}
 
     <div class="modal-actions">
-      <Button variant="ghost" on:click={closeModal}>
+      <Button variant="ghost" onclick={closeModal}>
         Cancel
       </Button>
       <Button type="submit">

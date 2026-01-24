@@ -12,6 +12,7 @@
   export let helperText: string | undefined = undefined;
   export let oninput: ((e: Event & { currentTarget: HTMLInputElement }) => void) | undefined = undefined;
   export let onchange: ((e: Event & { currentTarget: HTMLInputElement }) => void) | undefined = undefined;
+  export let onblur: ((e: FocusEvent & { currentTarget: HTMLInputElement }) => void) | undefined = undefined;
 
   // Generate unique ID for label-input association
   const id = `input-${Math.random().toString(36).substr(2, 9)}`;
@@ -34,11 +35,9 @@
     {min}
     {max}
     bind:value
-    on:input
-    on:input={oninput}
-    on:change
-    on:change={onchange}
-    on:blur
+    {oninput}
+    {onchange}
+    {onblur}
     class:error={error}
   />
   {#if helperText}

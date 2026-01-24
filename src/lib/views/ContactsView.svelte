@@ -133,7 +133,7 @@
 <div class="contacts-view">
   <div class="header">
     <h2>Contacts</h2>
-    <Button on:click={openCreateModal}>
+    <Button onclick={openCreateModal}>
       + New Contact
     </Button>
   </div>
@@ -150,7 +150,7 @@
     <Card padding={false}>
       <Table headers={['Name', 'Type', 'Email', 'Phone', 'Tax ID']}>
         {#each contacts as contact}
-          <tr class="clickable-row" on:click={() => openEditModal(contact)}>
+          <tr class="clickable-row" onclick={() => openEditModal(contact)}>
             <td>{contact.name}</td>
             <td>
               <span class="badge {contact.type}">{contact.type}</span>
@@ -165,8 +165,8 @@
   {/if}
 </div>
 
-<Modal open={showModal} title={editingContact ? "Edit Contact" : "New Contact"} onClose={closeModal}>
-  <form on:submit|preventDefault={handleSubmit}>
+<Modal open={showModal} title={editingContact ? "Edit Contact" : "New Contact"} onclose={closeModal}>
+  <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
     <Select
       label="Type"
       bind:value={formType}
@@ -208,7 +208,7 @@
     />
 
     <div class="modal-actions">
-      <Button variant="ghost" on:click={closeModal}>
+      <Button variant="ghost" onclick={closeModal}>
         Cancel
       </Button>
       <Button type="submit">

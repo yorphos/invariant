@@ -614,7 +614,7 @@
   open={showModeConfirmModal} 
   title="Switch Application Mode" 
   size="medium"
-  onClose={cancelModeSwitch}
+  onclose={cancelModeSwitch}
 >
   {#if pendingNewMode === 'pro'}
     <div class="mode-confirm-content">
