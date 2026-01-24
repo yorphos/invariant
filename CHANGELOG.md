@@ -11,6 +11,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1]
+
+### 🔧 Workflow Fixes
+- **Fixed Release workflow** to support both automatic and manual release triggers
+  - Added `push:tags` trigger for manual tag-based releases
+  - Added `skip-ci-check` job to bypass CI verification for manual tags
+  - Fixed version detection to extract from tag name when needed
+  - Prevents double-tag creation for manual releases
+- **Fixed CI/Release sequence** - Release now waits for CI to complete
+  - Release workflow only triggers after successful CI completion
+  - Eliminated duplicate test runs
+  - Ensures broken code never gets released
+
+### 📊 Technical Details
+- Modified `.github/workflows/release.yml`
+- Updated `AGENTS.md` documentation
+- All 501 tests passing
+- No migration changes
+
+### 🎯 Impact
+Release system now works correctly with both automatic (version bump) and manual (tag push) release methods. CI must pass before any release is built.
+
+---
+
 ## [0.3.0]
 
 ### 🔄 Phase 8: Auto-Update System
