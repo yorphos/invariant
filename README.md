@@ -4,11 +4,11 @@
 
 Invariant Accounting is a desktop application that brings enterprise-grade double-entry bookkeeping to your local machine. Built with modern web technologies wrapped in a native desktop shell, it provides the power of traditional accounting software without the complexity, cost, or cloud dependency.
 
-[![Status](https://img.shields.io/badge/Status-Phase%206%20Complete-brightgreen)]()
+[![Status](https://img.shields.io/badge/Status-Phase%207%20Complete-brightgreen)]()
 [![License](https://img.shields.io/badge/License-TBD-blue)]()
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
-[![Tests](https://img.shields.io/badge/Tests-428%20Passing-success)]()
-[![Migrations](https://img.shields.io/badge/Migrations-17-blue)]()
+[![Tests](https://img.shields.io/badge/Tests-501%20Passing-success)]()
+[![Migrations](https://img.shields.io/badge/Migrations-16-blue)]()
 
 ---
 
@@ -24,7 +24,7 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 
 ## ✨ Features
 
-### Current Release (MVP v0.1.3 - Phase 6 Complete)
+### Current Release (Phase 7 Complete)
 
 #### 🎨 UX Hardening (Phase 6 - NEW!)
 - **Manual Journal Entry UI** (Pro Mode only)
@@ -223,7 +223,7 @@ invariant/
 │   ├── capabilities/            # Permission system
 │   │   └── default.json
 │   └── tauri.conf.json          # Application configuration
-├── migrations/                  # Database versioning (17 migrations)
+├── migrations/                  # Database versioning (16 migrations)
 │   ├── 001_core_ledger.ts       # Accounts, journal, audit
 │   ├── 002_contacts_ar_ap.ts    # Contacts, invoices, payments
 │   ├── 003_inventory_payroll_tax.ts  # Future modules

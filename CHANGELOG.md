@@ -45,9 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tests: helper functions, database reset confirmation logic
   - Tests: account filtering for system roles
 
-- **Migration 018** - Seeds new system account mappings for existing databases
-  - Creates missing payroll liability accounts (CPP, EI, Tax Withholding)
-  - Maps default accounts for all new system roles
+- **Migration 016** - Document attachments for receipts and invoices
 
 #### 🔧 Fixed
 - Eliminated all hardcoded account code references in domain operations
@@ -72,8 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Helper functions added**:
   - `isSystemAccount()`, `getSystemAccountRoles()`, `getSystemAccountRolesMap()`
   - `tryGetSystemAccount()`, `tryGetSystemAccountId()` - Non-throwing variants
-- **Test count**: 500 passing (was 428, +72 new)
-- **Migrations**: 18 total (was 17, +1 new)
+- **Test count**: 501 passing (was 428, +73 new)
+- **Migrations**: 16 total
 
 **Impact**: Users can now renumber their chart of accounts freely without breaking system functionality. All hardcoded account references eliminated in favor of configurable system account mappings.
 
@@ -136,8 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `src/lib/views/ReconciliationView.svelte` - Adjustment flow, toasts
   - `src/lib/views/AccountsView.svelte` - Toast notifications
   - `src/lib/services/persistence.ts` - Added `getJournalEntries()` method
-- **Test count**: 428 passing (was 372, +56 new tests)
-- **Test files**: 15 files (was 14, +1 new file)
+- **Test count**: 501 passing (16 test files)
+- **Test files**: 16 files
 
 **Impact**: Improved user experience with non-blocking notifications, proper confirmation dialogs for mode switching, and reconciliation adjustment workflow for handling bank discrepancies.
 
@@ -182,8 +180,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Modified**: `src/lib/views/ReportsView.svelte` (reduced ~60 lines, uses service layer)
 - **Modified**: `src/lib/views/JournalEntryView.svelte` (uses optimized query)
 - **SQL Optimization**: Uses GROUP BY, IN clause for efficient aggregation
-- **Total migrations**: 17 (Phase 5 added migrations 016, 017)
-- **Test count**: 428 passing (15 test files)
+- **Total migrations**: 16
+- **Test count**: 501 passing (16 test files)
 
 #### 📝 Deferred
 - **Transaction Atomicity** for Bills/Inventory/Payroll workflows
