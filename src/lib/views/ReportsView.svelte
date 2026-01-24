@@ -50,6 +50,18 @@
   }
   let arAging: AgingBucket[] = [];
   
+  // A/P Aging
+  interface APAgingBucket {
+    vendor_name: string;
+    current: number;
+    days_1_30: number;
+    days_31_60: number;
+    days_61_90: number;
+    days_over_90: number;
+    total: number;
+  }
+  let apAging: APAgingBucket[] = [];
+  
   onMount(async () => {
     // Set default dates
     const today = new Date();
@@ -68,7 +80,8 @@
       loadIncomeStatement(),
       loadTrialBalance(),
       loadARIntegrityCheck(),
-      loadARAging()
+      loadARAging(),
+      loadAPAging()
     ]);
   }
 
@@ -360,12 +373,83 @@
     loading = false;
   }
 
+  async function loadAPAging() {
+    loading = true;
+    try {
+      const db = await getDatabase();
+      
+      const bills = await db.select<Array<{
+        vendor_id: number;
+        vendor_name: string;
+        due_date: string;
+        outstanding: number;
+      }>>(
+        `SELECT 
+          b.vendor_id,
+          c.name as vendor_name,
+          b.due_date,
+          (b.total_amount - b.paid_amount) as outstanding
+        FROM bill b
+        JOIN contact c ON c.id = b.vendor_id
+        WHERE b.status NOT IN ('void', 'paid')
+          AND (b.total_amount - b.paid_amount) > 0.01
+          AND DATE(b.bill_date) <= ?
+        ORDER BY c.name, b.due_date`,
+        [asOfDate]
+      );
+      
+      // Group by vendor and age buckets
+      const vendorMap = new Map<string, APAgingBucket>();
+      
+      for (const bill of bills) {
+        const dueDate = new Date(bill.due_date);
+        const asOf = new Date(asOfDate);
+        const daysOverdue = Math.floor((asOf.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        let bucket = vendorMap.get(bill.vendor_name);
+        if (!bucket) {
+          bucket = {
+            vendor_name: bill.vendor_name,
+            current: 0,
+            days_1_30: 0,
+            days_31_60: 0,
+            days_61_90: 0,
+            days_over_90: 0,
+            total: 0,
+          };
+          vendorMap.set(bill.vendor_name, bucket);
+        }
+        
+        if (daysOverdue <= 0) {
+          bucket.current += bill.outstanding;
+        } else if (daysOverdue <= 30) {
+          bucket.days_1_30 += bill.outstanding;
+        } else if (daysOverdue <= 60) {
+          bucket.days_31_60 += bill.outstanding;
+        } else if (daysOverdue <= 90) {
+          bucket.days_61_90 += bill.outstanding;
+        } else {
+          bucket.days_over_90 += bill.outstanding;
+        }
+        
+        bucket.total += bill.outstanding;
+      }
+      
+      apAging = Array.from(vendorMap.values())
+        .sort((a, b) => b.total - a.total); // Sort by total descending
+    } catch (e) {
+      console.error('Failed to load A/P aging:', e);
+    }
+    loading = false;
+  }
+
   // Automatically reload reports when dates change
   $: if (asOfDate) {
     loadBalanceSheet();
     loadTrialBalance();
     loadARIntegrityCheck();
     loadARAging();
+    loadAPAging();
   }
   
   $: if (incomeStartDate && incomeEndDate) {
@@ -845,6 +929,57 @@
                 <td class="amount"><strong>{formatCurrency(arAging.reduce((sum, a) => sum + a.days_61_90, 0))}</strong></td>
                 <td class="amount"><strong>{formatCurrency(arAging.reduce((sum, a) => sum + a.days_over_90, 0))}</strong></td>
                 <td class="amount"><strong>{formatCurrency(arAging.reduce((sum, a) => sum + a.total, 0))}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      {/if}
+    </Card>
+
+    <!-- A/P Aging Report -->
+    <Card title="Accounts Payable Aging" padding={false}>
+      <div class="report-header">
+        <h3>As of {new Date(asOfDate).toLocaleDateString('en-CA')}</h3>
+      </div>
+
+      {#if apAging.length === 0}
+        <div class="section">
+          <p>No outstanding bills.</p>
+        </div>
+      {:else}
+        <div class="aging-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Vendor</th>
+                <th class="amount">Current</th>
+                <th class="amount">1-30 Days</th>
+                <th class="amount">31-60 Days</th>
+                <th class="amount">61-90 Days</th>
+                <th class="amount">Over 90 Days</th>
+                <th class="amount">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each apAging as aging}
+                <tr>
+                  <td><strong>{aging.vendor_name}</strong></td>
+                  <td class="amount">{aging.current > 0 ? formatCurrency(aging.current) : '-'}</td>
+                  <td class="amount" class:warning={aging.days_1_30 > 0}>{aging.days_1_30 > 0 ? formatCurrency(aging.days_1_30) : '-'}</td>
+                  <td class="amount" class:warning={aging.days_31_60 > 0}>{aging.days_31_60 > 0 ? formatCurrency(aging.days_31_60) : '-'}</td>
+                  <td class="amount" class:danger={aging.days_61_90 > 0}>{aging.days_61_90 > 0 ? formatCurrency(aging.days_61_90) : '-'}</td>
+                  <td class="amount" class:danger={aging.days_over_90 > 0}>{aging.days_over_90 > 0 ? formatCurrency(aging.days_over_90) : '-'}</td>
+                  <td class="amount"><strong>{formatCurrency(aging.total)}</strong></td>
+                </tr>
+              {/each}
+              <tr class="total-row">
+                <td><strong>Totals</strong></td>
+                <td class="amount"><strong>{formatCurrency(apAging.reduce((sum, a) => sum + a.current, 0))}</strong></td>
+                <td class="amount"><strong>{formatCurrency(apAging.reduce((sum, a) => sum + a.days_1_30, 0))}</strong></td>
+                <td class="amount"><strong>{formatCurrency(apAging.reduce((sum, a) => sum + a.days_31_60, 0))}</strong></td>
+                <td class="amount"><strong>{formatCurrency(apAging.reduce((sum, a) => sum + a.days_61_90, 0))}</strong></td>
+                <td class="amount"><strong>{formatCurrency(apAging.reduce((sum, a) => sum + a.days_over_90, 0))}</strong></td>
+                <td class="amount"><strong>{formatCurrency(apAging.reduce((sum, a) => sum + a.total, 0))}</strong></td>
               </tr>
             </tbody>
           </table>

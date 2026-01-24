@@ -395,3 +395,175 @@ export async function voidBill(
     };
   }
 }
+
+export interface VendorPaymentInput {
+  payment_number: string;
+  vendor_id: number;
+  payment_date: string;
+  amount: number;
+  payment_method?: 'cash' | 'check' | 'transfer' | 'card' | 'other';
+  check_number?: string;
+  reference?: string;
+  notes?: string;
+}
+
+export interface BillPaymentAllocation {
+  bill_id: number;
+  amount: number;
+}
+
+/**
+ * Create a vendor payment and optionally allocate to bills
+ * Posts: DR Accounts Payable, CR Cash/Bank
+ * @param paymentData Payment information
+ * @param allocations Optional bill allocations
+ * @param context Policy context
+ * @returns Posting result with vendor_payment_id
+ */
+export async function createVendorPayment(
+  paymentData: VendorPaymentInput,
+  allocations: BillPaymentAllocation[],
+  context: PolicyContext
+): Promise<PostingResult & { vendor_payment_id?: number }> {
+  try {
+    const db = await getDatabase();
+    
+    // Validate payment amount
+    if (paymentData.amount <= 0) {
+      throw new Error('Payment amount must be greater than zero');
+    }
+    
+    // Validate allocations don't exceed payment amount
+    const totalAllocated = allocations.reduce((sum, a) => sum + a.amount, 0);
+    if (totalAllocated > paymentData.amount) {
+      throw new Error(`Total allocations ($${totalAllocated.toFixed(2)}) exceed payment amount ($${paymentData.amount.toFixed(2)})`);
+    }
+    
+    // Validate each bill allocation
+    for (const allocation of allocations) {
+      if (allocation.amount <= 0) {
+        throw new Error('Bill allocation amounts must be greater than zero');
+      }
+      
+      // Get bill and validate
+      const bills = await db.select<Bill[]>(
+        'SELECT * FROM bill WHERE id = ?',
+        [allocation.bill_id]
+      );
+      
+      if (bills.length === 0) {
+        throw new Error(`Bill ID ${allocation.bill_id} not found`);
+      }
+      
+      const bill = bills[0];
+      
+      if (bill.status === 'void') {
+        throw new Error(`Cannot pay voided bill ${bill.bill_number}`);
+      }
+      
+      // Check for over-payment
+      const amountDue = bill.total_amount - bill.paid_amount;
+      if (allocation.amount > amountDue + 0.01) { // 1 cent tolerance
+        throw new Error(
+          `Allocation to bill ${bill.bill_number} ($${allocation.amount.toFixed(2)}) ` +
+          `exceeds amount due ($${amountDue.toFixed(2)})`
+        );
+      }
+    }
+    
+    // Get required accounts
+    const apAccount = await getSystemAccount('accounts_payable');
+    
+    // Get cash/bank account (1000 = Cash, standard chart of accounts)
+    const accounts = await persistenceService.getAccounts();
+    const cashAccount = accounts.find(a => a.code === '1000' && a.type === 'asset');
+    if (!cashAccount) {
+      throw new Error('Cash account (1000) not found');
+    }
+    
+    // Create transaction event
+    const eventId = await persistenceService.createTransactionEvent({
+      event_type: 'vendor_payment',
+      description: `Vendor Payment ${paymentData.payment_number}`,
+      reference: paymentData.payment_number,
+      created_by: 'system',
+      metadata: JSON.stringify({
+        vendor_id: paymentData.vendor_id,
+        amount: paymentData.amount,
+        payment_method: paymentData.payment_method,
+        allocations: allocations.length,
+      }),
+    });
+    
+    // Create vendor payment record
+    const vendorPaymentId = await persistenceService.createVendorPayment({
+      payment_number: paymentData.payment_number,
+      vendor_id: paymentData.vendor_id,
+      event_id: eventId,
+      payment_date: paymentData.payment_date,
+      amount: paymentData.amount,
+      payment_method: paymentData.payment_method,
+      check_number: paymentData.check_number,
+      reference: paymentData.reference,
+      notes: paymentData.notes,
+      allocated_amount: totalAllocated,
+      status: totalAllocated >= paymentData.amount - 0.01 ? 'allocated' : 'partial',
+    });
+    
+    // Create bill allocations
+    for (const allocation of allocations) {
+      await persistenceService.createBillAllocation({
+        vendor_payment_id: vendorPaymentId,
+        bill_id: allocation.bill_id,
+        amount: allocation.amount,
+        allocation_date: paymentData.payment_date,
+      });
+    }
+    
+    // Post journal entry: DR A/P, CR Cash
+    const journalLines = [
+      {
+        account_id: apAccount.id!,
+        debit_amount: paymentData.amount,
+        credit_amount: 0,
+        description: `Payment ${paymentData.payment_number}`,
+      },
+      {
+        account_id: cashAccount.id!,
+        debit_amount: 0,
+        credit_amount: paymentData.amount,
+        description: `Payment ${paymentData.payment_number}`,
+      },
+    ];
+    
+    const journalEntryId = await persistenceService.createJournalEntry(
+      {
+        event_id: eventId,
+        entry_date: paymentData.payment_date,
+        description: `Vendor Payment ${paymentData.payment_number}`,
+        reference: paymentData.payment_number,
+        status: 'posted',
+      },
+      journalLines
+    );
+    
+    return {
+      ok: true,
+      warnings: [],
+      vendor_payment_id: vendorPaymentId,
+      journal_entry_id: journalEntryId,
+    };
+    
+  } catch (error) {
+    console.error('Vendor payment creation error:', error);
+    return {
+      ok: false,
+      warnings: [
+        {
+          severity: 'error',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      ],
+    };
+  }
+}
