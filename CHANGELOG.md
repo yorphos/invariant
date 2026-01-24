@@ -31,6 +31,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Core Accounting, Cash & Banking, Payroll, Other
   - All 18 roles configurable from Pro Mode Settings
 
+- **Database Reset to Factory State** (Pro Mode Settings)
+  - Complete database reset with "Danger Zone" UI section
+  - Requires typing "RESET DATABASE" to confirm (safety measure)
+  - Real-time validation shows mismatch warning
+  - Deletes database file and recreates with fresh migrations
+  - Toast notification confirms success before page reload
+
+- **Comprehensive System Accounts Test Suite** (`src/tests/unit/system-accounts.test.ts`)
+  - 72 new tests covering all system account functionality
+  - Tests: role types, account type constraints, code uniqueness validation
+  - Tests: warning logic, badge display, role labels, default mappings
+  - Tests: helper functions, database reset confirmation logic
+  - Tests: account filtering for system roles
+
 - **Migration 018** - Seeds new system account mappings for existing databases
   - Creates missing payroll liability accounts (CPP, EI, Tax Withholding)
   - Maps default accounts for all new system roles
@@ -58,7 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Helper functions added**:
   - `isSystemAccount()`, `getSystemAccountRoles()`, `getSystemAccountRolesMap()`
   - `tryGetSystemAccount()`, `tryGetSystemAccountId()` - Non-throwing variants
-- **Test count**: 428 passing (unchanged)
+- **Test count**: 500 passing (was 428, +72 new)
 - **Migrations**: 18 total (was 17, +1 new)
 
 **Impact**: Users can now renumber their chart of accounts freely without breaking system functionality. All hardcoded account references eliminated in favor of configurable system account mappings.

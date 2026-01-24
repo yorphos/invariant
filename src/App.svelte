@@ -21,7 +21,7 @@
   import ToastContainer from './lib/ui/ToastContainer.svelte';
   import Modal from './lib/ui/Modal.svelte';
   import { toasts } from './lib/stores/toast';
-  import { backupDatabase, restoreDatabase } from './lib/services/backup';
+  import { backupDatabase, restoreDatabase, resetDatabase, RESET_CONFIRMATION_TEXT, isResetConfirmationValid } from './lib/services/backup';
   import { 
     getFiscalYears, 
     closeFiscalYear, 
@@ -56,6 +56,11 @@
   // Mode switch confirmation state
   let showModeConfirmModal = false;
   let pendingNewMode: PolicyMode | null = null;
+
+  // Database reset state
+  let showResetModal = false;
+  let resetConfirmationInput = '';
+  let resetInProgress = false;
 
   onMount(async () => {
     try {
@@ -207,6 +212,36 @@
       }
     } catch (e) {
       toasts.error(`Restore failed: ${e}`);
+    }
+  }
+
+  function openResetModal() {
+    resetConfirmationInput = '';
+    showResetModal = true;
+  }
+
+  function closeResetModal() {
+    showResetModal = false;
+    resetConfirmationInput = '';
+  }
+
+  async function handleDatabaseReset() {
+    if (!isResetConfirmationValid(resetConfirmationInput)) {
+      toasts.error(`Please type "${RESET_CONFIRMATION_TEXT}" exactly to confirm.`);
+      return;
+    }
+
+    try {
+      resetInProgress = true;
+      await resetDatabase(resetConfirmationInput);
+      toasts.success('Database reset to factory state. The application will now reload.');
+      closeResetModal();
+      // Reload the app to reinitialize with fresh database
+      setTimeout(() => location.reload(), 1500);
+    } catch (e) {
+      toasts.error(`Reset failed: ${e}`);
+    } finally {
+      resetInProgress = false;
     }
   }
 
@@ -469,6 +504,28 @@
               <p><strong>Restore:</strong> Replace your current database with a backup. <em>This will delete all current data!</em></p>
             </div>
           </div>
+
+          {#if mode === 'pro'}
+            <div class="setting-group danger-zone">
+              <h3>Danger Zone</h3>
+              <p>
+                <strong>Warning:</strong> The following action is destructive and cannot be undone.
+              </p>
+              <button onclick={openResetModal} class="danger-button">
+                Reset Database to Factory State
+              </button>
+              <div class="info danger-info">
+                <p>This will <strong>permanently delete ALL data</strong> including:</p>
+                <ul>
+                  <li>All transactions, invoices, and payments</li>
+                  <li>All contacts (customers and vendors)</li>
+                  <li>All journal entries and reconciliations</li>
+                  <li>Custom accounts (reset to default chart)</li>
+                  <li>System settings and preferences</li>
+                </ul>
+              </div>
+            </div>
+          {/if}
 
           {#if mode === 'pro'}
             <div class="setting-group">
@@ -822,6 +879,70 @@
     <button class="btn-secondary" onclick={cancelModeSwitch}>Cancel</button>
     <button class="btn-primary" onclick={confirmModeSwitch}>
       Switch to {pendingNewMode === 'pro' ? 'Pro' : 'Beginner'} Mode
+    </button>
+  </div>
+</Modal>
+
+<!-- Database Reset Confirmation Modal -->
+<Modal 
+  open={showResetModal} 
+  title="Reset Database to Factory State" 
+  size="medium"
+  onclose={closeResetModal}
+>
+  <div class="reset-modal-content">
+    <div class="reset-warning-header">
+      <span class="danger-icon">⚠</span>
+      <h3>This action cannot be undone!</h3>
+    </div>
+    
+    <p>You are about to <strong>permanently delete all data</strong> and reset the application to its factory state.</p>
+    
+    <div class="reset-impact">
+      <h4>What will be deleted:</h4>
+      <ul>
+        <li>All transactions, invoices, payments, and bills</li>
+        <li>All customers, vendors, and contacts</li>
+        <li>All journal entries and account balances</li>
+        <li>All reconciliations and bank imports</li>
+        <li>All payroll records</li>
+        <li>All custom accounts and settings</li>
+      </ul>
+    </div>
+    
+    <div class="reset-confirmation-box">
+      <p>To confirm, type <code>{RESET_CONFIRMATION_TEXT}</code> in the box below:</p>
+      <input 
+        type="text" 
+        bind:value={resetConfirmationInput}
+        placeholder="Type RESET DATABASE to confirm"
+        class="reset-confirmation-input"
+        autocomplete="off"
+        disabled={resetInProgress}
+      />
+    </div>
+    
+    {#if resetConfirmationInput.length > 0 && !isResetConfirmationValid(resetConfirmationInput)}
+      <div class="reset-mismatch-warning">
+        Text does not match. Please type <code>{RESET_CONFIRMATION_TEXT}</code> exactly.
+      </div>
+    {/if}
+  </div>
+  
+  <div class="reset-modal-actions">
+    <button class="btn-secondary" onclick={closeResetModal} disabled={resetInProgress}>
+      Cancel
+    </button>
+    <button 
+      class="btn-danger" 
+      onclick={handleDatabaseReset}
+      disabled={resetInProgress || !isResetConfirmationValid(resetConfirmationInput)}
+    >
+      {#if resetInProgress}
+        Resetting...
+      {:else}
+        Reset Database
+      {/if}
     </button>
   </div>
 </Modal>
@@ -1412,5 +1533,182 @@
 
   .btn-primary:hover {
     background: #2980b9;
+  }
+
+  /* Danger Zone styles */
+  .danger-zone {
+    border: 2px solid #e74c3c;
+    background: #fdf2f2;
+  }
+
+  .danger-zone h3 {
+    color: #c0392b;
+  }
+
+  .danger-button {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin: 12px 0;
+  }
+
+  .danger-button:hover {
+    background: #c0392b;
+  }
+
+  .danger-info {
+    background: #fce4e4;
+    border-color: #f5c6c6;
+  }
+
+  .danger-info ul {
+    margin: 8px 0 0 0;
+    padding-left: 20px;
+  }
+
+  .danger-info li {
+    margin: 4px 0;
+    color: #721c24;
+  }
+
+  /* Database Reset Modal styles */
+  .reset-modal-content {
+    padding: 0;
+  }
+
+  .reset-warning-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    color: #c0392b;
+  }
+
+  .reset-warning-header h3 {
+    margin: 0;
+    font-size: 18px;
+  }
+
+  .danger-icon {
+    font-size: 32px;
+    color: #e74c3c;
+  }
+
+  .reset-modal-content > p {
+    margin: 0 0 20px 0;
+    color: #555;
+    line-height: 1.6;
+  }
+
+  .reset-impact {
+    background: #fdf2f2;
+    border: 1px solid #f5c6c6;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+
+  .reset-impact h4 {
+    margin: 0 0 12px 0;
+    color: #c0392b;
+    font-size: 14px;
+  }
+
+  .reset-impact ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #721c24;
+  }
+
+  .reset-impact li {
+    margin: 6px 0;
+    font-size: 14px;
+  }
+
+  .reset-confirmation-box {
+    background: #fff3cd;
+    border: 1px solid #ffeeba;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .reset-confirmation-box p {
+    margin: 0 0 12px 0;
+    color: #856404;
+    font-size: 14px;
+  }
+
+  .reset-confirmation-box code {
+    background: #fff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    color: #e74c3c;
+  }
+
+  .reset-confirmation-input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 16px;
+    font-family: monospace;
+    text-align: center;
+    box-sizing: border-box;
+  }
+
+  .reset-confirmation-input:focus {
+    outline: none;
+    border-color: #e74c3c;
+  }
+
+  .reset-mismatch-warning {
+    color: #e74c3c;
+    font-size: 13px;
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: #fdf2f2;
+    border-radius: 4px;
+  }
+
+  .reset-mismatch-warning code {
+    background: #fff;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+
+  .reset-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid #ecf0f1;
+  }
+
+  .btn-danger {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background: #c0392b;
+  }
+
+  .btn-danger:disabled {
+    background: #bdc3c7;
+    cursor: not-allowed;
   }
 </style>

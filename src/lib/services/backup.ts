@@ -5,7 +5,7 @@
  */
 
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { copyFile, readFile, writeFile } from '@tauri-apps/plugin-fs';
+import { copyFile, readFile, remove } from '@tauri-apps/plugin-fs';
 import { appDataDir } from '@tauri-apps/api/path';
 import { closeDatabase, getDatabase } from './database';
 
@@ -147,5 +147,79 @@ export async function exportDatabaseSQL(): Promise<boolean> {
   } catch (error) {
     console.error('Failed to export database:', error);
     throw new Error(`Export failed: ${error}`);
+  }
+}
+
+/**
+ * Required confirmation text for database reset
+ */
+export const RESET_CONFIRMATION_TEXT = 'RESET DATABASE';
+
+/**
+ * Validate the user's reset confirmation input
+ */
+export function isResetConfirmationValid(userInput: string): boolean {
+  return userInput.trim() === RESET_CONFIRMATION_TEXT;
+}
+
+/**
+ * Reset the database to factory state
+ * 
+ * CRITICAL: This completely deletes all data and recreates the database!
+ * Requires explicit confirmation text to prevent accidental data loss.
+ * 
+ * @param confirmationText - User must type "RESET DATABASE" exactly
+ * @returns true if reset successful
+ * @throws Error if confirmation text is invalid or reset fails
+ */
+export async function resetDatabase(confirmationText: string): Promise<boolean> {
+  // Validate confirmation text
+  if (!isResetConfirmationValid(confirmationText)) {
+    throw new Error(
+      `Invalid confirmation. Please type "${RESET_CONFIRMATION_TEXT}" exactly to confirm.`
+    );
+  }
+
+  try {
+    // Close the database connection
+    await closeDatabase();
+    
+    const dbPath = await getDatabasePath();
+    
+    // Delete the database file
+    try {
+      await remove(dbPath);
+      console.log('Database file deleted successfully');
+    } catch (e) {
+      // File might not exist if this is a fresh install
+      console.log('Database file not found or already deleted:', e);
+    }
+    
+    // Also delete WAL and SHM files if they exist (SQLite journal files)
+    try {
+      await remove(`${dbPath}-wal`);
+    } catch {
+      // WAL file might not exist
+    }
+    try {
+      await remove(`${dbPath}-shm`);
+    } catch {
+      // SHM file might not exist
+    }
+    
+    // Re-initialize the database (this will create fresh schema and seed data)
+    await getDatabase();
+    
+    console.log('Database reset to factory state successfully');
+    return true;
+  } catch (error) {
+    console.error('Failed to reset database:', error);
+    // Try to recover by getting the database again
+    try {
+      await getDatabase();
+    } catch {
+      // If we can't even get the database, we're in a bad state
+    }
+    throw new Error(`Database reset failed: ${error}`);
   }
 }
