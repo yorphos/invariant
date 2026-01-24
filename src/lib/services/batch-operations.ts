@@ -337,7 +337,36 @@ export class BatchOperationsService {
   }
 
   /**
-   * Parse CSV text into payment import rows
+   * Parse a CSV line handling quoted fields properly
+   * @param line CSV line to parse
+   * @returns Array of field values
+   */
+  private parseCSVLine(line: string): string[] {
+    const fields: string[] = [];
+    let currentField = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        fields.push(currentField.trim());
+        currentField = '';
+      } else {
+        currentField += char;
+      }
+    }
+    
+    // Push the last field
+    fields.push(currentField.trim());
+    
+    return fields;
+  }
+
+  /**
+   * Parse payment CSV for import
    * @param csvText Raw CSV text
    * @returns Array of parsed payment rows
    */
@@ -349,7 +378,7 @@ export class BatchOperationsService {
     }
 
     // Parse header
-    const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const header = this.parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
     
     // Expected headers (flexible matching)
     const paymentNumberIdx = header.findIndex(h => h.includes('payment') && h.includes('number'));
@@ -372,7 +401,7 @@ export class BatchOperationsService {
       const line = lines[i].trim();
       if (!line) continue; // Skip empty lines
       
-      const values = line.split(',').map(v => v.trim());
+      const values = this.parseCSVLine(line).map(v => v.trim());
       
       const paymentMethod = methodIdx >= 0 ? values[methodIdx].toLowerCase() : 'transfer';
       let method: 'cash' | 'check' | 'transfer' | 'card' | 'other' = 'transfer';
