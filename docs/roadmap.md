@@ -2,7 +2,7 @@
 
 This roadmap outlines the path from current MVP foundation to a production-ready accounting application.
 
-## 🎉 Current Status: Phase 4 Audit Hardening Complete
+## 🎉 Current Status: Phase 5 UX Hardening Next
 
 **Latest Update**: January 24, 2026
 
@@ -29,7 +29,14 @@ This roadmap outlines the path from current MVP foundation to a production-ready
   - ✅ Transaction foreign key enforcement (db.rs)
   - ⚠️ Outstanding issues documented (6 accepted risks - see below)
 
-**System Status**: Production-ready with full audit compliance
+**Next Up: Phase 5 - UX Hardening**:
+- 🔴 Manual Journal Entry UI (Critical - advertised but missing)
+- 🟠 System Account Mapping UI (Pro users cannot re-wire accounts)
+- 🟠 Beginner Mode UI improvements (replace alerts, hide advanced features)
+- 🟡 Mode switch confirmation dialog
+- 🟡 Reconciliation adjustment flow
+
+**System Status**: Production-ready with full audit compliance. UX refinements needed for Pro Mode viability.
 
 **Database Migrations**: 15 total (11 → 15 in Phase 4)
 **Test Coverage**: 351 passing tests (9.5x increase from Phase 1)
@@ -832,9 +839,142 @@ These items were identified in comprehensive financial and technical audits but 
 
 ---
 
-## Phase 5: Advanced Features 🔮 (FUTURE)
+## Phase 5: UX Hardening 🛠️ (NEXT)
 
-### 5.1 Bank Import
+**Goal**: Address critical UX gaps identified in the dual-mode "Beginner vs Pro" system audit. The current implementation is superficial—treating Beginner Mode as "Pro Mode with handcuffs" rather than a guided experience.
+
+**Audit Summary**: The mode system has the right conceptual foundation but lacks implementation depth:
+- Safety gates use hostile `alert()` dialogs instead of disabled UI
+- Pro Mode advertises features (Manual Journal Entries) that don't exist
+- UI density is identical across modes
+- Advanced features are exposed to beginners with only warning text
+
+### 5.1 Manual Journal Entry UI ✅ CRITICAL
+**Priority**: Critical | **Status**: Not Started
+
+**Why**: Pro Mode claims to enable "Direct journal entry creation" but no UI exists. This is a showstopper for accountants who need to make adjusting entries.
+
+**What to Build**:
+- [ ] Create `JournalEntryView.svelte` or `JournalEntryModal.svelte`
+- [ ] Multi-line debit/credit entry form
+- [ ] Account selection dropdowns
+- [ ] Real-time balance validation (debits = credits)
+- [ ] Date and memo fields
+- [ ] Pro Mode only (hidden from Beginner sidebar)
+- [ ] Integration with posting engine
+
+**Acceptance Criteria:**
+- [ ] Pro users can create manual journal entries
+- [ ] Form validates balance before posting
+- [ ] Proper audit trail created
+- [ ] Beginners cannot access this feature
+
+---
+
+### 5.2 System Account Mapping UI
+**Priority**: High | **Status**: Not Started
+
+**Why**: Backend has robust `system_account` abstraction mapping logical roles (A/R, A/P, Retained Earnings) to account IDs, but no frontend UI to configure these mappings. Pro users cannot re-wire system accounts to custom account IDs.
+
+**What to Build**:
+- [ ] Add "System Accounts" section to Settings (Pro Mode only)
+- [ ] Display current mappings (role → account code)
+- [ ] Allow Pro users to select different accounts for each role
+- [ ] Validate selected accounts match expected type (e.g., A/R must be Asset)
+- [ ] Show warning about consequences of changes
+
+**System Account Roles to Expose**:
+- Accounts Receivable (asset)
+- Accounts Payable (liability)
+- Retained Earnings (equity)
+- Current Year Earnings (equity)
+- HST Payable (liability)
+- Cash/Checking (asset)
+
+**Acceptance Criteria:**
+- [ ] Pro users can view system account mappings
+- [ ] Pro users can reassign accounts to different IDs
+- [ ] Validation prevents invalid assignments
+- [ ] Changes persist correctly
+
+---
+
+### 5.3 Beginner Mode UI Improvements
+**Priority**: High | **Status**: Not Started
+
+**Why**: Current Beginner Mode uses hostile `alert()` dialogs and shows identical complex UI to Pro Mode.
+
+**What to Build**:
+- [ ] **Replace alerts with disabled buttons**: In `AccountsView`, visually disable New/Edit buttons for beginners with tooltip explaining why
+- [ ] **Hide advanced sidebar items**: Conditionally hide `Batch Operations`, `Inventory`, `Payroll` from Beginner sidebar
+- [ ] **Progressive disclosure**: Add "More..." or "Advanced" section for hidden items
+- [ ] **Simplify account dropdowns**: For beginners, show friendly names ("Sales", "Services") instead of "4000 - Sales Revenue"
+
+**Acceptance Criteria:**
+- [ ] No `alert()` dialogs for permission denial
+- [ ] Beginners see simplified sidebar (5-6 core items)
+- [ ] Advanced features discoverable but not prominent
+- [ ] Dropdown selections are beginner-friendly
+
+---
+
+### 5.4 Mode Switch Confirmation
+**Priority**: Medium | **Status**: Not Started
+
+**Why**: Mode toggling is instant and unconfirmed. Users can accidentally enter "unsafe" territory without realizing consequences.
+
+**What to Build**:
+- [ ] Add confirmation dialog when switching Beginner → Pro
+- [ ] Dialog explains: "Switching to Pro Mode removes safety checks and allows irreversible data modification. Are you sure?"
+- [ ] No confirmation needed for Pro → Beginner (adding safety is always OK)
+- [ ] Optional "Don't show again" checkbox for experienced users
+
+**Acceptance Criteria:**
+- [ ] Beginner → Pro switch requires confirmation
+- [ ] Pro → Beginner switch is immediate
+- [ ] Clear explanation of consequences shown
+
+---
+
+### 5.5 Reconciliation Adjustment Flow
+**Priority**: Medium | **Status**: Not Started
+
+**Why**: Bank reconciliation often requires minor adjustments (bank fees, interest). Without inline adjustment capability or Manual Journal Entry, users get stuck when numbers don't match.
+
+**What to Build**:
+- [ ] Add "Add Adjustment" button in Reconciliation view
+- [ ] Quick entry for common adjustments (bank fees, interest earned)
+- [ ] Creates journal entry behind the scenes
+- [ ] Auto-categorization suggestions
+
+**Acceptance Criteria:**
+- [ ] Users can make adjustments without leaving reconciliation flow
+- [ ] Adjustments properly journaled
+- [ ] Common adjustment types pre-configured
+
+---
+
+### 5.6 Batch Operations UX
+**Priority**: Low | **Status**: Not Started
+
+**Why**: Batch Operations view shows full complex UI to beginners with just a warning card. Should be hidden entirely or wrapped in guided wizard.
+
+**What to Build**:
+- [ ] Remove Batch Operations from Beginner sidebar entirely
+- [ ] OR: Wrap in wizard-style interface for beginners
+- [ ] Move "Import Payments" button to Payments view (contextual)
+- [ ] Move "Bulk Invoice Creation" button to Invoices view (contextual)
+
+**Acceptance Criteria:**
+- [ ] Beginners don't see Batch Operations in sidebar
+- [ ] Batch features accessible from relevant context
+- [ ] Reduced confusion for new users
+
+---
+
+## Phase 6: Advanced Features 🔮 (FUTURE)
+
+### 6.1 Bank Import
 **Priority**: Medium
 
 - [ ] QBO file import
@@ -844,7 +984,7 @@ These items were identified in comprehensive financial and technical audits but 
 
 ---
 
-### 5.2 Receipt/Document Management
+### 6.2 Receipt/Document Management
 **Priority**: Low
 
 - [ ] File upload and storage
@@ -855,7 +995,20 @@ These items were identified in comprehensive financial and technical audits but 
 
 ---
 
-### 5.3 Cloud Sync (Optional)
+### 6.3 Credit Notes & Refunds
+**Priority**: Medium
+
+**Why**: Currently, partial refunds require voiding entire invoice and recreating. Credit notes allow proper handling of returns and adjustments.
+
+- [ ] `CreditNote` entity with line items
+- [ ] Journal entries: DR Revenue / CR Accounts Receivable
+- [ ] Apply credit notes to future invoices
+- [ ] Refund workflow (credit note → cash payment out)
+- [ ] Partial returns from multi-line invoices
+
+---
+
+### 6.4 Cloud Sync (Optional)
 **Priority**: Low
 
 - [ ] Sync server design (separate project)
@@ -866,7 +1019,7 @@ These items were identified in comprehensive financial and technical audits but 
 
 ---
 
-### 5.4 Budgeting
+### 6.5 Budgeting
 **Priority**: Low
 
 - [ ] Budget creation per account
@@ -876,7 +1029,7 @@ These items were identified in comprehensive financial and technical audits but 
 
 ---
 
-### 5.5 Multi-Company
+### 6.6 Multi-Company
 **Priority**: Low
 
 - [ ] Company/entity table
@@ -886,7 +1039,7 @@ These items were identified in comprehensive financial and technical audits but 
 
 ---
 
-### 5.6 User Management & Permissions
+### 6.7 User Management & Permissions
 **Priority**: Low
 
 - [ ] User accounts
@@ -896,9 +1049,9 @@ These items were identified in comprehensive financial and technical audits but 
 
 ---
 
-## Phase 6: Polish & Production 🚀 (BEFORE RELEASE)
+## Phase 7: Polish & Production 🚀 (BEFORE RELEASE)
 
-### 6.1 Testing
+### 7.1 Testing
 **Priority**: Critical
 
 - [ ] Unit tests for posting engine
@@ -909,7 +1062,7 @@ These items were identified in comprehensive financial and technical audits but 
 
 ---
 
-### 6.2 Error Handling & Validation
+### 7.2 Error Handling & Validation
 **Priority**: High
 
 - [ ] Comprehensive input validation
@@ -919,7 +1072,7 @@ These items were identified in comprehensive financial and technical audits but 
 
 ---
 
-### 6.3 Performance Optimization
+### 7.3 Performance Optimization
 **Priority**: Medium
 
 - [ ] Database indexing review
@@ -930,7 +1083,7 @@ These items were identified in comprehensive financial and technical audits but 
 
 ---
 
-### 6.4 Documentation
+### 7.4 Documentation
 **Priority**: High
 
 - [ ] User guide
@@ -941,7 +1094,7 @@ These items were identified in comprehensive financial and technical audits but 
 
 ---
 
-### 6.5 Distribution & Updates
+### 7.5 Distribution & Updates
 **Priority**: High
 
 - [ ] Code signing certificates
@@ -952,7 +1105,7 @@ These items were identified in comprehensive financial and technical audits but 
 
 ---
 
-### 6.6 Accessibility
+### 7.6 Accessibility
 **Priority**: Medium
 
 - [ ] Keyboard navigation
@@ -986,12 +1139,19 @@ These items were identified in comprehensive financial and technical audits but 
 - [x] Backup/restore hardening
 - [x] Transaction FK enforcement
 
-### Milestone 4: Beta Release
-- [ ] Phase 5 advanced features
+### Milestone 4: UX Hardened MVP
+- [ ] Manual Journal Entry UI (Critical)
+- [ ] System Account Mapping UI
+- [ ] Beginner Mode UI improvements
+- [ ] Mode switch confirmation
+- [ ] Reconciliation adjustments
+
+### Milestone 5: Beta Release
+- [ ] Phase 6 advanced features
 - [ ] Reporting performance
 - [ ] Documentation
 
-### Milestone 5: Production Release v1.0
+### Milestone 6: Production Release v1.0
 - [ ] All core features
 - [ ] Full testing
 - [ ] Polish
