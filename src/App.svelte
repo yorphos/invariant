@@ -19,6 +19,7 @@
   import PayrollView from './lib/views/PayrollView.svelte';
   import JournalEntryView from './lib/views/JournalEntryView.svelte';
   import ToastContainer from './lib/ui/ToastContainer.svelte';
+  import Modal from './lib/ui/Modal.svelte';
   import { toasts } from './lib/stores/toast';
   import { backupDatabase, restoreDatabase } from './lib/services/backup';
   import { 
@@ -51,6 +52,10 @@
   let allAccounts: Account[] = [];
   let systemAccountsLoading = false;
   let systemAccountsError = '';
+
+  // Mode switch confirmation state
+  let showModeConfirmModal = false;
+  let pendingNewMode: PolicyMode | null = null;
 
   onMount(async () => {
     try {
@@ -131,10 +136,23 @@
     return allAccounts.filter(a => a.is_active && types.includes(a.type));
   }
 
-  async function toggleMode() {
-    const newMode: PolicyMode = mode === 'beginner' ? 'pro' : 'beginner';
-    await persistenceService.setMode(newMode);
-    mode = newMode;
+  function requestModeSwitch() {
+    pendingNewMode = mode === 'beginner' ? 'pro' : 'beginner';
+    showModeConfirmModal = true;
+  }
+
+  async function confirmModeSwitch() {
+    if (!pendingNewMode) return;
+    await persistenceService.setMode(pendingNewMode);
+    mode = pendingNewMode;
+    showModeConfirmModal = false;
+    pendingNewMode = null;
+    toasts.success(`Switched to ${mode === 'pro' ? 'Pro' : 'Beginner'} Mode`);
+  }
+
+  function cancelModeSwitch() {
+    showModeConfirmModal = false;
+    pendingNewMode = null;
   }
 
   async function handleBackup() {
@@ -376,7 +394,7 @@
             <p>
               Current mode: <strong>{mode}</strong>
             </p>
-            <button onclick={toggleMode}>
+            <button onclick={requestModeSwitch}>
               Switch to {mode === 'beginner' ? 'Pro' : 'Beginner'} Mode
             </button>
             
@@ -590,6 +608,70 @@
     </main>
   {/if}
 </div>
+
+<!-- Mode Switch Confirmation Modal -->
+<Modal 
+  open={showModeConfirmModal} 
+  title="Switch Application Mode" 
+  size="medium"
+  onClose={cancelModeSwitch}
+>
+  {#if pendingNewMode === 'pro'}
+    <div class="mode-confirm-content">
+      <div class="mode-confirm-header pro">
+        <span class="mode-icon">⚠</span>
+        <h3>Switch to Pro Mode</h3>
+      </div>
+      
+      <p>Pro Mode unlocks advanced accounting features designed for experienced users and accountants.</p>
+      
+      <div class="mode-features">
+        <h4>What you can do in Pro Mode:</h4>
+        <ul>
+          <li><strong>Create and edit accounts</strong> - Customize your chart of accounts</li>
+          <li><strong>Manual journal entries</strong> - Create adjusting entries and corrections</li>
+          <li><strong>System account mapping</strong> - Reconfigure which accounts are used for A/R, A/P, etc.</li>
+          <li><strong>Fiscal year close</strong> - Execute year-end closing process</li>
+          <li><strong>Override warnings</strong> - Bypass guardrails when needed</li>
+        </ul>
+      </div>
+      
+      <div class="mode-warning-box">
+        <strong>Important:</strong> In Pro Mode, fewer guardrails are in place. Incorrect entries can cause your books to be out of balance. Make sure you understand double-entry bookkeeping before using Pro Mode features.
+      </div>
+    </div>
+  {:else}
+    <div class="mode-confirm-content">
+      <div class="mode-confirm-header beginner">
+        <span class="mode-icon">✓</span>
+        <h3>Switch to Beginner Mode</h3>
+      </div>
+      
+      <p>Beginner Mode provides guided workflows with extra validation to prevent accounting errors.</p>
+      
+      <div class="mode-features">
+        <h4>What changes in Beginner Mode:</h4>
+        <ul>
+          <li><strong>Account editing locked</strong> - Chart of accounts cannot be modified</li>
+          <li><strong>Guided workflows</strong> - Step-by-step assistance for transactions</li>
+          <li><strong>Extra validation</strong> - More warnings and confirmations</li>
+          <li><strong>Simplified interface</strong> - Some advanced features hidden</li>
+        </ul>
+      </div>
+      
+      <div class="mode-info-box">
+        <strong>Note:</strong> Your existing data and transactions are not affected. You can switch back to Pro Mode at any time.
+      </div>
+    </div>
+  {/if}
+  
+  <div class="mode-confirm-actions">
+    <button class="btn-secondary" onclick={cancelModeSwitch}>Cancel</button>
+    <button class="btn-primary" onclick={confirmModeSwitch}>
+      Switch to {pendingNewMode === 'pro' ? 'Pro' : 'Beginner'} Mode
+    </button>
+  </div>
+</Modal>
 
 <ToastContainer />
 
@@ -1038,5 +1120,122 @@
     .system-account-select select {
       min-width: unset;
     }
+  }
+
+  /* Mode Switch Confirmation Modal styles */
+  .mode-confirm-content {
+    padding: 0;
+  }
+
+  .mode-confirm-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .mode-confirm-header.pro {
+    color: #e74c3c;
+  }
+
+  .mode-confirm-header.beginner {
+    color: #27ae60;
+  }
+
+  .mode-confirm-header h3 {
+    margin: 0;
+    font-size: 18px;
+  }
+
+  .mode-icon {
+    font-size: 24px;
+  }
+
+  .mode-confirm-content > p {
+    margin: 0 0 20px 0;
+    color: #555;
+    line-height: 1.6;
+  }
+
+  .mode-features {
+    background: #f8f9fa;
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+
+  .mode-features h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: #2c3e50;
+  }
+
+  .mode-features ul {
+    margin: 0;
+    padding-left: 20px;
+    line-height: 1.8;
+    color: #555;
+  }
+
+  .mode-features li strong {
+    color: #2c3e50;
+  }
+
+  .mode-warning-box {
+    padding: 16px;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    color: #856404;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+
+  .mode-info-box {
+    padding: 16px;
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    border-radius: 8px;
+    color: #0c5460;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+
+  .mode-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid #ecf0f1;
+  }
+
+  .btn-secondary {
+    background: #ecf0f1;
+    color: #2c3e50;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .btn-secondary:hover {
+    background: #bdc3c7;
+  }
+
+  .btn-primary {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .btn-primary:hover {
+    background: #2980b9;
   }
 </style>
