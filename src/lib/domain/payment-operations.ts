@@ -40,71 +40,64 @@ export async function createPayment(
     // Calculate allocated amount
     const allocatedAmount = allocations.reduce((sum, a) => sum + a.amount, 0);
 
-    // Execute all operations in a transaction for atomicity
-    const result = await persistenceService.executeInTransaction(async () => {
-      // Create transaction event
-      const eventId = await persistenceService.createTransactionEvent({
-        event_type: 'payment_received',
+    // Create transaction event
+    const eventId = await persistenceService.createTransactionEvent({
+      event_type: 'payment_received',
+      description: `Payment ${paymentData.payment_number}`,
+      reference: paymentData.payment_number,
+      created_by: 'system',
+    });
+
+    // Create payment record
+    const paymentId = await persistenceService.createPayment({
+      ...paymentData,
+      event_id: eventId,
+      allocated_amount: allocatedAmount,
+      status: allocatedAmount === paymentData.amount ? 'allocated' : 'partial',
+    });
+
+    // Create allocations
+    for (const allocation of allocations) {
+      await persistenceService.createAllocation({
+        payment_id: paymentId,
+        invoice_id: allocation.invoice_id,
+        amount: allocation.amount,
+        allocation_method: 'manual',
+      });
+    }
+
+    // Create journal entry
+    // DR Cash
+    // CR Accounts Receivable
+    const journalEntryId = await persistenceService.createJournalEntry(
+      {
+        event_id: eventId,
+        entry_date: paymentData.payment_date,
         description: `Payment ${paymentData.payment_number}`,
         reference: paymentData.payment_number,
-        created_by: 'system',
-      });
-
-      // Create payment record
-      const paymentId = await persistenceService.createPayment({
-        ...paymentData,
-        event_id: eventId,
-        allocated_amount: allocatedAmount,
-        status: allocatedAmount === paymentData.amount ? 'allocated' : 'partial',
-      });
-
-      // Create allocations
-      for (const allocation of allocations) {
-        await persistenceService.createAllocation({
-          payment_id: paymentId,
-          invoice_id: allocation.invoice_id,
-          amount: allocation.amount,
-          allocation_method: 'manual',
-        });
-      }
-
-      // Create journal entry
-      // DR Cash
-      // CR Accounts Receivable
-      const journalEntryId = await persistenceService.createJournalEntry(
+        status: 'posted',
+      },
+      [
         {
-          event_id: eventId,
-          entry_date: paymentData.payment_date,
-          description: `Payment ${paymentData.payment_number}`,
-          reference: paymentData.payment_number,
-          status: 'posted',
+          account_id: cashAccount.id,
+          debit_amount: paymentData.amount,
+          credit_amount: 0,
+          description: `Payment received`,
         },
-        [
-          {
-            account_id: cashAccount.id,
-            debit_amount: paymentData.amount,
-            credit_amount: 0,
-            description: `Payment received`,
-          },
-          {
-            account_id: arAccount.id,
-            debit_amount: 0,
-            credit_amount: paymentData.amount,
-            description: `Payment applied to invoices`,
-          },
-        ]
-      );
-
-      return {
-        payment_id: paymentId,
-        journal_entry_id: journalEntryId,
-        event_id: eventId,
-      };
-    });
+        {
+          account_id: arAccount.id,
+          debit_amount: 0,
+          credit_amount: paymentData.amount,
+          description: `Payment applied to invoices`,
+        },
+      ]
+    );
 
     return {
       ok: true,
-      ...result,
+      payment_id: paymentId,
+      journal_entry_id: journalEntryId,
+      event_id: eventId,
       warnings: [],
     };
   } catch (error) {
@@ -122,7 +115,7 @@ export async function createPayment(
       } else if (errorMessage.includes('FOREIGN KEY')) {
         errorMessage = 'Foreign key constraint error. Please ensure all referenced data exists.';
       } else if (errorMessage.includes('UNIQUE')) {
-        errorMessage = 'This payment number already exists. Please use a different number.';
+        errorMessage = 'This invoice number already exists. Please use a different number.';
       } else if (errorMessage.includes('balanced')) {
         errorMessage = 'Journal entry is not balanced. This is an internal error - please report it.';
       }

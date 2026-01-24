@@ -42,85 +42,78 @@ export async function createInvoice(
       }
     }
 
-    // Execute all operations in a transaction for atomicity
-    const result = await persistenceService.executeInTransaction(async () => {
-      // Create transaction event
-      const eventId = await persistenceService.createTransactionEvent({
-        event_type: 'invoice_created',
+    // Create transaction event
+    const eventId = await persistenceService.createTransactionEvent({
+      event_type: 'invoice_created',
+      description: `Invoice ${invoiceData.invoice_number}`,
+      reference: invoiceData.invoice_number,
+      created_by: 'system',
+    });
+
+    // Create invoice record
+    const invoiceId = await persistenceService.createInvoice(
+      {
+        ...invoiceData,
+        event_id: eventId,
+        status: 'sent',
+        subtotal,
+        tax_amount: taxAmount,
+        total_amount: totalAmount,
+        paid_amount: 0,
+      },
+      lines
+    );
+
+    // Create journal entries (AR posting)
+    // DR Accounts Receivable
+    // CR Revenue (per line item)
+    // CR Sales Tax Payable
+
+    const journalLines = [
+      // Debit A/R
+      {
+        account_id: arAccount.id,
+        debit_amount: totalAmount,
+        credit_amount: 0,
+        description: `Invoice ${invoiceData.invoice_number}`,
+      },
+      // Credit tax
+      {
+        account_id: taxAccount.id,
+        debit_amount: 0,
+        credit_amount: taxAmount,
+        description: 'HST collected',
+      },
+    ];
+
+    // Credit each revenue line
+    for (const line of lines) {
+      if (line.account_id) {
+        journalLines.push({
+          account_id: line.account_id,
+          debit_amount: 0,
+          credit_amount: line.amount,
+          description: line.description,
+        });
+      }
+    }
+
+    const journalEntryId = await persistenceService.createJournalEntry(
+      {
+        event_id: eventId,
+        entry_date: invoiceData.issue_date,
         description: `Invoice ${invoiceData.invoice_number}`,
         reference: invoiceData.invoice_number,
-        created_by: 'system',
-      });
-
-      // Create invoice record
-      const invoiceId = await persistenceService.createInvoice(
-        {
-          ...invoiceData,
-          event_id: eventId,
-          status: 'sent',
-          subtotal,
-          tax_amount: taxAmount,
-          total_amount: totalAmount,
-          paid_amount: 0,
-        },
-        lines
-      );
-
-      // Create journal entries (AR posting)
-      // DR Accounts Receivable
-      // CR Revenue (per line item)
-      // CR Sales Tax Payable
-
-      const journalLines = [
-        // Debit A/R
-        {
-          account_id: arAccount.id,
-          debit_amount: totalAmount,
-          credit_amount: 0,
-          description: `Invoice ${invoiceData.invoice_number}`,
-        },
-        // Credit tax
-        {
-          account_id: taxAccount.id,
-          debit_amount: 0,
-          credit_amount: taxAmount,
-          description: 'HST collected',
-        },
-      ];
-
-      // Credit each revenue line
-      for (const line of lines) {
-        if (line.account_id) {
-          journalLines.push({
-            account_id: line.account_id,
-            debit_amount: 0,
-            credit_amount: line.amount,
-            description: line.description,
-          });
-        }
-      }
-
-      const journalEntryId = await persistenceService.createJournalEntry(
-        {
-          event_id: eventId,
-          entry_date: invoiceData.issue_date,
-          description: `Invoice ${invoiceData.invoice_number}`,
-          reference: invoiceData.invoice_number,
-          status: 'posted',
-        },
-        journalLines
-      );
-
-      return {
-        invoice_id: invoiceId,
-        journal_entry_id: journalEntryId,
-        event_id: eventId,
-      };
-    });
+        status: 'posted',
+      },
+      journalLines
+    );
 
     return {
       ok: true,
-      ...result,
+      invoice_id: invoiceId,
+      journal_entry_id: journalEntryId,
+      event_id: eventId,
       warnings: [],
     };
   } catch (error) {

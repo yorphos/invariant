@@ -29,52 +29,45 @@ export async function createExpense(
       throw new Error(`Payment account ID ${expenseData.payment_account_id} not found`);
     }
 
-    // Execute all operations in a transaction for atomicity
-    const result = await persistenceService.executeInTransaction(async () => {
-      // Create transaction event
-      const eventId = await persistenceService.createTransactionEvent({
-        event_type: 'expense_recorded',
+    // Create transaction event
+    const eventId = await persistenceService.createTransactionEvent({
+      event_type: 'expense_recorded',
+      description: expenseData.description,
+      reference: expenseData.reference,
+      created_by: 'system',
+    });
+
+    // Create journal entry
+    // DR Expense Account
+    // CR Cash/Bank Account
+    const journalEntryId = await persistenceService.createJournalEntry(
+      {
+        event_id: eventId,
+        entry_date: expenseData.expense_date,
         description: expenseData.description,
         reference: expenseData.reference,
-        created_by: 'system',
-      });
-
-      // Create journal entry
-      // DR Expense Account
-      // CR Cash/Bank Account
-      const journalEntryId = await persistenceService.createJournalEntry(
+        status: 'posted',
+      },
+      [
         {
-          event_id: eventId,
-          entry_date: expenseData.expense_date,
+          account_id: expenseData.expense_account_id,
+          debit_amount: expenseData.amount,
+          credit_amount: 0,
           description: expenseData.description,
-          reference: expenseData.reference,
-          status: 'posted',
         },
-        [
-          {
-            account_id: expenseData.expense_account_id,
-            debit_amount: expenseData.amount,
-            credit_amount: 0,
-            description: expenseData.description,
-          },
-          {
-            account_id: expenseData.payment_account_id,
-            debit_amount: 0,
-            credit_amount: expenseData.amount,
-            description: 'Payment',
-          },
-        ]
-      );
-
-      return {
-        journal_entry_id: journalEntryId,
-        event_id: eventId,
-      };
-    });
+        {
+          account_id: expenseData.payment_account_id,
+          debit_amount: 0,
+          credit_amount: expenseData.amount,
+          description: 'Payment',
+        },
+      ]
+    );
 
     return {
       ok: true,
-      ...result,
+      journal_entry_id: journalEntryId,
+      event_id: eventId,
       warnings: [],
     };
   } catch (error) {
