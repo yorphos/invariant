@@ -284,3 +284,120 @@ export async function getTrialBalanceData(asOfDate: string): Promise<TrialBalanc
     totalCredits,
   };
 }
+
+/**
+ * Inventory Valuation Line for report display
+ */
+export interface InventoryValuationLine {
+  item_id: number;
+  sku: string;
+  name: string;
+  quantity: number;
+  average_cost: number;
+  total_value: number;
+}
+
+export interface InventoryValuationData {
+  items: InventoryValuationLine[];
+  totalValue: number;
+}
+
+/**
+ * Get Inventory Valuation data using optimized grouped queries
+ * Reduces from 2N queries to 2 queries total (where N = number of items)
+ * 
+ * @param asOfDate Date to calculate inventory as of (YYYY-MM-DD)
+ * @returns Inventory valuation data with items and total value
+ */
+export async function getInventoryValuationData(asOfDate: string): Promise<InventoryValuationData> {
+  const db = await getDatabase();
+  
+  // Query 1: Get all items with their net quantity on hand (single grouped query)
+  const quantityByItem = await db.select<Array<{
+    item_id: number;
+    sku: string;
+    name: string;
+    qty_on_hand: number;
+  }>>(
+    `SELECT 
+      i.id as item_id,
+      i.sku,
+      i.name,
+      COALESCE(SUM(im.quantity), 0) as qty_on_hand
+    FROM item i
+    LEFT JOIN inventory_movement im ON im.item_id = i.id 
+      AND DATE(im.movement_date) <= ?
+    WHERE i.is_active = 1
+    GROUP BY i.id, i.sku, i.name
+    HAVING qty_on_hand > 0
+    ORDER BY i.sku`,
+    [asOfDate]
+  );
+  
+  // If no items with inventory, return early
+  if (quantityByItem.length === 0) {
+    return { items: [], totalValue: 0 };
+  }
+  
+  // Query 2: Get all purchase movements for cost calculation (single query)
+  const purchases = await db.select<Array<{
+    item_id: number;
+    quantity: number;
+    unit_cost: number;
+  }>>(
+    `SELECT 
+      item_id,
+      quantity,
+      COALESCE(unit_cost, 0) as unit_cost
+    FROM inventory_movement
+    WHERE movement_type IN ('purchase', 'adjustment')
+      AND quantity > 0
+      AND DATE(movement_date) <= ?
+    ORDER BY item_id, movement_date ASC`,
+    [asOfDate]
+  );
+  
+  // Build a map of item_id -> purchases for efficient lookup
+  const purchasesByItem = new Map<number, Array<{ quantity: number; unit_cost: number }>>();
+  for (const p of purchases) {
+    if (!purchasesByItem.has(p.item_id)) {
+      purchasesByItem.set(p.item_id, []);
+    }
+    purchasesByItem.get(p.item_id)!.push({ quantity: p.quantity, unit_cost: p.unit_cost });
+  }
+  
+  // Calculate average cost for each item
+  const items: InventoryValuationLine[] = [];
+  
+  for (const item of quantityByItem) {
+    const itemPurchases = purchasesByItem.get(item.item_id) || [];
+    
+    // Calculate weighted average cost
+    let totalCost = 0;
+    let totalQty = 0;
+    for (const p of itemPurchases) {
+      totalCost += p.quantity * p.unit_cost;
+      totalQty += p.quantity;
+    }
+    
+    const avgCost = totalQty > 0 ? totalCost / totalQty : 0;
+    const totalValue = item.qty_on_hand * avgCost;
+    
+    items.push({
+      item_id: item.item_id,
+      sku: item.sku,
+      name: item.name,
+      quantity: item.qty_on_hand,
+      average_cost: avgCost,
+      total_value: totalValue,
+    });
+  }
+  
+  // Sort by total value descending
+  items.sort((a, b) => b.total_value - a.total_value);
+  
+  // Calculate total inventory value
+  const totalValue = items.reduce((sum, item) => sum + item.total_value, 0);
+  
+  return { items, totalValue };
+}

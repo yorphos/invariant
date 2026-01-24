@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getDatabase } from '../services/database';
-  import { getBalanceSheetData, getProfitAndLossData, getTrialBalanceData } from '../services/reports';
-  import type { AccountBalance } from '../services/reports';
+  import { getBalanceSheetData, getProfitAndLossData, getTrialBalanceData, getInventoryValuationData } from '../services/reports';
+  import type { AccountBalance, InventoryValuationLine } from '../services/reports';
   import type { Account } from '../domain/types';
   import Card from '../ui/Card.svelte';
   import Input from '../ui/Input.svelte';
@@ -313,82 +313,16 @@
     loading = false;
   }
 
-  // Inventory Valuation
-  interface InventoryValuationLine {
-    sku: string;
-    name: string;
-    quantity: number;
-    average_cost: number;
-    total_value: number;
-  }
+  // Inventory Valuation (uses imported type from reports.ts)
   let inventoryValuation: InventoryValuationLine[] = [];
 
   async function loadInventoryValuation() {
     loading = true;
     try {
-      const db = await getDatabase();
-      
-      // Get all items
-      const items = await db.select<Array<{
-        id: number;
-        sku: string;
-        name: string;
-      }>>(
-        `SELECT id, sku, name FROM item WHERE is_active = 1 ORDER BY sku`
-      );
-      
-      const valuation: InventoryValuationLine[] = [];
-      
-      for (const item of items) {
-        // Calculate quantity on hand
-        const qtyResult = await db.select<Array<{ qty: number }>>(
-          `SELECT COALESCE(SUM(quantity), 0) as qty
-           FROM inventory_movement
-           WHERE item_id = ?
-             AND movement_date <= ?`,
-          [item.id, asOfDate]
-        );
-        
-        const qty = qtyResult[0]?.qty || 0;
-        
-        if (qty === 0) continue; // Skip items with no inventory
-        
-        // Get all purchases to calculate average cost (simplified FIFO-based valuation)
-        const purchases = await db.select<Array<{
-          quantity: number;
-          unit_cost: number;
-        }>>(
-          `SELECT quantity, unit_cost
-           FROM inventory_movement
-           WHERE item_id = ?
-             AND movement_type IN ('purchase', 'adjustment')
-             AND quantity > 0
-             AND movement_date <= ?
-           ORDER BY movement_date ASC`,
-          [item.id, asOfDate]
-        );
-        
-        // Calculate average cost
-        let totalCost = 0;
-        let totalQty = 0;
-        for (const p of purchases) {
-          totalCost += p.quantity * (p.unit_cost || 0);
-          totalQty += p.quantity;
-        }
-        
-        const avgCost = totalQty > 0 ? totalCost / totalQty : 0;
-        const totalValue = qty * avgCost;
-        
-        valuation.push({
-          sku: item.sku,
-          name: item.name,
-          quantity: qty,
-          average_cost: avgCost,
-          total_value: totalValue
-        });
-      }
-      
-      inventoryValuation = valuation.sort((a, b) => b.total_value - a.total_value);
+      // Use optimized service layer with grouped aggregate queries
+      // Reduces from 2N queries to 2 queries total
+      const data = await getInventoryValuationData(asOfDate);
+      inventoryValuation = data.items;
     } catch (e) {
       console.error('Failed to load inventory valuation:', e);
     }

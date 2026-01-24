@@ -64,19 +64,13 @@
   async function loadData() {
     loading = true;
     try {
-      const [entriesResult, accountsResult] = await Promise.all([
-        persistenceService.getJournalEntries(),
+      // Use optimized query that fetches entries and lines in 2 queries instead of N+1
+      const [entriesWithLines, accountsResult] = await Promise.all([
+        persistenceService.getJournalEntriesWithLines(50),
         persistenceService.getAccounts()
       ]);
       
-      // Load lines for each entry
-      journalEntries = await Promise.all(
-        entriesResult.slice(0, 50).map(async (entry: JournalEntry) => {
-          const lines = await persistenceService.getJournalLines(entry.id!);
-          return { ...entry, lines };
-        })
-      );
-      
+      journalEntries = entriesWithLines;
       accounts = accountsResult;
     } catch (e) {
       console.error('Failed to load journal entries:', e);

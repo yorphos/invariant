@@ -215,6 +215,54 @@ export class PersistenceService {
     );
   }
 
+  /**
+   * Get journal entries with their lines in a single optimized query.
+   * Reduces N+1 query pattern from (1 + N) queries to 2 queries.
+   * 
+   * @param limit Maximum number of entries to fetch
+   * @returns Journal entries with embedded lines array
+   */
+  async getJournalEntriesWithLines(limit: number = 50): Promise<(JournalEntry & { lines: JournalLine[] })[]> {
+    const db = await getDatabase();
+    
+    // Query 1: Get the entries
+    const entries = await db.select<JournalEntry[]>(
+      'SELECT * FROM journal_entry ORDER BY entry_date DESC, id DESC LIMIT ?',
+      [limit]
+    );
+    
+    if (entries.length === 0) {
+      return [];
+    }
+    
+    // Query 2: Get all lines for these entries in one query
+    const entryIds = entries.map(e => e.id);
+    const placeholders = entryIds.map(() => '?').join(', ');
+    
+    const allLines = await db.select<JournalLine[]>(
+      `SELECT * FROM journal_line 
+       WHERE journal_entry_id IN (${placeholders})
+       ORDER BY journal_entry_id, id`,
+      entryIds
+    );
+    
+    // Group lines by journal_entry_id
+    const linesByEntryId = new Map<number, JournalLine[]>();
+    for (const line of allLines) {
+      const entryId = line.journal_entry_id!;
+      if (!linesByEntryId.has(entryId)) {
+        linesByEntryId.set(entryId, []);
+      }
+      linesByEntryId.get(entryId)!.push(line);
+    }
+    
+    // Attach lines to entries
+    return entries.map(entry => ({
+      ...entry,
+      lines: linesByEntryId.get(entry.id!) || []
+    }));
+  }
+
   // Contact operations
   async getContacts(type?: 'customer' | 'vendor' | 'both'): Promise<Contact[]> {
     const db = await getDatabase();
