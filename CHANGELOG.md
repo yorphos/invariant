@@ -11,6 +11,232 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.7]
+
+### 🔧 Signing Fix (Password)
+- **Added `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`** to release workflow
+- Required for password-protected signing keys
+- Version bump to 0.3.7
+
+### 📊 Technical Details
+- Workflow updated to pass password env var
+- All tests passing
+
+### 🎯 Impact
+Fixes `incorrect updater private key password` error during signing.
+
+---
+
+## [0.3.6]
+
+### 🔧 Signing Fix (Environment Variable)
+- **Explicitly set `TAURI_SIGNING_PRIVATE_KEY`** in release workflow
+- The Tauri CLI specifically demands `TAURI_SIGNING_PRIVATE_KEY` when a pubkey is present
+- Set both `TAURI_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY` to be absolutely sure
+- **Clean version bump to 0.3.6**
+
+### 📊 Technical Details
+- Modified `.github/workflows/release.yml` env vars
+- All 501 tests passing
+
+### 🎯 Impact
+This fixes the `A public key has been found, but no private key` error during the signing phase.
+
+---
+
+## [0.3.5]
+
+### 🔧 Fixed Release Workflow & JSON Syntax
+- **Fixed critical JSON syntax error** in `tauri.conf.json` (missing closing brace)
+- **Restored v0.2.0-style release workflow** with proper version checking
+- **Fixed signing environment variable** (`TAURI_PRIVATE_KEY`)
+- **Clean version bump to 0.3.5** to ensure fresh release
+
+### 📊 Technical Details
+- Reverted to proven release workflow pattern
+- Fixed malformed JSON that was causing parser errors
+- All 501 tests passing
+
+### 🎯 Impact
+Release system should now be fully functional again.
+
+---
+
+## [0.3.4]
+
+### 🔧 Signing Fix and Version Bump
+- **Fixed Tauri signing environment variable name**
+  - Changed from TAURI_SIGNING_PRIVATE_KEY to TAURI_PRIVATE_KEY
+  - tauri-action expects TAURI_PRIVATE_KEY
+- **Version bump to 0.3.4**
+  - All 3 version files updated
+  - Ready for new release
+
+### 📊 Technical Details
+- Fixed environment variable name in release workflow
+- Version bump: 0.3.3 → 0.3.4
+- All 501 tests passing
+- No migration changes
+- No code changes (workflow and version only)
+
+### 🎯 Impact
+Signing will now work with correct environment variable. New release should trigger and build all platform installers successfully.
+
+---
+
+## [0.3.3]
+
+### 🔄 Simplified Release Workflow
+- **Reverted to simple, working release workflow** from v0.3.0
+  - Removed all complex two-workflow logic
+  - Removed manual release workflow (was broken)
+  - Back to simple trigger: `push` with version file paths
+  - **Version bump to 0.3.2**
+  - Back to what actually worked
+
+### 📊 Technical Details
+- Reverted `.github/workflows/release.yml` to v0.2.0 simple version
+- Updated version files: package.json, tauri.conf.json, Cargo.toml
+- All 501 tests passing
+- No migration changes
+- No code changes (workflow only)
+
+### 🎯 Impact
+Back to simple, proven release workflow that worked for v0.2.0. Ready for v0.3.2 release.
+
+---
+
+## [0.3.1]
+
+### 🔧 Release Workflow Fix
+- **Fixed bash condition** in release workflow for proper tag push detection
+  - Changed from GitHub Actions expression syntax to bash pattern matching
+  - Used `[[ "${{ github.ref }}" == refs/tags/* ]]` for tag detection
+  - Added debug output showing trigger event and git ref
+- **Root cause**: Previous condition used `${{ startsWith(...) }}` which is a GitHub Actions expression, not bash syntax
+
+### 📊 Technical Details
+- Modified `.github/workflows/release.yml`
+- All 501 tests passing
+- No migration changes
+- No code changes (workflow fix only)
+
+### 🎯 Impact
+Release workflow now correctly identifies tag pushes and triggers matrix build jobs.
+
+---
+
+## [0.3.1]
+
+### 🔧 Workflow Fixes
+- **Fixed Release workflow** to support both automatic and manual release triggers
+  - Added `push:tags` trigger for manual tag-based releases
+  - Added `skip-ci-check` job to bypass CI verification for manual tags
+  - Fixed version detection to extract from tag name when needed
+  - Prevents double-tag creation for manual releases
+- **Fixed CI/Release sequence** - Release now waits for CI to complete
+  - Release workflow only triggers after successful CI completion
+  - Eliminated duplicate test runs
+  - Ensures broken code never gets released
+
+### 📊 Technical Details
+- Modified `.github/workflows/release.yml`
+- Updated `AGENTS.md` documentation
+- All 501 tests passing
+- No migration changes
+
+### 🎯 Impact
+Release system now works correctly with both automatic (version bump) and manual (tag push) release methods. CI must pass before any release is built.
+
+---
+
+## [0.3.0]
+
+### 🔄 Phase 8: Auto-Update System
+
+#### 🚀 Added
+- **Automatic Update Checking** - Check for updates on app startup (non-blocking)
+  - Checks GitHub Releases for new versions
+  - Skips check if run within last 12 hours
+  - Desktop platforms only (Windows, macOS, Linux)
+
+- **Manual Update Check** - "Check for Updates" button in Settings
+  - Force update check regardless of last check time
+  - Shows update modal if newer version available
+  - Shows toast notification if already up to date
+
+- **Update Channel Selection** (Pro Mode) - Choose between Stable and Beta releases
+  - Stable channel: Production releases only (default)
+  - Beta channel: Pre-release builds for early testing
+  - Preference stored in database settings table
+
+- **Update Modal UI** - Beautiful update notification with progress tracking
+  - Release version and release notes from GitHub
+  - Download progress bar with percentage
+  - Three action buttons:
+    - "Skip This Version" (session-only, not persisted)
+    - "Remind Me Later" (dismiss modal)
+    - "Install Now" (download and install update)
+  - Markdown rendering for release notes
+
+- **Cryptographic Signature Verification** - Updates signed with minisign (Ed25519)
+  - Public key embedded in app configuration
+  - Prevents tampering with update files
+  - Signature verification happens automatically
+
+- **Silent Installation** (Windows) - Passive install mode with progress bar
+  - No user interaction required during install
+  - Progress shown in installer window
+  - App restarts automatically after update
+
+- **GitHub Actions Integration** - Automated release workflow
+  - Detects version changes in tauri.conf.json
+  - Builds signed installers for all platforms
+  - Creates GitHub Release with artifacts
+  - Uploads `latest.json` for update discovery
+
+#### 🔧 Technical Details
+- **New files**:
+  - `src-tauri/src/updater.rs` - Rust backend for update operations
+  - `src/lib/services/updater.ts` - TypeScript frontend service
+  - `src/lib/ui/UpdateModal.svelte` - Update notification UI
+  - `migrations/017_update_channel.ts` - Database schema for update preferences
+- **Modified files**:
+  - `src-tauri/tauri.conf.json` - Added updater plugin configuration
+  - `src-tauri/Cargo.toml` - Added `tauri-plugin-updater` and `thiserror` dependencies
+  - `src-tauri/src/lib.rs` - Registered updater module with `cfg(desktop)` conditional compilation
+  - `src/lib/services/persistence.ts` - Added update preference methods
+  - `src/App.svelte` - Integrated update checking, modal, and settings UI
+  - `.github/workflows/release.yml` - Added `TAURI_SIGNING_PRIVATE_KEY` environment variable
+- **Dependencies**:
+  - `tauri-plugin-updater` 2.9.0 - Tauri's official update plugin
+  - `thiserror` 2.0.18 - Rust error handling
+- **Migrations**: 17 total (was 16)
+- **Test count**: 501 passing (16 test files)
+
+#### 📊 Update Distribution
+- **GitHub Endpoint**: `https://github.com/yorphos/invariant/releases/latest/download/latest.json`
+- **Stable Channel**: Points to latest release
+- **Beta Channel**: Points to latest pre-release
+- **Supported Platforms**: Windows, macOS (Intel + Apple Silicon), Linux
+
+#### 🔒 Security
+- **Code Signing**: All releases signed with minisign (Ed25519)
+- **Signature Verification**: Automatic verification before installation
+- **HTTPS Only**: All downloads over encrypted connection
+- **No Auto-Install**: User must explicitly click "Install Now"
+
+#### 💡 User Experience
+- **Non-Intrusive**: Startup check runs in background, doesn't block UI
+- **Informative**: Shows release notes before installing
+- **Flexible**: Skip version, remind later, or install immediately
+- **Safe**: Cryptographic verification prevents malicious updates
+
+#### 🎯 Impact
+Users can now receive automatic updates without manually downloading and reinstalling the application. This ensures users stay on the latest version with bug fixes, security patches, and new features.
+
+---
+
 ## [0.2.0]
 
 ### 🔧 Phase 7: Dynamic Account Code Management

@@ -1,5 +1,5 @@
 # Release Build - Creates distributable installers for all platforms
-# Automatically triggered when version is bumped in config files
+# Automatically triggered when version is bumped in tauri.conf.json
 # Creates a GitHub Release with all platform installers attached
 
 name: Release
@@ -9,6 +9,7 @@ on:
     branches:
       - main
     paths:
+      # Only run when version-related files change
       - 'src-tauri/tauri.conf.json'
       - 'package.json'
       - 'src-tauri/Cargo.toml'
@@ -31,7 +32,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 2  # Need previous commit to compare
 
       - name: Check for version change
         id: check
@@ -80,6 +81,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=${{ steps.check.outputs.version }}
+          # Check if tag already exists
           if git ls-remote --tags origin | grep -q "refs/tags/v$VERSION"; then
             echo "Release v$VERSION already exists - skipping"
             echo "should_release=false" >> $GITHUB_OUTPUT
@@ -105,16 +107,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Cache Vite build
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules/.vite
-            .svelte-kit
-          key: vite-${{ runner.os }}-${{ hashFiles('src/**', 'vite.config.ts', 'svelte.config.js', 'tsconfig.json') }}
-          restore-keys: |
-            vite-${{ runner.os }}-
-
       - name: Run TypeScript check
         run: npm run check
 
@@ -132,18 +124,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Windows x64
           - name: Windows
             platform: windows-latest
             args: ''
 
+          # macOS Apple Silicon (M1/M2/M3)
           - name: macOS (Apple Silicon)
             platform: macos-latest
             args: '--target aarch64-apple-darwin'
 
+          # macOS Intel
           - name: macOS (Intel)
             platform: macos-latest
             args: '--target x86_64-apple-darwin'
 
+          # Linux x64
           - name: Linux
             platform: ubuntu-22.04
             args: ''
@@ -179,20 +175,12 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Cache Vite build
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules/.vite
-            .svelte-kit
-          key: vite-${{ runner.os }}-${{ hashFiles('src/**', 'vite.config.ts', 'svelte.config.js', 'tsconfig.json') }}
-          restore-keys: |
-            vite-${{ runner.os }}-
-
       - name: Build Tauri app and create release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v${{ needs.check-version.outputs.version }}
           releaseName: 'Invariant Accounting v${{ needs.check-version.outputs.version }}'
@@ -212,29 +200,3 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
-
-  # Create git tag after successful release
-  create-tag:
-    name: Create Git Tag
-    needs: [check-version, build-release]
-    if: needs.check-version.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Create and push tag
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION=${{ needs.check-version.outputs.version }}
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git tag -a "v$VERSION" -m "Release v$VERSION"
-          git push origin "v$VERSION"
-          
-          echo "Created and pushed tag v$VERSION"
