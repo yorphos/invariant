@@ -1,27 +1,37 @@
 # Release Build - Creates distributable installers for all platforms
-# Automatically triggered when version is bumped in config files
-# Creates a GitHub Release with all platform installers attached
+# Triggered ONLY after CI workflow completes successfully
+# Checks if version was bumped, then creates GitHub Release with all platform installers
 
 name: Release
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
     branches:
       - main
-    paths:
-      - 'src-tauri/tauri.conf.json'
-      - 'package.json'
-      - 'src-tauri/Cargo.toml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # First, check if CI actually succeeded (fail fast if CI failed)
+  check-ci-success:
+    name: Verify CI Success
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: CI workflow succeeded
+        run: echo "CI workflow completed successfully, proceeding with release checks"
+
   # Check if this is actually a version bump that needs a release
   check-version:
     name: Check Version Change
     runs-on: ubuntu-latest
+    needs: check-ci-success
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
       version: ${{ steps.check.outputs.version }}
@@ -85,46 +95,10 @@ jobs:
             echo "should_release=false" >> $GITHUB_OUTPUT
           fi
 
-  # Run tests before building release
-  test:
-    name: Test & Lint
-    needs: check-version
-    if: needs.check-version.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Cache Vite build
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules/.vite
-            .svelte-kit
-          key: vite-${{ runner.os }}-${{ hashFiles('src/**', 'vite.config.ts', 'svelte.config.js', 'tsconfig.json') }}
-          restore-keys: |
-            vite-${{ runner.os }}-
-
-      - name: Run TypeScript check
-        run: npm run check
-
-      - name: Run tests
-        run: npm run test:run
-
   # Build and release for all platforms
   build-release:
     name: Build (${{ matrix.name }})
-    needs: [check-version, test]
+    needs: [check-version]
     if: needs.check-version.outputs.should_release == 'true'
     permissions:
       contents: write
