@@ -5,6 +5,8 @@
   import Card from '../ui/Card.svelte';
   import Input from '../ui/Input.svelte';
   import Table from '../ui/Table.svelte';
+  import Button from '../ui/Button.svelte';
+  import { toCSV, downloadCSV, formatCurrencyForCSV } from '../utils/csv-export';
 
   let loading = false;
   let asOfDate = '';
@@ -108,6 +110,109 @@
     .reduce((sum, b) => sum + b.balance, 0);
 
   $: netIncome = totalRevenue - totalExpenses;
+
+  function exportBalanceSheet() {
+    const assets = balances
+      .filter(b => b.account.type === 'asset')
+      .map(b => ({
+        Type: 'Asset',
+        Code: b.account.code,
+        Account: b.account.name,
+        Balance: formatCurrencyForCSV(b.balance),
+      }));
+
+    const liabilities = balances
+      .filter(b => b.account.type === 'liability')
+      .map(b => ({
+        Type: 'Liability',
+        Code: b.account.code,
+        Account: b.account.name,
+        Balance: formatCurrencyForCSV(b.balance),
+      }));
+
+    const equity = balances
+      .filter(b => b.account.type === 'equity')
+      .map(b => ({
+        Type: 'Equity',
+        Code: b.account.code,
+        Account: b.account.name,
+        Balance: formatCurrencyForCSV(b.balance),
+      }));
+
+    // Add totals
+    const data = [
+      ...assets,
+      { Type: 'Asset', Code: '', Account: 'Total Assets', Balance: formatCurrencyForCSV(totalAssets) },
+      { Type: '', Code: '', Account: '', Balance: '' },
+      ...liabilities,
+      { Type: 'Liability', Code: '', Account: 'Total Liabilities', Balance: formatCurrencyForCSV(totalLiabilities) },
+      { Type: '', Code: '', Account: '', Balance: '' },
+      ...equity,
+      { Type: 'Equity', Code: '', Account: 'Net Income', Balance: formatCurrencyForCSV(netIncome) },
+      { Type: 'Equity', Code: '', Account: 'Total Equity', Balance: formatCurrencyForCSV(totalEquity + netIncome) },
+    ];
+
+    const csv = toCSV(data, ['Type', 'Code', 'Account', 'Balance']);
+    downloadCSV(csv, `balance-sheet-${asOfDate}.csv`);
+  }
+
+  function exportProfitLoss() {
+    const revenue = balances
+      .filter(b => b.account.type === 'revenue')
+      .map(b => ({
+        Type: 'Revenue',
+        Code: b.account.code,
+        Account: b.account.name,
+        Amount: formatCurrencyForCSV(b.balance),
+      }));
+
+    const expenses = balances
+      .filter(b => b.account.type === 'expense')
+      .map(b => ({
+        Type: 'Expense',
+        Code: b.account.code,
+        Account: b.account.name,
+        Amount: formatCurrencyForCSV(b.balance),
+      }));
+
+    const data = [
+      ...revenue,
+      { Type: 'Revenue', Code: '', Account: 'Total Revenue', Amount: formatCurrencyForCSV(totalRevenue) },
+      { Type: '', Code: '', Account: '', Amount: '' },
+      ...expenses,
+      { Type: 'Expense', Code: '', Account: 'Total Expenses', Amount: formatCurrencyForCSV(totalExpenses) },
+      { Type: '', Code: '', Account: '', Amount: '' },
+      { Type: '', Code: '', Account: 'Net Income', Amount: formatCurrencyForCSV(netIncome) },
+    ];
+
+    const csv = toCSV(data, ['Type', 'Code', 'Account', 'Amount']);
+    downloadCSV(csv, `profit-loss-${asOfDate}.csv`);
+  }
+
+  function exportTrialBalance() {
+    const data = balances.map(b => ({
+      Code: b.account.code,
+      Account: b.account.name,
+      Type: b.account.type as string,
+      Debit: b.debit_total > b.credit_total ? formatCurrencyForCSV(b.balance) : '0.00',
+      Credit: b.credit_total > b.debit_total ? formatCurrencyForCSV(b.balance) : '0.00',
+    }));
+
+    // Add totals
+    const totalDebits = balances.reduce((sum, b) => sum + (b.debit_total > b.credit_total ? b.balance : 0), 0);
+    const totalCredits = balances.reduce((sum, b) => sum + (b.credit_total > b.debit_total ? b.balance : 0), 0);
+
+    data.push({
+      Code: '',
+      Account: 'Totals',
+      Type: '',
+      Debit: formatCurrencyForCSV(totalDebits),
+      Credit: formatCurrencyForCSV(totalCredits),
+    });
+
+    const csv = toCSV(data, ['Code', 'Account', 'Type', 'Debit', 'Credit']);
+    downloadCSV(csv, `trial-balance-${asOfDate}.csv`);
+  }
 </script>
 
 <div class="reports-view">
@@ -135,6 +240,7 @@
     <Card title="Balance Sheet" padding={false}>
       <div class="report-header">
         <h3>As of {new Date(asOfDate).toLocaleDateString('en-CA')}</h3>
+        <Button variant="secondary" on:click={exportBalanceSheet}>Export CSV</Button>
       </div>
 
       <div class="balance-sheet">
@@ -205,6 +311,7 @@
     <Card title="Profit & Loss Statement" padding={false}>
       <div class="report-header">
         <h3>For period ending {new Date(asOfDate).toLocaleDateString('en-CA')}</h3>
+        <Button variant="secondary" on:click={exportProfitLoss}>Export CSV</Button>
       </div>
 
       <div class="profit-loss">
@@ -251,6 +358,7 @@
     <Card title="Trial Balance" padding={false}>
       <div class="report-header">
         <h3>As of {new Date(asOfDate).toLocaleDateString('en-CA')}</h3>
+        <Button variant="secondary" on:click={exportTrialBalance}>Export CSV</Button>
       </div>
 
       <Table headers={['Code', 'Account', 'Debit', 'Credit']}>
@@ -303,6 +411,9 @@
   }
 
   .report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     padding: 20px 24px;
     border-bottom: 2px solid #2c3e50;
   }

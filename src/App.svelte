@@ -11,6 +11,7 @@
   import ReportsView from './lib/views/ReportsView.svelte';
   import DashboardView from './lib/views/DashboardView.svelte';
   import AccountsView from './lib/views/AccountsView.svelte';
+  import { backupDatabase, restoreDatabase } from './lib/services/backup';
 
   let mode: PolicyMode = 'beginner';
   let dbReady = false;
@@ -32,6 +33,29 @@
     const newMode: PolicyMode = mode === 'beginner' ? 'pro' : 'beginner';
     await persistenceService.setMode(newMode);
     mode = newMode;
+  }
+
+  async function handleBackup() {
+    try {
+      const success = await backupDatabase();
+      if (success) {
+        alert('Database backed up successfully!');
+      }
+    } catch (e) {
+      alert(`Backup failed: ${e}`);
+    }
+  }
+
+  async function handleRestore() {
+    try {
+      const success = await restoreDatabase();
+      if (success) {
+        // App restart required
+        location.reload();
+      }
+    } catch (e) {
+      alert(`Restore failed: ${e}`);
+    }
   }
 
   function setView(view: typeof activeView) {
@@ -158,6 +182,25 @@
               {/if}
             </div>
           </div>
+
+          <div class="setting-group">
+            <h3>Database Backup</h3>
+            <p>
+              Back up your accounting data to prevent data loss. Backups are stored as SQLite database files.
+            </p>
+            <div class="button-group">
+              <button onclick={handleBackup}>
+                Backup Database
+              </button>
+              <button onclick={handleRestore} class="danger">
+                Restore from Backup
+              </button>
+            </div>
+            <div class="info">
+              <p><strong>Backup:</strong> Save a copy of your database to a location of your choice.</p>
+              <p><strong>Restore:</strong> Replace your current database with a backup. <em>This will delete all current data!</em></p>
+            </div>
+          </div>
         </div>
       {/if}
     </main>
@@ -249,15 +292,6 @@
     font-size: 28px;
   }
 
-  .info {
-    background: #e8f4f8;
-    padding: 16px;
-    border-radius: 6px;
-    border-left: 4px solid #3498db;
-    margin-top: 16px;
-    color: #2c3e50;
-  }
-
   .setting-group {
     background: white;
     padding: 24px;
@@ -284,6 +318,43 @@
 
   .setting-group button:hover {
     background: #2980b9;
+  }
+
+  .button-group {
+    display: flex;
+    gap: 12px;
+    margin: 16px 0;
+  }
+
+  .setting-group button.danger {
+    background: #e74c3c;
+  }
+
+  .setting-group button.danger:hover {
+    background: #c0392b;
+  }
+
+  .info {
+    background: #e8f4f8;
+    padding: 16px;
+    border-radius: 6px;
+    border-left: 4px solid #3498db;
+    margin-top: 16px;
+    color: #2c3e50;
+  }
+
+  .info p {
+    margin: 8px 0;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .info p:first-child {
+    margin-top: 0;
+  }
+
+  .info p:last-child {
+    margin-bottom: 0;
   }
 
   .mode-info {
