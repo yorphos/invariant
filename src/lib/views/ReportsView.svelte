@@ -3,10 +3,9 @@
   import { getDatabase } from '../services/database';
   import type { Account } from '../domain/types';
   import Card from '../ui/Card.svelte';
-  import Select from '../ui/Select.svelte';
+  import Input from '../ui/Input.svelte';
   import Table from '../ui/Table.svelte';
 
-  let reportType: 'balance-sheet' | 'profit-loss' | 'trial-balance' = 'balance-sheet';
   let loading = false;
   let asOfDate = '';
 
@@ -19,11 +18,12 @@
 
   let balances: AccountBalance[] = [];
   
-  onMount(() => {
+  onMount(async () => {
     asOfDate = new Date().toISOString().split('T')[0];
+    await loadReports();
   });
 
-  async function generateReport() {
+  async function loadReports() {
     loading = true;
     try {
       const db = await getDatabase();
@@ -69,10 +69,15 @@
 
       balances = accountBalances.filter(b => Math.abs(b.balance) > 0.01);
     } catch (e) {
-      console.error('Failed to generate report:', e);
-      alert('Failed to generate report: ' + e);
+      console.error('Failed to load reports:', e);
+      alert('Failed to load reports: ' + e);
     }
     loading = false;
+  }
+
+  // Automatically reload reports when date changes
+  $: if (asOfDate) {
+    loadReports();
   }
 
   function formatCurrency(amount: number): string {
@@ -106,177 +111,172 @@
 </script>
 
 <div class="reports-view">
-  <h2>Financial Reports</h2>
-
-  <Card title="Report Options">
-    <div class="report-options">
-      <Select
-        label="Report Type"
-        bind:value={reportType}
-        options={[
-          { value: 'balance-sheet', label: 'Balance Sheet' },
-          { value: 'profit-loss', label: 'Profit & Loss' },
-          { value: 'trial-balance', label: 'Trial Balance' }
-        ]}
+  <div class="header">
+    <h2>Financial Reports</h2>
+    <div class="date-selector">
+      <Input
+        type="date"
+        label="As of Date"
+        bind:value={asOfDate}
       />
-
-      <div class="date-generate">
-        <input type="date" bind:value={asOfDate} class="date-input" />
-        <button class="generate-btn" on:click={generateReport} disabled={loading}>
-          {loading ? 'Generating...' : 'Generate Report'}
-        </button>
-      </div>
     </div>
-  </Card>
+  </div>
 
-  {#if balances.length > 0}
-    {#if reportType === 'balance-sheet'}
-      <Card title="Balance Sheet" padding={false}>
-        <div class="report-header">
-          <h3>As of {new Date(asOfDate).toLocaleDateString('en-CA')}</h3>
-        </div>
+  {#if loading}
+    <Card>
+      <p>Loading reports...</p>
+    </Card>
+  {:else if balances.length === 0}
+    <Card>
+      <p>No data available for the selected date. Try recording some transactions first.</p>
+    </Card>
+  {:else}
+    <!-- Balance Sheet -->
+    <Card title="Balance Sheet" padding={false}>
+      <div class="report-header">
+        <h3>As of {new Date(asOfDate).toLocaleDateString('en-CA')}</h3>
+      </div>
 
-        <div class="balance-sheet">
-          <div class="section">
-            <h4>Assets</h4>
-            <Table headers={['Account', 'Balance']}>
-              {#each balances.filter(b => b.account.type === 'asset') as item}
-                <tr>
-                  <td>{item.account.code} - {item.account.name}</td>
-                  <td class="amount">{formatCurrency(item.balance)}</td>
-                </tr>
-              {/each}
-              <tr class="total-row">
-                <td><strong>Total Assets</strong></td>
-                <td class="amount"><strong>{formatCurrency(totalAssets)}</strong></td>
-              </tr>
-            </Table>
-          </div>
-
-          <div class="section">
-            <h4>Liabilities</h4>
-            <Table headers={['Account', 'Balance']}>
-              {#each balances.filter(b => b.account.type === 'liability') as item}
-                <tr>
-                  <td>{item.account.code} - {item.account.name}</td>
-                  <td class="amount">{formatCurrency(item.balance)}</td>
-                </tr>
-              {/each}
-              <tr class="total-row">
-                <td><strong>Total Liabilities</strong></td>
-                <td class="amount"><strong>{formatCurrency(totalLiabilities)}</strong></td>
-              </tr>
-            </Table>
-          </div>
-
-          <div class="section">
-            <h4>Equity</h4>
-            <Table headers={['Account', 'Balance']}>
-              {#each balances.filter(b => b.account.type === 'equity') as item}
-                <tr>
-                  <td>{item.account.code} - {item.account.name}</td>
-                  <td class="amount">{formatCurrency(item.balance)}</td>
-                </tr>
-              {/each}
+      <div class="balance-sheet">
+        <div class="section">
+          <h4>Assets</h4>
+          <Table headers={['Account', 'Balance']}>
+            {#each balances.filter(b => b.account.type === 'asset') as item}
               <tr>
-                <td>Net Income (Current Period)</td>
-                <td class="amount">{formatCurrency(netIncome)}</td>
+                <td>{item.account.code} - {item.account.name}</td>
+                <td class="amount">{formatCurrency(item.balance)}</td>
               </tr>
-              <tr class="total-row">
-                <td><strong>Total Equity</strong></td>
-                <td class="amount"><strong>{formatCurrency(totalEquity + netIncome)}</strong></td>
-              </tr>
-            </Table>
-          </div>
-
-          <div class="accounting-equation">
-            <strong>Liabilities + Equity = {formatCurrency(totalLiabilities + totalEquity + netIncome)}</strong>
-            {#if Math.abs((totalLiabilities + totalEquity + netIncome) - totalAssets) > 0.01}
-              <span class="warning">⚠️ Not balanced!</span>
-            {:else}
-              <span class="success">✓ Balanced</span>
-            {/if}
-          </div>
-        </div>
-      </Card>
-
-    {:else if reportType === 'profit-loss'}
-      <Card title="Profit & Loss Statement" padding={false}>
-        <div class="report-header">
-          <h3>For period ending {new Date(asOfDate).toLocaleDateString('en-CA')}</h3>
-        </div>
-
-        <div class="profit-loss">
-          <div class="section">
-            <h4>Revenue</h4>
-            <Table headers={['Account', 'Amount']}>
-              {#each balances.filter(b => b.account.type === 'revenue') as item}
-                <tr>
-                  <td>{item.account.code} - {item.account.name}</td>
-                  <td class="amount">{formatCurrency(item.balance)}</td>
-                </tr>
-              {/each}
-              <tr class="total-row">
-                <td><strong>Total Revenue</strong></td>
-                <td class="amount"><strong>{formatCurrency(totalRevenue)}</strong></td>
-              </tr>
-            </Table>
-          </div>
-
-          <div class="section">
-            <h4>Expenses</h4>
-            <Table headers={['Account', 'Amount']}>
-              {#each balances.filter(b => b.account.type === 'expense') as item}
-                <tr>
-                  <td>{item.account.code} - {item.account.name}</td>
-                  <td class="amount">{formatCurrency(item.balance)}</td>
-                </tr>
-              {/each}
-              <tr class="total-row">
-                <td><strong>Total Expenses</strong></td>
-                <td class="amount"><strong>{formatCurrency(totalExpenses)}</strong></td>
-              </tr>
-            </Table>
-          </div>
-
-          <div class="net-income" class:profit={netIncome > 0} class:loss={netIncome < 0}>
-            <strong>Net Income:</strong>
-            <strong>{formatCurrency(netIncome)}</strong>
-          </div>
-        </div>
-      </Card>
-
-    {:else if reportType === 'trial-balance'}
-      <Card title="Trial Balance" padding={false}>
-        <div class="report-header">
-          <h3>As of {new Date(asOfDate).toLocaleDateString('en-CA')}</h3>
-        </div>
-
-        <Table headers={['Code', 'Account', 'Debit', 'Credit']}>
-          {#each balances as item}
-            <tr>
-              <td>{item.account.code}</td>
-              <td>{item.account.name}</td>
-              <td class="amount">
-                {item.debit_total > item.credit_total ? formatCurrency(item.balance) : '-'}
-              </td>
-              <td class="amount">
-                {item.credit_total > item.debit_total ? formatCurrency(item.balance) : '-'}
-              </td>
+            {/each}
+            <tr class="total-row">
+              <td><strong>Total Assets</strong></td>
+              <td class="amount"><strong>{formatCurrency(totalAssets)}</strong></td>
             </tr>
-          {/each}
-          <tr class="total-row">
-            <td colspan="2"><strong>Totals</strong></td>
+          </Table>
+        </div>
+
+        <div class="section">
+          <h4>Liabilities</h4>
+          <Table headers={['Account', 'Balance']}>
+            {#each balances.filter(b => b.account.type === 'liability') as item}
+              <tr>
+                <td>{item.account.code} - {item.account.name}</td>
+                <td class="amount">{formatCurrency(item.balance)}</td>
+              </tr>
+            {/each}
+            <tr class="total-row">
+              <td><strong>Total Liabilities</strong></td>
+              <td class="amount"><strong>{formatCurrency(totalLiabilities)}</strong></td>
+            </tr>
+          </Table>
+        </div>
+
+        <div class="section">
+          <h4>Equity</h4>
+          <Table headers={['Account', 'Balance']}>
+            {#each balances.filter(b => b.account.type === 'equity') as item}
+              <tr>
+                <td>{item.account.code} - {item.account.name}</td>
+                <td class="amount">{formatCurrency(item.balance)}</td>
+              </tr>
+            {/each}
+            <tr>
+              <td>Net Income (Current Period)</td>
+              <td class="amount">{formatCurrency(netIncome)}</td>
+            </tr>
+            <tr class="total-row">
+              <td><strong>Total Equity</strong></td>
+              <td class="amount"><strong>{formatCurrency(totalEquity + netIncome)}</strong></td>
+            </tr>
+          </Table>
+        </div>
+
+        <div class="accounting-equation">
+          <strong>Liabilities + Equity = {formatCurrency(totalLiabilities + totalEquity + netIncome)}</strong>
+          {#if Math.abs((totalLiabilities + totalEquity + netIncome) - totalAssets) > 0.01}
+            <span class="warning">⚠️ Not balanced!</span>
+          {:else}
+            <span class="success">✓ Balanced</span>
+          {/if}
+        </div>
+      </div>
+    </Card>
+
+    <!-- Profit & Loss -->
+    <Card title="Profit & Loss Statement" padding={false}>
+      <div class="report-header">
+        <h3>For period ending {new Date(asOfDate).toLocaleDateString('en-CA')}</h3>
+      </div>
+
+      <div class="profit-loss">
+        <div class="section">
+          <h4>Revenue</h4>
+          <Table headers={['Account', 'Amount']}>
+            {#each balances.filter(b => b.account.type === 'revenue') as item}
+              <tr>
+                <td>{item.account.code} - {item.account.name}</td>
+                <td class="amount">{formatCurrency(item.balance)}</td>
+              </tr>
+            {/each}
+            <tr class="total-row">
+              <td><strong>Total Revenue</strong></td>
+              <td class="amount"><strong>{formatCurrency(totalRevenue)}</strong></td>
+            </tr>
+          </Table>
+        </div>
+
+        <div class="section">
+          <h4>Expenses</h4>
+          <Table headers={['Account', 'Amount']}>
+            {#each balances.filter(b => b.account.type === 'expense') as item}
+              <tr>
+                <td>{item.account.code} - {item.account.name}</td>
+                <td class="amount">{formatCurrency(item.balance)}</td>
+              </tr>
+            {/each}
+            <tr class="total-row">
+              <td><strong>Total Expenses</strong></td>
+              <td class="amount"><strong>{formatCurrency(totalExpenses)}</strong></td>
+            </tr>
+          </Table>
+        </div>
+
+        <div class="net-income" class:profit={netIncome > 0} class:loss={netIncome < 0}>
+          <strong>Net Income:</strong>
+          <strong>{formatCurrency(netIncome)}</strong>
+        </div>
+      </div>
+    </Card>
+
+    <!-- Trial Balance -->
+    <Card title="Trial Balance" padding={false}>
+      <div class="report-header">
+        <h3>As of {new Date(asOfDate).toLocaleDateString('en-CA')}</h3>
+      </div>
+
+      <Table headers={['Code', 'Account', 'Debit', 'Credit']}>
+        {#each balances as item}
+          <tr>
+            <td>{item.account.code}</td>
+            <td>{item.account.name}</td>
             <td class="amount">
-              <strong>{formatCurrency(balances.reduce((sum, b) => sum + (b.debit_total > b.credit_total ? b.balance : 0), 0))}</strong>
+              {item.debit_total > item.credit_total ? formatCurrency(item.balance) : '-'}
             </td>
             <td class="amount">
-              <strong>{formatCurrency(balances.reduce((sum, b) => sum + (b.credit_total > b.debit_total ? b.balance : 0), 0))}</strong>
+              {item.credit_total > item.debit_total ? formatCurrency(item.balance) : '-'}
             </td>
           </tr>
-        </Table>
-      </Card>
-    {/if}
+        {/each}
+        <tr class="total-row">
+          <td colspan="2"><strong>Totals</strong></td>
+          <td class="amount">
+            <strong>{formatCurrency(balances.reduce((sum, b) => sum + (b.debit_total > b.credit_total ? b.balance : 0), 0))}</strong>
+          </td>
+          <td class="amount">
+            <strong>{formatCurrency(balances.reduce((sum, b) => sum + (b.credit_total > b.debit_total ? b.balance : 0), 0))}</strong>
+          </td>
+        </tr>
+      </Table>
+    </Card>
   {/if}
 </div>
 
@@ -285,53 +285,21 @@
     max-width: 1200px;
   }
 
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+
   h2 {
-    margin: 0 0 24px 0;
+    margin: 0;
     color: #2c3e50;
     font-size: 28px;
   }
 
-  .report-options {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    align-items: end;
-  }
-
-  .date-generate {
-    display: flex;
-    gap: 12px;
-    align-items: end;
-  }
-
-  .date-input {
-    flex: 1;
-    padding: 10px 12px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 14px;
-    font-family: inherit;
-  }
-
-  .generate-btn {
-    background: #3498db;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
-  .generate-btn:hover:not(:disabled) {
-    background: #2980b9;
-  }
-
-  .generate-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  .date-selector {
+    width: 200px;
   }
 
   .report-header {
