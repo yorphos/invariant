@@ -4,10 +4,12 @@ export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expens
 export type JournalStatus = 'draft' | 'posted' | 'void';
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'partial' | 'overdue' | 'void';
 export type PaymentStatus = 'pending' | 'allocated' | 'partial' | 'reconciled';
-export type PaymentMethod = 'cash' | 'check' | 'transfer' | 'card' | 'other';
+export type BillStatus = 'draft' | 'pending' | 'paid' | 'partial' | 'overdue' | 'void';
+export type VendorPaymentStatus = 'pending' | 'allocated' | 'partial' | 'cleared';
 export type AllocationMethod = 'exact' | 'fifo' | 'manual' | 'heuristic';
-export type PolicyMode = 'beginner' | 'pro';
 export type ReconciliationStatus = 'in_progress' | 'completed' | 'cancelled';
+export type PaymentMethod = 'cash' | 'check' | 'transfer' | 'card' | 'other';
+export type PolicyMode = 'beginner' | 'pro';
 
 export interface Account {
   id: number;
@@ -120,6 +122,64 @@ export interface Allocation {
   allocation_method: AllocationMethod;
   confidence_score?: number;
   explanation?: string;
+  created_at?: string;
+}
+
+export interface Bill {
+  id?: number;
+  bill_number: string;
+  vendor_id: number;
+  event_id?: number;
+  bill_date: string;
+  due_date: string;
+  status: BillStatus;
+  subtotal: number;
+  tax_amount: number;
+  total_amount: number;
+  paid_amount: number;
+  tax_code_id?: number;
+  reference?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BillLine {
+  id?: number;
+  bill_id?: number;
+  line_number: number;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  amount: number;
+  account_id: number;
+  item_id?: number;
+}
+
+export interface VendorPayment {
+  id?: number;
+  payment_number: string;
+  vendor_id: number;
+  event_id?: number;
+  payment_date: string;
+  amount: number;
+  payment_method?: PaymentMethod;
+  check_number?: string;
+  reference?: string;
+  notes?: string;
+  allocated_amount: number;
+  status: VendorPaymentStatus;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BillAllocation {
+  id?: number;
+  vendor_payment_id: number;
+  bill_id: number;
+  amount: number;
+  allocation_date: string;
+  notes?: string;
   created_at?: string;
 }
 
