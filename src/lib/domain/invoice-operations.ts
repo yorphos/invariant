@@ -1,5 +1,6 @@
 import { persistenceService } from '../services/persistence';
 import { PostingEngine } from '../domain/posting-engine';
+import { calculateTax } from '../services/tax';
 import type { Invoice, InvoiceLine, PolicyContext } from '../domain/types';
 
 const postingEngine = new PostingEngine();
@@ -9,6 +10,7 @@ export interface InvoiceInput {
   contact_id: number;
   issue_date: string;
   due_date: string;
+  tax_code_id?: number;
   notes?: string;
 }
 
@@ -16,13 +18,18 @@ export interface InvoiceInput {
  * Validate invoice data and recalculate amounts
  * Shared logic for create and edit operations
  */
-function validateAndRecalculateInvoice(
+async function validateAndRecalculateInvoice(
   invoiceData: InvoiceInput,
   lines: InvoiceLine[]
 ) {
   // Validate date logic
   if (new Date(invoiceData.due_date) < new Date(invoiceData.issue_date)) {
     throw new Error('Due date must be on or after issue date');
+  }
+  
+  // Require tax_code_id
+  if (!invoiceData.tax_code_id) {
+    throw new Error('Tax code is required for invoices');
   }
   
   // Recalculate all line amounts server-side (don't trust client)
@@ -61,7 +68,14 @@ function validateAndRecalculateInvoice(
   
   // Calculate totals from recalculated amounts
   const subtotal = recalculatedLines.reduce((sum, line) => sum + line.amount, 0);
-  const taxAmount = subtotal * 0.13; // 13% HST
+  
+  // Calculate tax using tax service (looks up rate from database)
+  const { taxAmount, accountId: taxAccountId } = await calculateTax(
+    subtotal,
+    invoiceData.tax_code_id,
+    invoiceData.issue_date
+  );
+  
   const totalAmount = subtotal + taxAmount;
 
   // Validate amounts are positive
@@ -76,7 +90,8 @@ function validateAndRecalculateInvoice(
     recalculatedLines,
     subtotal,
     taxAmount,
-    totalAmount
+    totalAmount,
+    taxAccountId,
   };
 }
 
@@ -86,16 +101,22 @@ export async function createInvoice(
   context: PolicyContext
 ) {
   try {
-    const { recalculatedLines, subtotal, taxAmount, totalAmount } = 
-      validateAndRecalculateInvoice(invoiceData, lines);
+    const { recalculatedLines, subtotal, taxAmount, totalAmount, taxAccountId } = 
+      await validateAndRecalculateInvoice(invoiceData, lines);
 
     // Get required accounts first (fail fast if missing)
     const accounts = await persistenceService.getAccounts();
     const arAccount = accounts.find(a => a.code === '1100'); // Accounts Receivable
-    const taxAccount = accounts.find(a => a.code === '2220'); // HST Payable
 
-    if (!arAccount || !taxAccount) {
-      throw new Error('Required accounts not found. Please ensure accounts 1100 (A/R) and 2220 (HST Payable) exist.');
+    if (!arAccount) {
+      throw new Error('Required account not found. Please ensure account 1100 (A/R) exists.');
+    }
+    
+    // Tax account comes from tax rate lookup
+    const taxAccount = taxAccountId ? accounts.find(a => a.id === taxAccountId) : null;
+    
+    if (taxAmount > 0 && !taxAccount) {
+      throw new Error('Tax account not found for the selected tax code.');
     }
 
     // Validate that all line item accounts exist and are revenue accounts
@@ -127,6 +148,7 @@ export async function createInvoice(
         tax_amount: taxAmount,
         total_amount: totalAmount,
         paid_amount: 0,
+        tax_code_id: invoiceData.tax_code_id,
       },
       recalculatedLines // Use recalculated lines
     );
@@ -156,13 +178,15 @@ export async function createInvoice(
       });
     }
     
-    // Credit tax
-    journalLines.push({
-      account_id: taxAccount.id,
-      debit_amount: 0,
-      credit_amount: taxAmount,
-      description: 'HST collected',
-    });
+    // Credit tax (only if tax amount > 0)
+    if (taxAmount > 0 && taxAccount) {
+      journalLines.push({
+        account_id: taxAccount.id,
+        debit_amount: 0,
+        credit_amount: taxAmount,
+        description: 'Sales tax collected',
+      });
+    }
 
     const journalEntryId = await persistenceService.createJournalEntry(
       {
@@ -246,10 +270,18 @@ export async function voidInvoice(
     // Get required accounts
     const accounts = await persistenceService.getAccounts();
     const arAccount = accounts.find(a => a.code === '1100'); // Accounts Receivable
-    const taxAccount = accounts.find(a => a.code === '2220'); // HST Payable
     
-    if (!arAccount || !taxAccount) {
-      throw new Error('Required accounts not found');
+    if (!arAccount) {
+      throw new Error('Required account not found (A/R)');
+    }
+    
+    // Get tax account from invoice's tax code
+    let taxAccount = null;
+    if (invoice.tax_code_id && invoice.tax_amount > 0) {
+      const taxRate = await import('../services/tax').then(m => m.getTaxRate(invoice.tax_code_id!, invoice.issue_date));
+      if (taxRate && taxRate.account_id) {
+        taxAccount = accounts.find(a => a.id === taxRate.account_id);
+      }
     }
     
     // Get invoice lines from database
@@ -294,13 +326,15 @@ export async function voidInvoice(
       }
     }
     
-    // Debit tax (reversal of credit)
-    journalLines.push({
-      account_id: taxAccount.id,
-      debit_amount: invoice.tax_amount,
-      credit_amount: 0,
-      description: 'VOID: HST collected',
-    });
+    // Debit tax (reversal of credit) - only if there was tax
+    if (invoice.tax_amount > 0 && taxAccount) {
+      journalLines.push({
+        account_id: taxAccount.id,
+        debit_amount: invoice.tax_amount,
+        credit_amount: 0,
+        description: 'VOID: Sales tax collected',
+      });
+    }
     
     // Create the reversal journal entry
     const journalEntryId = await persistenceService.createJournalEntry(

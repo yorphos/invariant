@@ -77,6 +77,7 @@ export interface Invoice {
   tax_amount: number;
   total_amount: number;
   paid_amount: number;
+  tax_code_id?: number;
   notes?: string;
   created_at?: string;
   updated_at?: string;
@@ -119,6 +120,25 @@ export interface Allocation {
   confidence_score?: number;
   explanation?: string;
   created_at?: string;
+}
+
+export interface TaxCode {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  is_compound: boolean;
+  is_active: boolean;
+}
+
+export interface TaxRate {
+  id: number;
+  tax_code_id: number;
+  jurisdiction_id: number;
+  rate: number;
+  effective_from: string;
+  effective_to?: string;
+  account_id?: number;
 }
 
 export interface PolicyContext {
