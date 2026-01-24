@@ -26,9 +26,19 @@ export async function createPayment(
     const accounts = await persistenceService.getAccounts();
     const cashAccount = accounts.find(a => a.code === '1010'); // Checking Account
     const arAccount = accounts.find(a => a.code === '1100'); // Accounts Receivable
+    const customerDepositsAccount = accounts.find(a => a.code === '2150'); // Customer Deposits
 
-    if (!cashAccount || !arAccount) {
-      throw new Error('Required accounts not found. Please ensure accounts 1010 (Cash) and 1100 (A/R) exist.');
+    if (!cashAccount) {
+      throw new Error('Required account not found. Please ensure account 1010 (Cash) exists.');
+    }
+    
+    // For allocated payments, we need A/R account
+    // For unallocated payments, we need Customer Deposits account
+    if (allocations.length > 0 && !arAccount) {
+      throw new Error('Required account not found. Please ensure account 1100 (A/R) exists.');
+    }
+    if (allocations.length === 0 && !customerDepositsAccount) {
+      throw new Error('Required account not found. Please ensure account 2150 (Customer Deposits) exists.');
     }
 
     // Validate that all invoice IDs exist and allocation amounts are positive
@@ -75,8 +85,35 @@ export async function createPayment(
     }
 
     // Create journal entry
-    // DR Cash
-    // CR Accounts Receivable
+    // For allocated payments: DR Cash, CR Accounts Receivable
+    // For unallocated payments: DR Cash, CR Customer Deposits
+    const journalLines = [
+      {
+        account_id: cashAccount.id,
+        debit_amount: paymentData.amount,
+        credit_amount: 0,
+        description: `Payment received`,
+      },
+    ];
+
+    if (allocations.length > 0) {
+      // Payment allocated to invoices - reduce A/R
+      journalLines.push({
+        account_id: arAccount!.id, // Safe because we validated above
+        debit_amount: 0,
+        credit_amount: paymentData.amount,
+        description: `Payment applied to invoices`,
+      });
+    } else {
+      // Unallocated payment - record as customer deposit (liability)
+      journalLines.push({
+        account_id: customerDepositsAccount!.id, // Safe because we validated above
+        debit_amount: 0,
+        credit_amount: paymentData.amount,
+        description: `Unallocated payment - customer deposit`,
+      });
+    }
+
     const journalEntryId = await persistenceService.createJournalEntry(
       {
         event_id: eventId,
@@ -85,20 +122,7 @@ export async function createPayment(
         reference: paymentData.payment_number,
         status: 'posted',
       },
-      [
-        {
-          account_id: cashAccount.id,
-          debit_amount: paymentData.amount,
-          credit_amount: 0,
-          description: `Payment received`,
-        },
-        {
-          account_id: arAccount.id,
-          debit_amount: 0,
-          credit_amount: paymentData.amount,
-          description: `Payment applied to invoices`,
-        },
-      ]
+      journalLines
     );
 
     return {

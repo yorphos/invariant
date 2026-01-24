@@ -74,20 +74,13 @@
 
   async function handleSubmit() {
     try {
-      if (!formContactId || typeof formContactId !== 'number') {
-        alert('Please select a customer');
-        return;
-      }
-
-      if (selectedInvoices.length === 0) {
-        alert('Please select at least one invoice');
-        return;
-      }
+      // Contact is now optional for free-floating payments
+      const contactId = formContactId && typeof formContactId === 'number' ? formContactId : undefined;
 
       const result = await createPayment(
         {
           payment_number: formPaymentNumber,
-          contact_id: formContactId,
+          contact_id: contactId,
           payment_date: formPaymentDate,
           amount: formAmount,
           payment_method: formMethod,
@@ -187,13 +180,12 @@
           />
 
           <Select
-            label="Customer"
+            label="Customer (Optional)"
             bind:value={formContactId}
-            required
             options={contacts
               .filter(c => c.type === 'customer' || c.type === 'both')
               .map(c => ({ value: c.id!, label: c.name }))}
-            placeholder="Select customer"
+            placeholder="Select customer (or leave blank for unallocated payment)"
           />
         </div>
 
@@ -244,7 +236,8 @@
       </Card>
 
       {#if contactOpenInvoices.length > 0}
-        <Card title="Apply to Invoices">
+        <Card title="Apply to Invoices (Optional)">
+          <p class="hint">Select invoices to apply this payment to, or leave blank to record as an unallocated payment.</p>
           <div class="invoices-list">
             {#each contactOpenInvoices as invoice}
               <label class="invoice-item">
@@ -297,6 +290,12 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
+  }
+
+  .hint {
+    color: #7f8c8d;
+    font-size: 14px;
+    margin-bottom: 16px;
   }
 
   .form-actions {

@@ -22,6 +22,7 @@ const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccount[] = [
   // Liabilities (2000-2999)
   { code: '2000', name: 'Accounts Payable', type: 'liability', parent_id: null },
   { code: '2100', name: 'Credit Card Payable', type: 'liability', parent_id: null },
+  { code: '2150', name: 'Customer Deposits', type: 'liability', parent_id: null }, // For unallocated payments
   { code: '2200', name: 'Sales Tax Payable', type: 'liability', parent_id: null },
   { code: '2210', name: 'GST Payable', type: 'liability', parent_id: null },
   { code: '2220', name: 'HST Payable', type: 'liability', parent_id: null },
