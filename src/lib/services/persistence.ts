@@ -218,20 +218,8 @@ export class PersistenceService {
           }
         }
         
-        // Check if we're removing 'vendor' capability
-        if ((currentType === 'vendor' || currentType === 'both') && newType === 'customer') {
-          // Check for existing expenses (vendor references in transaction events)
-          const expenseCount = await db.select<Array<{ count: number }>>(
-            `SELECT COUNT(*) as count 
-             FROM transaction_event 
-             WHERE event_type = 'expense_recorded' 
-             AND json_extract(notes, '$.vendor_id') = ?`,
-            [id.toString()]
-          );
-          if (expenseCount[0].count > 0) {
-            throw new Error('Cannot change to customer-only: contact has existing expenses. Change to "Both" instead.');
-          }
-        }
+        // For now, we don't check vendor→customer since expenses aren't linked to vendors in the schema
+        // This could be enhanced in the future if vendor tracking is added to expenses
       }
     }
     
@@ -274,6 +262,56 @@ export class PersistenceService {
         [...values, id]
       );
     }
+  }
+
+  /**
+   * Get available contact type options for a contact
+   * Returns only valid options based on existing transactions
+   */
+  async getAvailableContactTypes(contactId: number): Promise<Array<'customer' | 'vendor' | 'both'>> {
+    const db = await getDatabase();
+    
+    // Get current contact
+    const existingContact = await db.select<Contact[]>(
+      'SELECT * FROM contact WHERE id = ?',
+      [contactId]
+    );
+    
+    if (existingContact.length === 0) {
+      // For new contacts, all options are available
+      return ['customer', 'vendor', 'both'];
+    }
+    
+    const currentType = existingContact[0].type;
+    
+    // Check for existing invoices
+    const invoiceCount = await db.select<Array<{ count: number }>>(
+      'SELECT COUNT(*) as count FROM invoice WHERE contact_id = ?',
+      [contactId]
+    );
+    const hasInvoices = invoiceCount[0].count > 0;
+    
+    // Check for existing payments
+    const paymentCount = await db.select<Array<{ count: number }>>(
+      'SELECT COUNT(*) as count FROM payment WHERE contact_id = ?',
+      [contactId]
+    );
+    const hasPayments = paymentCount[0].count > 0;
+    
+    const hasCustomerTransactions = hasInvoices || hasPayments;
+    
+    // Build available options
+    const availableTypes: Array<'customer' | 'vendor' | 'both'> = ['both']; // 'both' is always available
+    
+    if (!hasCustomerTransactions) {
+      // No customer transactions, so can change to vendor-only
+      availableTypes.push('vendor');
+    }
+    
+    // Can always select customer if they have customer transactions, or no transactions at all
+    availableTypes.push('customer');
+    
+    return availableTypes;
   }
 
   // Invoice operations

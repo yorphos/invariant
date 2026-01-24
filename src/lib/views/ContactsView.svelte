@@ -21,6 +21,13 @@
   let formPhone = '';
   let formAddress = '';
   let formTaxId = '';
+  
+  // Dynamic type options based on existing transactions
+  let availableTypeOptions: Array<{ value: string; label: string }> = [
+    { value: 'customer', label: 'Customer' },
+    { value: 'vendor', label: 'Vendor' },
+    { value: 'both', label: 'Both' }
+  ];
 
   onMount(async () => {
     await loadContacts();
@@ -44,10 +51,16 @@
     formPhone = '';
     formAddress = '';
     formTaxId = '';
+    // For new contacts, all options are available
+    availableTypeOptions = [
+      { value: 'customer', label: 'Customer' },
+      { value: 'vendor', label: 'Vendor' },
+      { value: 'both', label: 'Both' }
+    ];
     showModal = true;
   }
 
-  function openEditModal(contact: Contact) {
+  async function openEditModal(contact: Contact) {
     editingContact = contact;
     formType = contact.type;
     formName = contact.name;
@@ -55,6 +68,31 @@
     formPhone = contact.phone || '';
     formAddress = contact.address || '';
     formTaxId = contact.tax_id || '';
+    
+    // Load available type options based on transactions
+    if (contact.id !== undefined) {
+      try {
+        const availableTypes = await persistenceService.getAvailableContactTypes(contact.id);
+        availableTypeOptions = availableTypes.map((type: 'customer' | 'vendor' | 'both') => ({
+          value: type,
+          label: type.charAt(0).toUpperCase() + type.slice(1)
+        }));
+        
+        // Ensure current type is selected even if not in available options (shouldn't happen, but safety)
+        if (!availableTypes.includes(contact.type)) {
+          formType = 'both'; // Default to 'both' which is always available
+        }
+      } catch (e) {
+        console.error('Failed to load available contact types:', e);
+        // Fallback to all options
+        availableTypeOptions = [
+          { value: 'customer', label: 'Customer' },
+          { value: 'vendor', label: 'Vendor' },
+          { value: 'both', label: 'Both' }
+        ];
+      }
+    }
+    
     showModal = true;
   }
 
@@ -133,11 +171,7 @@
       label="Type"
       bind:value={formType}
       required
-      options={[
-        { value: 'customer', label: 'Customer' },
-        { value: 'vendor', label: 'Vendor' },
-        { value: 'both', label: 'Both' }
-      ]}
+      options={availableTypeOptions}
     />
 
     <Input
