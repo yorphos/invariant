@@ -11,6 +11,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+ ## [Unreleased]
+
+---
+
+## [0.3.2]
+
+### 🔧 Release Workflow Fix
+- **Fixed bash condition** in release workflow for proper tag push detection
+  - Changed from GitHub Actions expression syntax to bash pattern matching
+  - Used `[[ "${{ github.ref }}" == refs/tags/* ]]` for tag detection
+  - Added debug output showing trigger event and git ref
+- **Root cause**: Previous condition used `${{ startsWith(...) }}` which is a GitHub Actions expression, not bash syntax
+
+### 📊 Technical Details
+- Modified `.github/workflows/release.yml`
+- All 501 tests passing
+- No migration changes
+- No code changes (workflow fix only)
+
+### 🎯 Impact
+Release workflow now correctly identifies tag pushes and triggers matrix build jobs.
+
+---
+
 ## [0.3.1]
 
 ### 🔧 Workflow Fixes
