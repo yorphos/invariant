@@ -35,3 +35,6 @@ src-tauri/Cargo.lock
 # OS files
 .DS_Store
 Thumbs.db
+
+# OpenCode agent configuration
+AGENTS.md
