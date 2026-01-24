@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.2.0]
+
 ### 🔧 Phase 7: Dynamic Account Code Management
 
 #### 🚀 Added
@@ -66,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `src/App.svelte` - Expanded system accounts UI with sections
   - `src/lib/services/seed.ts` - Added payroll accounts
 - **New files**:
-  - `migrations/018_additional_system_accounts.ts` - System account seeding
+  - `migrations/016_document_attachments.ts` - Document attachments
 - **Helper functions added**:
   - `isSystemAccount()`, `getSystemAccountRoles()`, `getSystemAccountRolesMap()`
   - `tryGetSystemAccount()`, `tryGetSystemAccountId()` - Non-throwing variants
