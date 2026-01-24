@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.7]
+
+### 🔧 Signing Fix (Password)
+- **Added `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`** to release workflow
+- Required for password-protected signing keys
+- Version bump to 0.3.7
+
+### 📊 Technical Details
+- Workflow updated to pass password env var
+- All tests passing
+
+### 🎯 Impact
+Fixes `incorrect updater private key password` error during signing.
+
+---
+
 ## [0.3.6]
 
 ### 🔧 Signing Fix (Environment Variable)
