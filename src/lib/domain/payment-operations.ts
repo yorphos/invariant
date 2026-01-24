@@ -1,4 +1,5 @@
 import { persistenceService } from '../services/persistence';
+import { getSystemAccount, tryGetSystemAccount } from '../services/system-accounts';
 import type { PaymentMethod, PolicyContext } from '../domain/types';
 
 export interface PaymentInput {
@@ -22,21 +23,10 @@ export async function createPayment(
       throw new Error('Payment amount must be greater than 0');
     }
 
-    // Get required accounts first (fail fast if missing)
-    const accounts = await persistenceService.getAccounts();
-    const cashAccount = accounts.find(a => a.code === '1010'); // Checking Account
-    const arAccount = accounts.find(a => a.code === '1100'); // Accounts Receivable
-    const customerDepositsAccount = accounts.find(a => a.code === '2150'); // Customer Deposits
-
-    if (!cashAccount) {
-      throw new Error('Required account not found. Please ensure account 1010 (Cash) exists.');
-    }
-    if (!arAccount) {
-      throw new Error('Required account not found. Please ensure account 1100 (A/R) exists.');
-    }
-    if (!customerDepositsAccount) {
-      throw new Error('Required account not found. Please ensure account 2150 (Customer Deposits) exists.');
-    }
+    // Get required system accounts (fail fast if missing)
+    const cashAccount = await getSystemAccount('checking_account');
+    const arAccount = await getSystemAccount('accounts_receivable');
+    const customerDepositsAccount = await getSystemAccount('customer_deposits');
 
     // Get all open invoices for FIFO allocation
     let allOpenInvoices = await persistenceService.getOpenInvoices();

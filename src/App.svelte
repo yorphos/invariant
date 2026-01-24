@@ -111,22 +111,54 @@
 
   function getSystemAccountRoleLabel(role: SystemAccountRole): string {
     const labels: Record<SystemAccountRole, string> = {
+      // Core A/R and A/P
       accounts_receivable: 'Accounts Receivable (A/R)',
       accounts_payable: 'Accounts Payable (A/P)',
       sales_tax_payable: 'Sales Tax Payable',
       retained_earnings: 'Retained Earnings',
-      current_year_earnings: 'Current Year Earnings'
+      current_year_earnings: 'Current Year Earnings',
+      // Cash and Bank accounts
+      cash_default: 'Default Cash Account',
+      checking_account: 'Checking Account',
+      customer_deposits: 'Customer Deposits (Unapplied)',
+      // Payroll accounts
+      salary_expense: 'Salary Expense',
+      cpp_payable: 'CPP Payable',
+      ei_payable: 'EI Payable',
+      tax_withholding_payable: 'Tax Withholding Payable',
+      // Future expansion
+      inventory_asset: 'Inventory Asset',
+      cogs_expense: 'Cost of Goods Sold',
+      fx_gain_loss: 'FX Gain/Loss',
+      default_revenue: 'Default Revenue',
+      default_expense: 'Default Expense',
     };
     return labels[role] || role;
   }
 
   function getExpectedAccountTypes(role: SystemAccountRole): string[] {
     const types: Record<SystemAccountRole, string[]> = {
+      // Core A/R and A/P
       accounts_receivable: ['asset'],
       accounts_payable: ['liability'],
       sales_tax_payable: ['liability'],
       retained_earnings: ['equity'],
-      current_year_earnings: ['equity']
+      current_year_earnings: ['equity'],
+      // Cash and Bank accounts
+      cash_default: ['asset'],
+      checking_account: ['asset'],
+      customer_deposits: ['liability'],
+      // Payroll accounts
+      salary_expense: ['expense'],
+      cpp_payable: ['liability'],
+      ei_payable: ['liability'],
+      tax_withholding_payable: ['liability'],
+      // Future expansion
+      inventory_asset: ['asset'],
+      cogs_expense: ['expense'],
+      fx_gain_loss: ['revenue', 'expense'],
+      default_revenue: ['revenue'],
+      default_expense: ['expense'],
     };
     return types[role] || [];
   }
@@ -553,7 +585,128 @@
                 <p>Loading system accounts...</p>
               {:else}
                 <div class="system-accounts-list">
+                  <h4 class="system-accounts-section">Core Accounting</h4>
                   {#each ['accounts_receivable', 'accounts_payable', 'sales_tax_payable', 'retained_earnings', 'current_year_earnings'] as role}
+                    {@const currentAccount = systemAccounts.get(role as SystemAccountRole)}
+                    {@const availableAccounts = getAccountsForRole(role as SystemAccountRole)}
+                    <div class="system-account-item">
+                      <div class="system-account-label">
+                        <strong>{getSystemAccountRoleLabel(role as SystemAccountRole)}</strong>
+                        <span class="expected-type">
+                          (expects: {getExpectedAccountTypes(role as SystemAccountRole).join(', ')})
+                        </span>
+                      </div>
+                      <div class="system-account-select">
+                        <select 
+                          value={currentAccount?.id || ''}
+                          onchange={(e) => {
+                            const newId = parseInt((e.target as HTMLSelectElement).value);
+                            if (newId && newId !== currentAccount?.id) {
+                              handleUpdateSystemAccount(role as SystemAccountRole, newId);
+                            }
+                          }}
+                          disabled={systemAccountsLoading}
+                        >
+                          {#if !currentAccount}
+                            <option value="">-- Select Account --</option>
+                          {/if}
+                          {#each availableAccounts as account}
+                            <option value={account.id}>
+                              {account.code} - {account.name}
+                            </option>
+                          {/each}
+                        </select>
+                        {#if currentAccount}
+                          <span class="current-account-badge">
+                            Current: {currentAccount.code}
+                          </span>
+                        {/if}
+                      </div>
+                    </div>
+                  {/each}
+                  
+                  <h4 class="system-accounts-section">Cash & Banking</h4>
+                  {#each ['cash_default', 'checking_account', 'customer_deposits'] as role}
+                    {@const currentAccount = systemAccounts.get(role as SystemAccountRole)}
+                    {@const availableAccounts = getAccountsForRole(role as SystemAccountRole)}
+                    <div class="system-account-item">
+                      <div class="system-account-label">
+                        <strong>{getSystemAccountRoleLabel(role as SystemAccountRole)}</strong>
+                        <span class="expected-type">
+                          (expects: {getExpectedAccountTypes(role as SystemAccountRole).join(', ')})
+                        </span>
+                      </div>
+                      <div class="system-account-select">
+                        <select 
+                          value={currentAccount?.id || ''}
+                          onchange={(e) => {
+                            const newId = parseInt((e.target as HTMLSelectElement).value);
+                            if (newId && newId !== currentAccount?.id) {
+                              handleUpdateSystemAccount(role as SystemAccountRole, newId);
+                            }
+                          }}
+                          disabled={systemAccountsLoading}
+                        >
+                          {#if !currentAccount}
+                            <option value="">-- Select Account --</option>
+                          {/if}
+                          {#each availableAccounts as account}
+                            <option value={account.id}>
+                              {account.code} - {account.name}
+                            </option>
+                          {/each}
+                        </select>
+                        {#if currentAccount}
+                          <span class="current-account-badge">
+                            Current: {currentAccount.code}
+                          </span>
+                        {/if}
+                      </div>
+                    </div>
+                  {/each}
+                  
+                  <h4 class="system-accounts-section">Payroll</h4>
+                  {#each ['salary_expense', 'cpp_payable', 'ei_payable', 'tax_withholding_payable'] as role}
+                    {@const currentAccount = systemAccounts.get(role as SystemAccountRole)}
+                    {@const availableAccounts = getAccountsForRole(role as SystemAccountRole)}
+                    <div class="system-account-item">
+                      <div class="system-account-label">
+                        <strong>{getSystemAccountRoleLabel(role as SystemAccountRole)}</strong>
+                        <span class="expected-type">
+                          (expects: {getExpectedAccountTypes(role as SystemAccountRole).join(', ')})
+                        </span>
+                      </div>
+                      <div class="system-account-select">
+                        <select 
+                          value={currentAccount?.id || ''}
+                          onchange={(e) => {
+                            const newId = parseInt((e.target as HTMLSelectElement).value);
+                            if (newId && newId !== currentAccount?.id) {
+                              handleUpdateSystemAccount(role as SystemAccountRole, newId);
+                            }
+                          }}
+                          disabled={systemAccountsLoading}
+                        >
+                          {#if !currentAccount}
+                            <option value="">-- Select Account --</option>
+                          {/if}
+                          {#each availableAccounts as account}
+                            <option value={account.id}>
+                              {account.code} - {account.name}
+                            </option>
+                          {/each}
+                        </select>
+                        {#if currentAccount}
+                          <span class="current-account-badge">
+                            Current: {currentAccount.code}
+                          </span>
+                        {/if}
+                      </div>
+                    </div>
+                  {/each}
+                  
+                  <h4 class="system-accounts-section">Other</h4>
+                  {#each ['inventory_asset', 'cogs_expense', 'default_revenue', 'default_expense'] as role}
                     {@const currentAccount = systemAccounts.get(role as SystemAccountRole)}
                     {@const availableAccounts = getAccountsForRole(role as SystemAccountRole)}
                     <div class="system-account-item">
@@ -1047,6 +1200,19 @@
     flex-direction: column;
     gap: 16px;
     margin: 20px 0;
+  }
+
+  .system-accounts-section {
+    margin: 16px 0 8px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e9ecef;
+    color: #2c3e50;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .system-accounts-section:first-child {
+    margin-top: 0;
   }
 
   .system-account-item {

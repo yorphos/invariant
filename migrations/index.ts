@@ -16,6 +16,7 @@ import { migration014 } from './014_invoice_line_tax_inclusive';
 import { migration015 } from './015_invoice_total_triggers';
 import { migration016 } from './016_bank_import';
 import { migration017 } from './017_document_attachments';
+import { migration018 } from './018_additional_system_accounts';
 
 export const allMigrations: Migration[] = [
   migration001,
@@ -35,4 +36,5 @@ export const allMigrations: Migration[] = [
   migration015,
   migration016,
   migration017,
+  migration018,
 ];

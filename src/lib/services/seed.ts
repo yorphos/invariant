@@ -28,6 +28,9 @@ const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccount[] = [
   { code: '2220', name: 'HST Payable', type: 'liability', parent_id: null },
   { code: '2230', name: 'PST Payable', type: 'liability', parent_id: null },
   { code: '2300', name: 'Payroll Liabilities', type: 'liability', parent_id: null },
+  { code: '2310', name: 'CPP Payable', type: 'liability', parent_id: null },
+  { code: '2320', name: 'EI Payable', type: 'liability', parent_id: null },
+  { code: '2330', name: 'Income Tax Withholding', type: 'liability', parent_id: null },
   { code: '2500', name: 'Long-term Debt', type: 'liability', parent_id: null },
 
   // Equity (3000-3999)

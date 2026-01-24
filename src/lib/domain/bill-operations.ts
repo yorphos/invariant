@@ -473,13 +473,7 @@ export async function createVendorPayment(
     
     // Get required accounts
     const apAccount = await getSystemAccount('accounts_payable');
-    
-    // Get cash/bank account (1000 = Cash, standard chart of accounts)
-    const accounts = await persistenceService.getAccounts();
-    const cashAccount = accounts.find(a => a.code === '1000' && a.type === 'asset');
-    if (!cashAccount) {
-      throw new Error('Cash account (1000) not found');
-    }
+    const cashAccount = await getSystemAccount('cash_default');
     
     // Create transaction event
     const eventId = await persistenceService.createTransactionEvent({

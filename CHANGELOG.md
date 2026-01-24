@@ -9,6 +9,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🔧 Phase 7: Dynamic Account Code Management
+
+#### 🚀 Added
+- **Dynamic System Account Roles** - Expanded from 5 to 18 configurable system account roles
+  - Core Accounting: accounts_receivable, accounts_payable, sales_tax_payable, retained_earnings, current_year_earnings
+  - Cash & Banking: cash_default, checking_account, customer_deposits
+  - Payroll: salary_expense, cpp_payable, ei_payable, tax_withholding_payable
+  - Other: inventory_asset, cogs_expense, fx_gain_loss, default_revenue, default_expense
+
+- **Editable Account Codes** - Account codes can now be changed when editing accounts
+  - Code uniqueness validation prevents duplicate account codes
+  - Confirmation dialog warns when changing system account codes
+  - Account type remains non-editable (as per accounting principles)
+
+- **System Account Badges** - Accounts mapped to system roles now show a "System" badge
+  - Tooltip displays which system role(s) the account is mapped to
+  - Visual indicator helps users identify critical accounts
+
+- **Enhanced System Accounts Settings UI** - Organized into logical sections
+  - Core Accounting, Cash & Banking, Payroll, Other
+  - All 18 roles configurable from Pro Mode Settings
+
+- **Migration 018** - Seeds new system account mappings for existing databases
+  - Creates missing payroll liability accounts (CPP, EI, Tax Withholding)
+  - Maps default accounts for all new system roles
+
+#### 🔧 Fixed
+- Eliminated all hardcoded account code references in domain operations
+  - `payment-operations.ts`: Now uses `getSystemAccount()` for checking, A/R, customer deposits
+  - `bill-operations.ts`: Now uses `getSystemAccount()` for cash default
+  - `PayrollView.svelte`: Now uses `tryGetSystemAccount()` instead of name-based heuristics
+
+- Added payroll accounts to default chart of accounts seed
+  - 2310 CPP Payable, 2320 EI Payable, 2330 Income Tax Withholding
+
+#### 📊 Technical Details
+- **Modified files**:
+  - `src/lib/services/system-accounts.ts` - Expanded SystemAccountRole type, added helper functions
+  - `src/lib/domain/payment-operations.ts` - Dynamic account lookup
+  - `src/lib/domain/bill-operations.ts` - Dynamic account lookup
+  - `src/lib/views/PayrollView.svelte` - System accounts integration
+  - `src/lib/views/AccountsView.svelte` - Editable codes, system badges, validation
+  - `src/App.svelte` - Expanded system accounts UI with sections
+  - `src/lib/services/seed.ts` - Added payroll accounts
+- **New files**:
+  - `migrations/018_additional_system_accounts.ts` - System account seeding
+- **Helper functions added**:
+  - `isSystemAccount()`, `getSystemAccountRoles()`, `getSystemAccountRolesMap()`
+  - `tryGetSystemAccount()`, `tryGetSystemAccountId()` - Non-throwing variants
+- **Test count**: 428 passing (unchanged)
+- **Migrations**: 18 total (was 17, +1 new)
+
+**Impact**: Users can now renumber their chart of accounts freely without breaking system functionality. All hardcoded account references eliminated in favor of configurable system account mappings.
+
+---
+
 ### 🎨 Phase 6: UX Hardening
 
 #### 🚀 Added

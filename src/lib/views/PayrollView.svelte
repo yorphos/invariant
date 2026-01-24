@@ -2,6 +2,9 @@
   import { onMount } from 'svelte';
   import { getDatabase } from '../services/database';
   import { 
+    tryGetSystemAccount
+  } from '../services/system-accounts';
+  import { 
     createPayrollRun, 
     approvePayrollRun, 
     voidPayrollRun,
@@ -130,22 +133,21 @@
       formPeriodEnd = periodEnd.toISOString().split('T')[0];
       formPayDate = payDate.toISOString().split('T')[0];
 
-      // Try to find typical payroll accounts
-      const cashAccounts = accounts.filter(a => a.code === '1000' || a.name.toLowerCase().includes('cash'));
-      if (cashAccounts.length > 0) cashAccountId = cashAccounts[0].id!;
+      // Load system accounts for payroll (use configured accounts, not name-based heuristics)
+      const cashAccount = await tryGetSystemAccount('cash_default');
+      if (cashAccount) cashAccountId = cashAccount.id!;
 
-      const salaryAccounts = accounts.filter(a => a.type === 'expense' && a.name.toLowerCase().includes('salary'));
-      if (salaryAccounts.length > 0) salaryExpenseAccountId = salaryAccounts[0].id!;
+      const salaryAccount = await tryGetSystemAccount('salary_expense');
+      if (salaryAccount) salaryExpenseAccountId = salaryAccount.id!;
 
-      const liabilityAccounts = accounts.filter(a => a.type === 'liability');
-      const cppAccounts = liabilityAccounts.filter(a => a.name.toLowerCase().includes('cpp'));
-      if (cppAccounts.length > 0) cppPayableAccountId = cppAccounts[0].id!;
+      const cppAccount = await tryGetSystemAccount('cpp_payable');
+      if (cppAccount) cppPayableAccountId = cppAccount.id!;
 
-      const eiAccounts = liabilityAccounts.filter(a => a.name.toLowerCase().includes('ei'));
-      if (eiAccounts.length > 0) eiPayableAccountId = eiAccounts[0].id!;
+      const eiAccount = await tryGetSystemAccount('ei_payable');
+      if (eiAccount) eiPayableAccountId = eiAccount.id!;
 
-      const taxAccounts = liabilityAccounts.filter(a => a.name.toLowerCase().includes('tax'));
-      if (taxAccounts.length > 0) taxPayableAccountId = taxAccounts[0].id!;
+      const taxAccount = await tryGetSystemAccount('tax_withholding_payable');
+      if (taxAccount) taxPayableAccountId = taxAccount.id!;
 
     } catch (e) {
       console.error('Failed to load data:', e);

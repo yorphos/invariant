@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { persistenceService } from '../services/persistence';
   import { seedDefaultAccounts } from '../services/seed';
+  import { getSystemAccountRolesMap, type SystemAccountRole } from '../services/system-accounts';
   import type { Account, PolicyMode, AccountType } from '../domain/types';
   import { toasts } from '../stores/toast';
   import Button from '../ui/Button.svelte';
@@ -14,6 +15,7 @@
   export let mode: PolicyMode;
 
   let accounts: Account[] = [];
+  let systemAccountRoles: Map<number, SystemAccountRole[]> = new Map();
   let loading = true;
   let showModal = false;
   let showInitModal = false;
@@ -36,6 +38,7 @@
     loading = true;
     try {
       accounts = await persistenceService.getAccounts(true); // Include inactive accounts
+      systemAccountRoles = await getSystemAccountRolesMap();
       
       // If no accounts exist, show initialization modal
       if (accounts.length === 0) {
@@ -96,6 +99,27 @@
 
   async function handleSubmit() {
     try {
+      // Validate code uniqueness
+      const existingWithCode = accounts.find(a => a.code === formCode && a.id !== editingAccount?.id);
+      if (existingWithCode) {
+        toasts.error(`Account code "${formCode}" is already used by "${existingWithCode.name}"`);
+        return;
+      }
+      
+      // Warn if changing code for a system account
+      if (editingAccount && editingAccount.id !== undefined) {
+        const roles = systemAccountRoles.get(editingAccount.id);
+        if (roles && roles.length > 0 && formCode !== editingAccount.code) {
+          const roleNames = roles.map(r => formatRoleName(r)).join(', ');
+          const confirmed = confirm(
+            `Warning: This account is configured as a system account for: ${roleNames}\n\n` +
+            `Changing the account code is allowed, but make sure this is intentional.\n\n` +
+            `The system account mapping will remain intact (it uses the account ID, not the code).`
+          );
+          if (!confirmed) return;
+        }
+      }
+      
       const accountData = {
         code: formCode,
         name: formName,
@@ -118,6 +142,13 @@
       console.error('Failed to save account:', e);
       toasts.error('Failed to save account: ' + e);
     }
+  }
+  
+  function formatRoleName(role: SystemAccountRole): string {
+    return role
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   }
 
   async function toggleAccountStatus(account: Account) {
@@ -236,7 +267,12 @@
           {#each accountList as account}
             <tr class:inactive={!account.is_active}>
               <td><strong>{account.code}</strong></td>
-              <td>{account.name}</td>
+              <td>
+                {account.name}
+                {#if systemAccountRoles.has(account.id)}
+                  <span class="badge system" title={systemAccountRoles.get(account.id)?.map(r => formatRoleName(r)).join(', ')}>System</span>
+                {/if}
+              </td>
               <td>
                 {#if account.is_active}
                   <span class="badge active">Active</span>
@@ -310,7 +346,6 @@
         bind:value={formCode}
         required
         placeholder="e.g., 1000"
-        disabled={!!editingAccount}
       />
 
       <Select
@@ -438,6 +473,13 @@
   .badge.inactive {
     background: #ecf0f1;
     color: #95a5a6;
+  }
+
+  .badge.system {
+    background: #e8f4fd;
+    color: #2980b9;
+    margin-left: 8px;
+    cursor: help;
   }
 
   .actions {
