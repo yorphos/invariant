@@ -104,11 +104,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ✅ Finding 3.5 (MEDIUM): Tax-inclusive pricing → Full support implemented
 - ✅ Finding 3.6 (LOW): Bank reconciliation → Already implemented in Phase 3
 
+**Outstanding Issues (Documented as Accepted Risks):**
+- ⚠️ Floating-point precision with 1-cent tolerance (Low priority, acceptable for MVP)
+- ⚠️ Client-side invoice numbering (Low risk for single-user architecture)
+
 **Technical Audit Findings - RESOLVED:**
 - ✅ Finding 4.3 (CRITICAL): Dual DB access paths → Foreign key enforcement unified
 - ✅ Finding 4.4 (HIGH): System account seeding → All mappings corrected
 - ✅ Finding 4.5 (HIGH): Trigger coverage gaps → Comprehensive invoice total triggers
 - ✅ Finding 4.9 (MEDIUM): Backup/restore risks → Safe file operations implemented
+
+**Outstanding Issues (Documented for Future Phases):**
+- ⚠️ Report N+1 query patterns (Medium priority, Phase 5)
+- ⚠️ Test suite quality improvements (Low priority, future work)
+- ⚠️ UI layer data access (Low priority tech debt, acceptable for MVP)
+- ⚠️ Non-atomic workflows partially mitigated (ongoing in Phase 5)
+
+**See docs/roadmap.md for complete audit findings and risk assessment.**
 
 ### 📈 Impact Summary
 

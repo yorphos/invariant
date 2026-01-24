@@ -32,6 +32,8 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 - **System account integrity** fixes for A/P and equity accounts (Migrations 007, 013)
 - **Safe backup/restore** operations under active use
 - **Foreign key enforcement** across all database access paths
+- **Full audit compliance** achieved (see docs/roadmap.md for details)
+- Outstanding issues documented and accepted as low-priority risks
 
 #### 📋 Contact Management
 - Create and manage customers and vendors

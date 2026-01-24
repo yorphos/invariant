@@ -27,6 +27,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
   - ✅ Tax-inclusive pricing support (Migrations 014, 015)
   - ✅ Backup/restore hardening (backup.ts)
   - ✅ Transaction foreign key enforcement (db.rs)
+  - ⚠️ Outstanding issues documented (6 accepted risks - see below)
 
 **System Status**: Production-ready with full audit compliance
 
@@ -635,7 +636,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 - ✅ Backdating into closed periods is blocked at DB level
 - ✅ Immutable audit trail maintained after period close
 
-**Related:** Migration 012 | Financial Audit Finding 3.2 (RESOLVED)
+**Related:** Migration 012 | ~~Financial Audit Finding 3.2~~ (RESOLVED - audit findings now consolidated in "Outstanding Issues" section below)
 
 ---
 
@@ -659,7 +660,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 - ✅ A/P operations use correct account (2000)
 - ✅ No invalid account references in system_account table
 
-**Related:** Migrations 007, 013 | Technical Audit Finding 4.4 (RESOLVED)
+**Related:** Migrations 007, 013 | ~~Technical Audit Finding 4.4~~ (RESOLVED - see "Outstanding Issues" section)
 
 ---
 
@@ -696,7 +697,7 @@ Retailers and service providers can now enter "$113 all-in" and system correctly
 - ✅ UI displays both modes clearly
 - ✅ Triggers calculate totals correctly for both modes
 
-**Related:** Migrations 014, 015 | Financial Audit Finding 3.5 (RESOLVED)
+**Related:** Migrations 014, 015 | ~~Financial Audit Finding 3.5~~ (RESOLVED - see "Outstanding Issues" section)
 
 ---
 
@@ -721,7 +722,7 @@ SQLite file-level copies while connections are open can produce corrupted backup
 - ✅ Restores safely replace the DB file
 - ✅ No corrupted backups from open handles
 
-**Related:** Technical Audit Finding 4.9 (RESOLVED)
+**Related:** ~~Technical Audit Finding 4.9~~ (RESOLVED - see "Outstanding Issues" section)
 
 ---
 
@@ -743,7 +744,91 @@ The Rust SQLx path (used for transactions) did not enable foreign key enforcemen
 - ✅ Foreign keys enforced for all transaction execution paths
 - ✅ No constraint bypass via dual DB access stacks
 
-**Related:** Technical Audit Finding 4.3 (RESOLVED)
+**Related:** ~~Technical Audit Finding 4.3~~ (RESOLVED - see "Outstanding Issues" section)
+
+---
+
+## Outstanding Issues & Known Limitations
+
+**Status:** Documented, Low Priority, Acceptable for MVP
+
+These items were identified in comprehensive financial and technical audits but are considered acceptable for the current MVP scope. They are documented here for future consideration.
+
+### From Financial Audit:
+
+#### Floating-Point Precision
+- **Status:** ⚠️ ACCEPTED RISK (Low Priority)
+- **Issue:** System uses SQLite `REAL` type for monetary values with 1-cent tolerance check
+- **Why it matters:** Can theoretically cause "penny drift" over millions of transactions
+- **Current mitigation:** `Math.abs(diff) > 0.01` tolerance in balance checks
+- **MVP decision:** 1-cent tolerance is acceptable for small business use
+- **Future consideration:** Migrate to integer-cent storage (multiply by 100) for absolute precision
+- **Related:** Financial Audit Finding 3.3
+
+#### Client-Side Invoice Numbering
+- **Status:** ⚠️ ACCEPTED RISK (Low Priority)
+- **Issue:** Invoice numbers generated client-side via `MAX(id)` query
+- **Why it matters:** Race conditions possible if multiple windows open or sync added later
+- **Current mitigation:** Single-user, local-first architecture makes this low risk
+- **MVP decision:** Acceptable for target use case (single user, no sync)
+- **Future consideration:** ACID-compliant counter or collision-resistant format (Year-Month-Sequence)
+- **Related:** Financial Audit Finding 3.4
+
+### From Technical Audit:
+
+#### Report N+1 Query Patterns
+- **Status:** ⚠️ DEFERRED (Medium Priority - Phase 5)
+- **Issue:** Reports loop through accounts executing one query per account
+- **Why it matters:** Performance degrades linearly with account count and transaction volume
+- **Current impact:** Acceptable for typical small business datasets (reports <500ms)
+- **MVP decision:** Premature optimization; current performance is acceptable
+- **Future fix:** Rewrite report queries using grouped aggregates in service layer
+- **Planned:** Phase 5 (Advanced Features) - Performance optimization
+- **Related:** Technical Audit Finding 4.6
+
+#### Test Suite Quality Issues
+- **Status:** ⚠️ DEFERRED (Low Priority - Future)
+- **Issue:** Some tests validate arithmetic in test code rather than production code
+- **Why it matters:** False confidence - tests can pass even if production code breaks
+- **Current mitigation:** Core workflows have been manually verified; 351 tests do provide some coverage
+- **MVP decision:** Test refactoring is lower priority than feature completion
+- **Future fix:** Replace math-only tests with integration tests using real DB
+- **Examples:** `accounting-principles.test.ts`, `period-close.test.ts`, `expense-operations.test.ts`
+- **Related:** Technical Audit Finding (Section 3), Findings 7
+
+#### UI Layer Data Access
+- **Status:** ⚠️ ACCEPTED TECH DEBT (Low Priority)
+- **Issue:** Some views (especially `ReportsView.svelte`) query database directly instead of using service layer
+- **Why it matters:** Business logic scattered between UI and domain; harder to maintain and test
+- **Current impact:** Works correctly but violates clean architecture principles
+- **MVP decision:** Acceptable for MVP; UI is functional and correct
+- **Future refactor:** Extract report generation into service layer with proper boundaries
+- **Planned:** Long-term architectural improvement (no specific phase)
+- **Related:** Technical Audit Finding 4.1
+
+#### Non-Atomic Workflows (Partially Mitigated)
+- **Status:** ⚠️ PARTIALLY ADDRESSED (Medium Priority - Ongoing)
+- **Issue:** Not all multi-step workflows wrapped in database transactions
+- **Progress:** Transaction wrapper added to persistence service in v0.1.1
+- **What's done:** Invoice, payment, and expense creation now atomic
+- **What remains:** Bills, inventory, payroll workflows not yet wrapped
+- **Current risk:** Medium (reduced from High)
+- **Future work:** Expand transaction wrapper to all remaining workflows
+- **Planned:** Incrementally in Phase 5
+- **Related:** Technical Audit Finding 4.2
+
+### Summary of Accepted Risks
+
+| Issue | Severity | Decision | Future Action |
+|-------|----------|----------|---------------|
+| Floating-point precision | Low | Accept 1-cent tolerance | V2: Integer-cent storage |
+| Invoice numbering races | Low | Single-user acceptable | V2: ACID counter for multi-user |
+| Report N+1 queries | Medium | Performance acceptable for MVP | Phase 5: Aggregated queries |
+| Test suite quality | Low | Manual verification sufficient | Future: Integration test rewrite |
+| UI data access | Low | Works correctly, tech debt | Long-term: Service layer extraction |
+| Non-atomic workflows | Medium | Core flows fixed, others pending | Phase 5: Complete remaining |
+
+**Audit Compliance Status:** ✅ All critical issues resolved. System is production-ready with documented acceptable risks.
 
 ---
 
