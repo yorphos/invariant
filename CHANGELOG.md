@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.1] - 2026-01-24
+
+### 🔧 Fixed
+
+**Critical Data Integrity Fix**: Transaction Atomicity in Financial Operations
+
+- **Fixed**: Invoice creation atomicity issue (Error 1811)
+  - Previously, if journal entry creation failed, the invoice would still be created (partial operation)
+  - Now all operations are wrapped in database transactions (all-or-nothing behavior)
+  
+- **Added**: Transaction wrapper in persistence service
+  - New `executeInTransaction()` method provides automatic BEGIN/COMMIT/ROLLBACK
+  - Ensures data consistency across all financial operations
+  
+- **Enhanced**: Invoice creation workflow
+  - Validate required accounts BEFORE creating invoice (fail fast)
+  - Check that all line item accounts exist before starting
+  - Entire operation rolls back if any step fails
+  - Improved error messages with specific SQLite error handling
+  
+- **Enhanced**: Payment creation workflow
+  - Validate required accounts (Cash, A/R) before creating payment
+  - Validate all invoice IDs exist before allocating
+  - Wrap in transaction for atomicity
+  - Better error messages
+  
+- **Enhanced**: Expense creation workflow
+  - Validate expense and payment accounts before recording
+  - Wrap in transaction for atomicity
+  - Improved error handling
+  
+- **Improved**: Error messages for all operations
+  - Specific handling for SQLite error 1811 (database integrity)
+  - Specific handling for FOREIGN KEY violations
+  - Specific handling for UNIQUE constraint violations
+  - Specific handling for unbalanced journal entries
+  - Include error stack traces in console for debugging
+
+### 🛡️ Impact
+
+This bug could have caused data inconsistencies where:
+- An invoice exists but has no corresponding journal entry
+- A payment is recorded but allocation or journal entry failed
+- An expense is recorded but journal entry failed
+
+With this fix:
+- Either the entire operation succeeds, or nothing is saved
+- Data integrity is guaranteed at the database level
+- Users get clear error messages instead of silent failures
+
+### 📊 Technical Details
+
+**Root Cause**: Database triggers updating invoice totals were creating conflicts during invoice creation, causing SQLite error 1811. Operations were not atomic, so partial data could be committed.
+
+**Solution**: All multi-step financial operations now execute within SQLite transactions using `BEGIN TRANSACTION` / `COMMIT` / `ROLLBACK`.
+
+---
+
 ## [0.1.0] - 2026-01-24
 
 ### 🎉 Initial MVP Release
