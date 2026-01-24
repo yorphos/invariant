@@ -6,6 +6,7 @@ import { migration004 } from './004_integrity_triggers';
 import { migration005 } from './005_allocation_constraints';
 import { migration006 } from './006_tax_code_integration';
 import { migration007 } from './007_system_accounts_config';
+import { migration008 } from './008_fiscal_periods';
 
 export const allMigrations: Migration[] = [
   migration001,
@@ -15,4 +16,5 @@ export const allMigrations: Migration[] = [
   migration005,
   migration006,
   migration007,
+  migration008,
 ];

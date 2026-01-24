@@ -514,11 +514,11 @@
               />
             </div>
             <div class="quick-buttons">
-              <Button variant="secondary" size="small" on:click={() => setDateRange('this-month')}>This Month</Button>
-              <Button variant="secondary" size="small" on:click={() => setDateRange('last-month')}>Last Month</Button>
-              <Button variant="secondary" size="small" on:click={() => setDateRange('this-quarter')}>This Quarter</Button>
-              <Button variant="secondary" size="small" on:click={() => setDateRange('ytd')}>YTD</Button>
-              <Button variant="secondary" size="small" on:click={() => setDateRange('last-year')}>Last Year</Button>
+              <Button variant="secondary" size="sm" on:click={() => setDateRange('this-month')}>This Month</Button>
+              <Button variant="secondary" size="sm" on:click={() => setDateRange('last-month')}>Last Month</Button>
+              <Button variant="secondary" size="sm" on:click={() => setDateRange('this-quarter')}>This Quarter</Button>
+              <Button variant="secondary" size="sm" on:click={() => setDateRange('ytd')}>YTD</Button>
+              <Button variant="secondary" size="sm" on:click={() => setDateRange('last-year')}>Last Year</Button>
             </div>
           </div>
         </div>
