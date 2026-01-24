@@ -743,4 +743,4 @@ Database migrations will be handled automatically. Your data is safe:
 
 **Thank you for using Invariant Accounting!**
 
-For support, visit: https://github.com/yourusername/invariant/issues
+For support, visit: https://github.com/yorphos/invariant/issues

@@ -26,7 +26,16 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 
 ### Current Release (Phase 7 Complete)
 
-#### 🎨 UX Hardening (Phase 6 - NEW!)
+#### 🔧 Dynamic Account Management (Phase 7 - Latest)
+- **Editable Account Codes** - Change account codes when editing accounts
+  - Code uniqueness validation prevents duplicates
+  - Confirmation dialog for system account changes
+- **Expanded System Account Roles** - 18 configurable system account mappings
+  - Core Accounting, Cash & Banking, Payroll, and more
+- **System Account Badges** - Visual indicators for mapped accounts
+- **Database Reset** (Pro Mode) - Complete reset to factory state with safety confirmation
+
+#### 🎨 UX Hardening (Phase 6)
 - **Manual Journal Entry UI** (Pro Mode only)
   - Create custom journal entries with multiple lines
   - Real-time debit/credit balance validation
@@ -47,7 +56,7 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
   - Full audit trail with transaction metadata
 
 #### 🏦 Bank Import & Receipt Management (Phase 5)
-- **CSV bank statement import** with flexible column mapping (Migrations 016, 017)
+- **CSV bank statement import** with flexible column mapping
 - **Auto-matching** of imported transactions to existing journal entries
   - Amount matching with ±$0.01 tolerance
   - Date matching within ±3 days window
@@ -72,9 +81,9 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 - Bank Import view accessible from main navigation
 
 #### 🔒 Audit Hardening & Compliance (Phase 4)
-- **Closed period enforcement** with database triggers (Migration 012)
-- **Tax-inclusive pricing** support for retail scenarios (Migrations 014, 015)
-- **System account integrity** fixes for A/P and equity accounts (Migrations 007, 013)
+- **Closed period enforcement** with database triggers
+- **Tax-inclusive pricing** support for retail scenarios
+- **System account integrity** fixes for A/P and equity accounts
 - **Safe backup/restore** operations under active use
 - **Foreign key enforcement** across all database access paths
 - **Full audit compliance** achieved (see docs/roadmap.md for details)
@@ -193,29 +202,50 @@ invariant/
 │   │   │   ├── policy.ts        # Mode enforcement rules
 │   │   │   ├── invoice-operations.ts   # Invoice workflows
 │   │   │   ├── payment-operations.ts   # Payment workflows
-│   │   │   └── expense-operations.ts   # Expense workflows
+│   │   │   ├── expense-operations.ts   # Expense workflows
+│   │   │   ├── bill-operations.ts      # Vendor bill workflows
+│   │   │   ├── inventory-operations.ts # Inventory management
+│   │   │   ├── payroll-operations.ts   # Payroll processing
+│   │   │   └── currency-operations.ts  # Multi-currency support
 │   │   ├── services/            # Data layer
 │   │   │   ├── database.ts      # Migration runner
 │   │   │   ├── persistence.ts   # CRUD operations
-│   │   │   └── seed.ts          # Default data
-│   │   ├── ui/                  # Reusable components
-│   │   │   ├── Button.svelte
-│   │   │   ├── Input.svelte
-│   │   │   ├── Select.svelte
-│   │   │   ├── Card.svelte
-│   │   │   ├── Modal.svelte
-│   │   │   ├── Table.svelte
-│   │   │   ├── InvoiceDetailModal.svelte
-│   │   │   └── PaymentDetailModal.svelte
+│   │   │   ├── seed.ts          # Default data
+│   │   │   ├── reports.ts       # Report aggregation
+│   │   │   ├── backup.ts        # Backup/restore
+│   │   │   ├── bank-import.ts   # Bank statement import
+│   │   │   ├── bank-reconciliation.ts  # Reconciliation logic
+│   │   │   ├── batch-operations.ts     # Bulk operations
+│   │   │   ├── document-storage.ts     # Receipt attachments
+│   │   │   ├── period-close.ts  # Fiscal period management
+│   │   │   ├── system-accounts.ts      # System account mappings
+│   │   │   ├── tax.ts           # Tax calculations
+│   │   │   └── transactions.ts  # Transaction support
+│   │   ├── stores/              # Svelte stores
+│   │   │   └── toast.ts         # Toast notifications
+│   │   ├── ui/                  # Reusable components (10 components)
+│   │   │   ├── Button.svelte, Input.svelte, Select.svelte
+│   │   │   ├── Card.svelte, Modal.svelte, Table.svelte
+│   │   │   ├── FileUpload.svelte, ToastContainer.svelte
+│   │   │   └── InvoiceDetailModal.svelte, PaymentDetailModal.svelte
 │   │   ├── utils/               # Utility functions
-│   │   │   └── pdf-generator.ts # PDF generation
-│   │   └── views/               # Application screens
-│   │       ├── DashboardView.svelte
-│   │       ├── ContactsView.svelte
-│   │       ├── InvoicesView.svelte
-│   │       ├── PaymentsView.svelte
-│   │       ├── ExpensesView.svelte
-│   │       └── ReportsView.svelte
+│   │   │   ├── pdf-generator.ts # PDF generation
+│   │   │   └── csv-export.ts    # CSV export
+│   │   └── views/               # Application screens (14 views)
+│   │       ├── DashboardView.svelte     # Business metrics
+│   │       ├── ContactsView.svelte      # Customer/vendor management
+│   │       ├── AccountsView.svelte      # Chart of accounts
+│   │       ├── InvoicesView.svelte      # Sales invoices
+│   │       ├── PaymentsView.svelte      # Payment recording
+│   │       ├── ExpensesView.svelte      # Expense tracking
+│   │       ├── BillsView.svelte         # Vendor bills
+│   │       ├── InventoryView.svelte     # Inventory management
+│   │       ├── PayrollView.svelte       # Payroll processing
+│   │       ├── ReportsView.svelte       # Financial reports
+│   │       ├── ReconciliationView.svelte # Bank reconciliation
+│   │       ├── BankImportView.svelte    # Bank statement import
+│   │       ├── JournalEntryView.svelte  # Manual journal entries
+│   │       └── BatchOperationsView.svelte # Bulk operations
 │   └── main.ts                  # Application entry point
 ├── src-tauri/                   # Rust backend
 │   ├── src/lib.rs               # Plugin registration
@@ -226,16 +256,7 @@ invariant/
 ├── migrations/                  # Database versioning (16 migrations)
 │   ├── 001_core_ledger.ts       # Accounts, journal, audit
 │   ├── 002_contacts_ar_ap.ts    # Contacts, invoices, payments
-│   ├── 003_inventory_payroll_tax.ts  # Future modules
-│   ├── 004_integrity_triggers.ts     # Data integrity
-│   ├── 007_system_accounts_config.ts # System account mappings
-│   ├── 009_bank_reconciliation.ts    # Bank reconciliation
-│   ├── 012_closed_period_enforcement.ts  # Phase 4: Audit hardening
-│   ├── 013_system_account_fixes.ts       # Phase 4: Corrective migration
-│   ├── 014_invoice_line_tax_inclusive.ts # Phase 4: Tax-inclusive pricing
-│   ├── 015_invoice_total_triggers.ts     # Phase 4: Enhanced triggers
-│   ├── 016_bank_import.ts                # Phase 5: Bank import
-│   ├── 017_receipt_attachments.ts        # Phase 5: Receipt attachments
+│   ├── 003-016                  # Additional feature migrations
 │   └── index.ts                 # Migration registry
 └── docs/                        # Documentation
     ├── project.md               # Original architecture specification
@@ -290,7 +311,7 @@ See [Tauri Prerequisites](https://v2.tauri.app/start/prerequisites/) for other d
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/invariant.git
+git clone https://github.com/yorphos/invariant.git
 cd invariant
 
 # Install dependencies
@@ -315,7 +336,7 @@ On first run, Invariant will:
    - macOS: `~/Library/Application Support/invariant`
    - Linux: `~/.local/share/invariant`
 
-2. **Run Migrations**: Apply all 4 schema migrations automatically
+2. **Run Migrations**: Apply all 16 schema migrations automatically
 
 3. **Seed Data**: Insert default chart of accounts (50+ accounts)
 
@@ -409,7 +430,7 @@ npm run format          # Format code (if configured)
 - Run `npm run tauri dev` again to recompile
 
 **Database changes** (migrations):
-- Create a new file in `migrations/` (e.g., `018_my_feature.ts`)
+- Create a new file in `migrations/` (e.g., `017_my_feature.ts`)
 - Export the migration in `migrations/index.ts`
 - Restart app to apply migration
 - Follow append-only principle (never edit shipped migrations)
@@ -501,53 +522,61 @@ All business logic belongs in `src/lib/domain/`:
 
 ## 🗺️ Roadmap
 
-### ✅ Tier 1: Essential UX Improvements (COMPLETED)
+### ✅ Completed Phases
+
+#### Phase 1-3: Core MVP
 - [x] Invoice editing and voiding workflows
 - [x] Invoice and payment detail views
 - [x] PDF generation for invoices
 
-### ✅ Phase 4: Audit Hardening (COMPLETED)
+#### Phase 4: Audit Hardening
 - [x] Closed period enforcement (database triggers)
 - [x] System account integrity fixes
 - [x] Tax-inclusive pricing support
 - [x] Backup/restore hardening
 - [x] Foreign key enforcement consistency
 
-### ✅ Phase 5: Bank Import & Receipt Management (COMPLETED)
+#### Phase 5: Bank Import & Receipt Management
 - [x] CSV bank statement import with flexible mapping
 - [x] Transaction matching and auto-categorization
 - [x] Receipt attachment with drag-and-drop
 - [x] Content-hash deduplication
 - [x] Bank import UI and workflows
 
-### ✅ Phase 5.5: Performance & Integrity (COMPLETED)
+#### Phase 5.5: Performance & Integrity
 - [x] N+1 query pattern optimization in reports (10x+ faster)
 - [x] Database-level aggregation for Balance Sheet, P&L, Trial Balance
 - [x] Reports service layer for clean separation of concerns
-- [x] Transaction atomicity assessment (deferred to future phase)
 
-### Phase 6: Advanced Features
-- [ ] Test suite expansion (70+ tests)
-- [ ] Data export and backup functionality
-- [ ] Advanced payment allocation UI (FIFO, heuristic matching)
-- [ ] Date range filtering for reports
-- [ ] Custom report builder
-- [ ] Batch operations (bulk payments, invoice generation)
+#### Phase 6: UX Hardening
+- [x] Manual journal entry UI (Pro Mode)
+- [x] System account mapping UI
+- [x] Toast notification system
+- [x] Mode switch confirmation dialogs
+- [x] Reconciliation adjustment flow
 
-### Phase 6: Banking Integration
-- [ ] Enhanced bank import features
+#### Phase 7: Dynamic Account Management
+- [x] Editable account codes
+- [x] Expanded system account roles (18 configurable roles)
+- [x] System account badges in UI
+- [x] Database reset functionality (Pro Mode)
+- [x] Comprehensive test suite (501 tests)
+
+### 🚧 Future Phases
+
+#### Phase 8: Advanced Features
 - [ ] Additional file format support (OFX, QBO)
 - [ ] Advanced auto-categorization rules
-- [ ] Transaction matching improvements
+- [ ] Custom report builder
+- [ ] Date range filtering for reports
 
-### Phase 7: Polish & Production
+#### Phase 9: Extended Functionality
 - [ ] Multi-currency support with exchange rates
 - [ ] Inventory tracking and COGS calculation
 - [ ] Payroll processing with tax withholdings
 - [ ] Budgeting and forecasting
-- [ ] Custom fields and tags
 
-### Phase 5: Collaboration
+#### Phase 10: Collaboration
 - [ ] Multi-user support with permissions
 - [ ] Optional cloud sync (encrypted)
 - [ ] Accountant collaboration mode
@@ -605,8 +634,8 @@ Inspired by accounting principles from:
 ## 📚 Additional Resources
 
 - **Documentation**: See `docs/` directory
-- **Issue Tracker**: [GitHub Issues](https://github.com/yourusername/invariant/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/invariant/discussions)
+- **Issue Tracker**: [GitHub Issues](https://github.com/yorphos/invariant/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/yorphos/invariant/discussions)
 - **Project Status**: See [CHANGELOG.md](CHANGELOG.md)
 
 ---
