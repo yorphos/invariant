@@ -4,10 +4,10 @@
 
 Invariant Accounting is a desktop application that brings enterprise-grade double-entry bookkeeping to your local machine. Built with modern web technologies wrapped in a native desktop shell, it provides the power of traditional accounting software without the complexity, cost, or cloud dependency.
 
-[![Status](https://img.shields.io/badge/Status-Phase%205.5%20Complete-brightgreen)]()
+[![Status](https://img.shields.io/badge/Status-Phase%206%20Complete-brightgreen)]()
 [![License](https://img.shields.io/badge/License-TBD-blue)]()
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
-[![Tests](https://img.shields.io/badge/Tests-372%20Passing-success)]()
+[![Tests](https://img.shields.io/badge/Tests-428%20Passing-success)]()
 [![Migrations](https://img.shields.io/badge/Migrations-17-blue)]()
 
 ---
@@ -24,9 +24,29 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 
 ## ✨ Features
 
-### Current Release (MVP v0.1.2 - Phase 5.5 Complete)
+### Current Release (MVP v0.1.3 - Phase 6 Complete)
 
-#### 🏦 Bank Import & Receipt Management (Phase 5 - NEW!)
+#### 🎨 UX Hardening (Phase 6 - NEW!)
+- **Manual Journal Entry UI** (Pro Mode only)
+  - Create custom journal entries with multiple lines
+  - Real-time debit/credit balance validation
+  - View recent journal entries with detail modal
+- **System Account Mapping UI** (Pro Mode only)
+  - Configure A/R, A/P, Sales Tax Payable, Retained Earnings accounts
+  - Dropdown filters accounts by expected type
+- **Toast Notification System**
+  - Non-blocking notifications for success, error, warning, info
+  - Auto-dismiss with configurable duration
+  - Replaces all alert() dialogs
+- **Mode Switch Confirmation**
+  - Confirmation modal when switching Beginner/Pro modes
+  - Explains feature differences and guardrails
+- **Reconciliation Adjustment Flow**
+  - Create adjustment entries when reconciliation doesn't balance
+  - Proper double-entry with expense account selection
+  - Full audit trail with transaction metadata
+
+#### 🏦 Bank Import & Receipt Management (Phase 5)
 - **CSV bank statement import** with flexible column mapping (Migrations 016, 017)
 - **Auto-matching** of imported transactions to existing journal entries
   - Amount matching with ±$0.01 tolerance

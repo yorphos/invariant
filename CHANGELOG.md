@@ -9,6 +9,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🎨 Phase 6: UX Hardening
+
+#### 🚀 Added
+- **Manual Journal Entry UI** (`src/lib/views/JournalEntryView.svelte` - 911 lines)
+  - Create custom journal entries with multiple debit/credit lines
+  - Real-time balance validation (debits must equal credits)
+  - View recent journal entries in list view
+  - Detail modal showing entry lines and metadata
+  - Pro Mode gate (only available in Pro Mode)
+
+- **System Account Mapping UI** (Pro Mode Settings)
+  - Configure system accounts: A/R, A/P, Sales Tax Payable, Retained Earnings, Current Year Earnings
+  - Dropdown filters accounts by expected type (asset/liability/equity)
+  - Helper functions: `getSystemAccountRoleLabel()`, `getExpectedAccountTypes()`, `getAccountsForRole()`
+
+- **Toast Notification System**
+  - New store: `src/lib/stores/toast.ts` - Svelte store for toast management
+  - New component: `src/lib/ui/ToastContainer.svelte` - Toast display component
+  - Support for success, error, warning, info toast types
+  - Auto-dismiss with configurable duration (errors: 8s, others: 5s)
+  - Dismissible by user click
+
+- **Mode Switch Confirmation Dialog**
+  - Confirmation modal when switching between Beginner/Pro modes
+  - Explains what features are unlocked/locked in each mode
+  - Warns about reduced guardrails in Pro Mode
+
+- **Reconciliation Adjustment Flow**
+  - Create adjustment entries when bank reconciliation doesn't balance
+  - Modal with expense account selection and description
+  - Proper double-entry: bank account <-> expense account
+  - Full audit trail via transaction_event with metadata
+
+- **UX Features Test Suite** (`src/tests/unit/ux-features.test.ts` - 56 tests)
+  - Toast store logic: creation, types, duration, collection management
+  - System account mapping: role labels, expected types, account filtering
+  - Journal entry balance validation: debits/credits, tolerance, difference
+  - Mode switch logic: feature access, warning messages
+  - Reconciliation adjustment: entry creation, balanced entries
+
+#### 🔧 Fixed
+- Replaced all `alert()` calls with toast notifications
+  - ReconciliationView.svelte: 7 alerts replaced
+  - AccountsView.svelte: alerts replaced (Phase 6.3)
+  - App.svelte: alerts replaced (Phase 6.3)
+
+#### 📊 Technical Details
+- **New files**:
+  - `src/lib/views/JournalEntryView.svelte` (911 lines)
+  - `src/lib/stores/toast.ts` (70 lines)
+  - `src/lib/ui/ToastContainer.svelte`
+  - `src/tests/unit/ux-features.test.ts` (672 lines)
+- **Modified files**:
+  - `src/App.svelte` - Navigation, toasts, mode confirmation, system accounts UI
+  - `src/lib/views/ReconciliationView.svelte` - Adjustment flow, toasts
+  - `src/lib/views/AccountsView.svelte` - Toast notifications
+  - `src/lib/services/persistence.ts` - Added `getJournalEntries()` method
+- **Test count**: 428 passing (was 372, +56 new tests)
+- **Test files**: 15 files (was 14, +1 new file)
+
+**Impact**: Improved user experience with non-blocking notifications, proper confirmation dialogs for mode switching, and reconciliation adjustment workflow for handling bank discrepancies.
+
+---
+
 ### ⚡ Phase 5.5: Performance & Integrity Improvements
 
 #### 🚀 Added
