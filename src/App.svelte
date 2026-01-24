@@ -26,6 +26,12 @@
     type FiscalYear,
     type ClosingEntry 
   } from './lib/services/period-close';
+  import {
+    getAllSystemAccounts,
+    updateSystemAccount,
+    type SystemAccountRole
+  } from './lib/services/system-accounts';
+  import type { Account } from './lib/domain/types';
 
   let mode: PolicyMode = 'beginner';
   let dbReady = false;
@@ -38,12 +44,19 @@
   let selectedYearToClose: number | null = null;
   let closingInProgress = false;
 
+  // System accounts state
+  let systemAccounts: Map<SystemAccountRole, Account> = new Map();
+  let allAccounts: Account[] = [];
+  let systemAccountsLoading = false;
+  let systemAccountsError = '';
+
   onMount(async () => {
     try {
       await getDatabase();
       mode = await persistenceService.getMode();
       dbReady = true;
       await loadFiscalYears();
+      await loadSystemAccounts();
     } catch (e) {
       error = `Failed to initialize database: ${e}`;
       console.error(error);
@@ -56,6 +69,64 @@
     } catch (e) {
       console.error('Failed to load fiscal years:', e);
     }
+  }
+
+  async function loadSystemAccounts() {
+    try {
+      systemAccountsLoading = true;
+      systemAccountsError = '';
+      const [sysAccts, accts] = await Promise.all([
+        getAllSystemAccounts(),
+        persistenceService.getAccounts()
+      ]);
+      systemAccounts = sysAccts;
+      allAccounts = accts;
+    } catch (e) {
+      console.error('Failed to load system accounts:', e);
+      systemAccountsError = `Failed to load system accounts: ${e}`;
+    } finally {
+      systemAccountsLoading = false;
+    }
+  }
+
+  async function handleUpdateSystemAccount(role: SystemAccountRole, newAccountId: number) {
+    try {
+      systemAccountsLoading = true;
+      systemAccountsError = '';
+      await updateSystemAccount(role, newAccountId);
+      await loadSystemAccounts();
+    } catch (e) {
+      systemAccountsError = `Failed to update system account: ${e}`;
+    } finally {
+      systemAccountsLoading = false;
+    }
+  }
+
+  function getSystemAccountRoleLabel(role: SystemAccountRole): string {
+    const labels: Record<SystemAccountRole, string> = {
+      accounts_receivable: 'Accounts Receivable (A/R)',
+      accounts_payable: 'Accounts Payable (A/P)',
+      sales_tax_payable: 'Sales Tax Payable',
+      retained_earnings: 'Retained Earnings',
+      current_year_earnings: 'Current Year Earnings'
+    };
+    return labels[role] || role;
+  }
+
+  function getExpectedAccountTypes(role: SystemAccountRole): string[] {
+    const types: Record<SystemAccountRole, string[]> = {
+      accounts_receivable: ['asset'],
+      accounts_payable: ['liability'],
+      sales_tax_payable: ['liability'],
+      retained_earnings: ['equity'],
+      current_year_earnings: ['equity']
+    };
+    return types[role] || [];
+  }
+
+  function getAccountsForRole(role: SystemAccountRole): Account[] {
+    const types = getExpectedAccountTypes(role);
+    return allAccounts.filter(a => a.is_active && types.includes(a.type));
   }
 
   async function toggleMode() {
@@ -446,6 +517,71 @@
                 </div>
               {/if}
             </div>
+
+            <div class="setting-group">
+              <h3>System Account Mapping</h3>
+              <p>
+                Configure which accounts are used for system operations like invoicing, bills, and year-end closing.
+                <strong>Only change these if you've renumbered your chart of accounts.</strong>
+              </p>
+
+              {#if systemAccountsError}
+                <div class="error-message">{systemAccountsError}</div>
+              {/if}
+
+              {#if systemAccountsLoading}
+                <p>Loading system accounts...</p>
+              {:else}
+                <div class="system-accounts-list">
+                  {#each ['accounts_receivable', 'accounts_payable', 'sales_tax_payable', 'retained_earnings', 'current_year_earnings'] as role}
+                    {@const currentAccount = systemAccounts.get(role as SystemAccountRole)}
+                    {@const availableAccounts = getAccountsForRole(role as SystemAccountRole)}
+                    <div class="system-account-item">
+                      <div class="system-account-label">
+                        <strong>{getSystemAccountRoleLabel(role as SystemAccountRole)}</strong>
+                        <span class="expected-type">
+                          (expects: {getExpectedAccountTypes(role as SystemAccountRole).join(', ')})
+                        </span>
+                      </div>
+                      <div class="system-account-select">
+                        <select 
+                          value={currentAccount?.id || ''}
+                          onchange={(e) => {
+                            const newId = parseInt((e.target as HTMLSelectElement).value);
+                            if (newId && newId !== currentAccount?.id) {
+                              handleUpdateSystemAccount(role as SystemAccountRole, newId);
+                            }
+                          }}
+                          disabled={systemAccountsLoading}
+                        >
+                          {#if !currentAccount}
+                            <option value="">-- Select Account --</option>
+                          {/if}
+                          {#each availableAccounts as account}
+                            <option value={account.id}>
+                              {account.code} - {account.name}
+                            </option>
+                          {/each}
+                        </select>
+                        {#if currentAccount}
+                          <span class="current-account-badge">
+                            Current: {currentAccount.code}
+                          </span>
+                        {/if}
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+
+                <div class="info">
+                  <p><strong>Accounts Receivable:</strong> Used when creating invoices (money owed to you by customers).</p>
+                  <p><strong>Accounts Payable:</strong> Used when recording bills (money you owe to vendors).</p>
+                  <p><strong>Sales Tax Payable:</strong> Used to track collected sales taxes that must be remitted.</p>
+                  <p><strong>Retained Earnings:</strong> Net income is transferred here during year-end close.</p>
+                  <p><strong>Current Year Earnings:</strong> Running total of current year's net income.</p>
+                </div>
+              {/if}
+            </div>
           {/if}
         </div>
       {/if}
@@ -808,5 +944,95 @@
 
   .warning-box strong {
     color: #e74c3c;
+  }
+
+  /* System Account Mapping styles */
+  .system-accounts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 20px 0;
+  }
+
+  .system-account-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    gap: 16px;
+  }
+
+  .system-account-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 200px;
+  }
+
+  .system-account-label strong {
+    font-size: 14px;
+    color: #2c3e50;
+  }
+
+  .expected-type {
+    font-size: 12px;
+    color: #7f8c8d;
+  }
+
+  .system-account-select {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+  }
+
+  .system-account-select select {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    background: white;
+    min-width: 250px;
+  }
+
+  .system-account-select select:focus {
+    outline: none;
+    border-color: #3498db;
+  }
+
+  .current-account-badge {
+    font-size: 12px;
+    color: #27ae60;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .error-message {
+    padding: 12px 16px;
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 6px;
+    color: #721c24;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 768px) {
+    .system-account-item {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .system-account-select {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .system-account-select select {
+      min-width: unset;
+    }
   }
 </style>
