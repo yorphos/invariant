@@ -1,6 +1,7 @@
 <script lang="ts">
   export let open = false;
   export let title = '';
+  export let size: 'small' | 'medium' | 'large' | 'xlarge' = 'medium';
   export let onClose: () => void = () => {};
 
   function handleBackdropClick(e: MouseEvent) {
@@ -12,7 +13,7 @@
 
 {#if open}
   <div class="modal-backdrop" on:click={handleBackdropClick} role="presentation">
-    <div class="modal">
+    <div class="modal {size}">
       <div class="modal-header">
         <h2>{title}</h2>
         <button class="close-btn" on:click={onClose} aria-label="Close">
@@ -43,12 +44,27 @@
   .modal {
     background: white;
     border-radius: 8px;
-    max-width: 600px;
     width: 90%;
     max-height: 90vh;
     display: flex;
     flex-direction: column;
     box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  }
+
+  .modal.small {
+    max-width: 400px;
+  }
+
+  .modal.medium {
+    max-width: 600px;
+  }
+
+  .modal.large {
+    max-width: 900px;
+  }
+
+  .modal.xlarge {
+    max-width: 1200px;
   }
 
   .modal-header {

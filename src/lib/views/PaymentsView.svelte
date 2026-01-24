@@ -8,6 +8,7 @@
   import Select from '../ui/Select.svelte';
   import Card from '../ui/Card.svelte';
   import Table from '../ui/Table.svelte';
+  import PaymentDetailModal from '../ui/PaymentDetailModal.svelte';
 
   export let mode: PolicyMode;
 
@@ -16,6 +17,8 @@
   let contacts: Contact[] = [];
   let loading = true;
   let view: 'list' | 'create' = 'list';
+  let selectedPayment: Payment | null = null;
+  let showDetailModal = false;
 
   // Form fields
   let formPaymentNumber = '';
@@ -114,6 +117,16 @@
     selectedInvoices = [];
   }
 
+  function handleRowClick(payment: Payment) {
+    selectedPayment = payment;
+    showDetailModal = true;
+  }
+
+  function closeDetailModal() {
+    showDetailModal = false;
+    selectedPayment = null;
+  }
+
   function formatCurrency(amount: number): string {
     return new Intl.NumberFormat('en-CA', {
       style: 'currency',
@@ -147,7 +160,7 @@
       <Card padding={false}>
         <Table headers={['Payment #', 'Customer', 'Date', 'Amount', 'Method', 'Status']}>
           {#each payments as payment}
-            <tr>
+            <tr class="clickable-row" on:click={() => handleRowClick(payment)}>
               <td><strong>{payment.payment_number}</strong></td>
               <td>{contacts.find(c => c.id === payment.contact_id)?.name || '-'}</td>
               <td>{formatDate(payment.payment_date)}</td>
@@ -364,4 +377,22 @@
     height: 18px;
     cursor: pointer;
   }
+
+  .clickable-row {
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .clickable-row:hover {
+    background-color: #f8f9fa !important;
+  }
 </style>
+
+<!-- Payment Detail Modal -->
+{#if showDetailModal && selectedPayment}
+  <PaymentDetailModal
+    payment={selectedPayment}
+    onClose={closeDetailModal}
+    {mode}
+  />
+{/if}

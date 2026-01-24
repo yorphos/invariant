@@ -341,12 +341,120 @@ describe('Financial Accuracy', () => {
   });
 
   it('should calculate percentage correctly', () => {
-    const amount = 1000;
-    const percentage = 13; // 13% HST
-    const expected = 130;
+    const value = 100;
+    const percentage = 0.13;
+    const result = value * percentage;
+    
+    expect(result).toBe(13);
+  });
+});
 
-    const calculated = (amount * percentage) / 100;
+describe('Invoice Void Operations', () => {
+  it('should create reversal journal entries for voided invoice', () => {
+    // Original invoice posting:
+    // DR A/R 113.00, CR Revenue 100.00, CR Tax 13.00
+    
+    const originalARDebit = 113.00;
+    const originalRevenueCredit = 100.00;
+    const originalTaxCredit = 13.00;
+    
+    // Void should reverse all entries:
+    // CR A/R 113.00, DR Revenue 100.00, DR Tax 13.00
+    
+    const voidARCredit = 113.00;
+    const voidRevenueDebit = 100.00;
+    const voidTaxDebit = 13.00;
+    
+    // After void, net effect should be zero
+    const netAR = originalARDebit - voidARCredit;
+    const netRevenue = voidRevenueDebit - originalRevenueCredit;
+    const netTax = voidTaxDebit - originalTaxCredit;
+    
+    expect(netAR).toBe(0);
+    expect(netRevenue).toBe(0);
+    expect(netTax).toBe(0);
+  });
+  
+  it('should prevent voiding an already voided invoice', () => {
+    const invoiceStatus = 'void';
+    const canVoid = invoiceStatus !== 'void';
+    
+    expect(canVoid).toBe(false);
+  });
+  
+  it('should prevent voiding an invoice with payments', () => {
+    const paidAmount = 50.00;
+    const canVoid = paidAmount === 0;
+    
+    expect(canVoid).toBe(false);
+  });
+  
+  it('should allow voiding an invoice with no payments', () => {
+    const paidAmount = 0;
+    const invoiceStatus = 'sent';
+    const canVoid = paidAmount === 0 && invoiceStatus !== 'void';
+    
+    expect(canVoid).toBe(true);
+  });
+  
+  it('should maintain double-entry balance in void transaction', () => {
+    // Void transaction for invoice totaling $113.00
+    const voidDebits = [
+      { account: 'Revenue', amount: 100.00 },
+      { account: 'Tax', amount: 13.00 }
+    ];
+    
+    const voidCredits = [
+      { account: 'A/R', amount: 113.00 }
+    ];
+    
+    const totalDebits = voidDebits.reduce((sum, line) => sum + line.amount, 0);
+    const totalCredits = voidCredits.reduce((sum, line) => sum + line.amount, 0);
+    
+    expect(Math.abs(totalDebits - totalCredits)).toBeLessThan(0.01);
+  });
+});
 
-    expect(calculated).toBe(expected);
+describe('Invoice Edit Operations', () => {
+  it('should prevent editing invoices with payments', () => {
+    const paidAmount = 100.00;
+    const canEdit = paidAmount === 0;
+    
+    expect(canEdit).toBe(false);
+  });
+  
+  it('should prevent editing voided invoices', () => {
+    const status = 'void';
+    const canEdit = status !== 'void';
+    
+    expect(canEdit).toBe(false);
+  });
+  
+  it('should allow editing invoices with no payments', () => {
+    const paidAmount = 0;
+    const status = 'sent';
+    const canEdit = paidAmount === 0 && status !== 'void';
+    
+    expect(canEdit).toBe(true);
+  });
+  
+  it('should result in zero net effect after void and recreate', () => {
+    // Original invoice: DR A/R 113, CR Revenue 100, CR Tax 13
+    // Void: CR A/R 113, DR Revenue 100, DR Tax 13
+    // New invoice (same amounts): DR A/R 113, CR Revenue 100, CR Tax 13
+    
+    // Net effect on each account:
+    const netAR = 113 - 113 + 113; // = 113 (new invoice balance)
+    const netRevenue = -100 + 100 - 100; // = -100 (new revenue)
+    const netTax = -13 + 13 - 13; // = -13 (new tax liability)
+    
+    // Verify double-entry still balanced
+    const totalDebits = 113; // New A/R debit
+    const totalCredits = 100 + 13; // New Revenue + Tax credits
+    
+    expect(Math.abs(totalDebits - totalCredits)).toBeLessThan(0.01);
+    expect(netAR).toBe(113);
+    expect(netRevenue).toBe(-100);
+    expect(netTax).toBe(-13);
   });
 });

@@ -366,6 +366,23 @@ export class PersistenceService {
     );
   }
 
+  async getInvoiceById(id: number): Promise<Invoice | null> {
+    const db = await getDatabase();
+    const results = await db.select<Invoice[]>(
+      'SELECT * FROM invoice WHERE id = ?',
+      [id]
+    );
+    return results.length > 0 ? results[0] : null;
+  }
+
+  async getInvoiceLines(invoiceId: number): Promise<InvoiceLine[]> {
+    const db = await getDatabase();
+    return await db.select<InvoiceLine[]>(
+      'SELECT * FROM invoice_line WHERE invoice_id = ? ORDER BY line_number',
+      [invoiceId]
+    );
+  }
+
   // Payment operations
   async createPayment(payment: Omit<Payment, 'id' | 'created_at' | 'updated_at'>): Promise<number> {
     const db = await getDatabase();
@@ -389,6 +406,15 @@ export class PersistenceService {
     return await db.select<Payment[]>(
       'SELECT * FROM payment ORDER BY payment_date DESC'
     );
+  }
+
+  async getPaymentById(id: number): Promise<Payment | null> {
+    const db = await getDatabase();
+    const results = await db.select<Payment[]>(
+      'SELECT * FROM payment WHERE id = ?',
+      [id]
+    );
+    return results.length > 0 ? results[0] : null;
   }
 
   async updatePayment(id: number, payment: Partial<Omit<Payment, 'id' | 'created_at' | 'updated_at'>>): Promise<void> {

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { persistenceService } from '../services/persistence';
-  import { createInvoice } from '../domain/invoice-operations';
+  import { createInvoice, editInvoice } from '../domain/invoice-operations';
   import type { Invoice, InvoiceLine, Contact, Account, PolicyMode, ValidationWarning } from '../domain/types';
   import Button from '../ui/Button.svelte';
   import Input from '../ui/Input.svelte';
@@ -9,6 +9,7 @@
   import Card from '../ui/Card.svelte';
   import Modal from '../ui/Modal.svelte';
   import Table from '../ui/Table.svelte';
+  import InvoiceDetailModal from '../ui/InvoiceDetailModal.svelte';
 
   export let mode: PolicyMode;
 
@@ -17,7 +18,10 @@
   let revenueAccounts: Account[] = [];
   let loading = true;
   let showModal = false;
-  let view: 'list' | 'create' = 'list';
+  let view: 'list' | 'create' | 'edit' = 'list';
+  let selectedInvoice: Invoice | null = null;
+  let showDetailModal = false;
+  let editingInvoiceId: number | null = null;
 
   // Form fields
   let formInvoiceNumber = '';
@@ -107,36 +111,101 @@
         account_id: Number(line.account_id),
       }));
 
-      const result = await createInvoice(
-        {
-          invoice_number: formInvoiceNumber,
-          contact_id: Number(formContactId),
-          issue_date: formIssueDate,
-          due_date: formDueDate,
-          notes: formNotes || undefined,
-        },
-        lines,
-        { mode }
-      );
+      let result;
+      
+      if (editingInvoiceId) {
+        // Edit existing invoice (void and recreate)
+        result = await editInvoice(
+          editingInvoiceId,
+          {
+            invoice_number: formInvoiceNumber,
+            contact_id: Number(formContactId),
+            issue_date: formIssueDate,
+            due_date: formDueDate,
+            notes: formNotes || undefined,
+          },
+          lines,
+          { mode }
+        );
+      } else {
+        // Create new invoice
+        result = await createInvoice(
+          {
+            invoice_number: formInvoiceNumber,
+            contact_id: Number(formContactId),
+            issue_date: formIssueDate,
+            due_date: formDueDate,
+            notes: formNotes || undefined,
+          },
+          lines,
+          { mode }
+        );
+      }
 
       if (!result.ok) {
-        alert('Failed to create invoice:\n' + result.warnings.map((w: ValidationWarning) => w.message).join('\n'));
+        alert(`Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice:\n` + result.warnings.map((w: ValidationWarning) => w.message).join('\n'));
         return;
+      }
+
+      // Show warnings if any (e.g., "invoice was voided and recreated")
+      if (result.warnings.length > 0) {
+        alert(result.warnings.map((w: ValidationWarning) => w.message).join('\n'));
       }
 
       await loadData();
       view = 'list';
       resetForm();
     } catch (e) {
-      console.error('Failed to create invoice:', e);
-      alert('Failed to create invoice: ' + e);
+      console.error(`Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice:`, e);
+      alert(`Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice: ` + e);
     }
   }
 
   function resetForm() {
+    editingInvoiceId = null;
     formContactId = '';
     formNotes = '';
     formLines = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
+  }
+
+  function handleRowClick(invoice: Invoice) {
+    selectedInvoice = invoice;
+    showDetailModal = true;
+  }
+
+  function closeDetailModal() {
+    showDetailModal = false;
+    selectedInvoice = null;
+  }
+
+  async function handleEditFromDetail() {
+    if (!selectedInvoice) return;
+    
+    // Load invoice data into form
+    editingInvoiceId = selectedInvoice.id!;
+    formInvoiceNumber = selectedInvoice.invoice_number;
+    formContactId = selectedInvoice.contact_id;
+    formIssueDate = selectedInvoice.issue_date;
+    formDueDate = selectedInvoice.due_date;
+    formNotes = selectedInvoice.notes || '';
+    
+    // Load invoice lines
+    const lines = await persistenceService.getInvoiceLines(selectedInvoice.id!);
+    formLines = lines.map(line => ({
+      description: line.description,
+      quantity: line.quantity,
+      unit_price: line.unit_price,
+      account_id: line.account_id || '',
+    }));
+    
+    showDetailModal = false;
+    view = 'edit';
+  }
+
+  async function handleVoidFromDetail() {
+    // Reload data after void
+    await loadData();
+    closeDetailModal();
   }
 
   function formatCurrency(amount: number): string {
@@ -172,7 +241,7 @@
       <Card padding={false}>
         <Table headers={['Invoice #', 'Customer', 'Date', 'Due Date', 'Amount', 'Status']}>
           {#each invoices as invoice}
-            <tr>
+            <tr class="clickable-row" on:click={() => handleRowClick(invoice)}>
               <td><strong>{invoice.invoice_number}</strong></td>
               <td>{contacts.find(c => c.id === invoice.contact_id)?.name || 'Unknown'}</td>
               <td>{formatDate(invoice.issue_date)}</td>
@@ -188,8 +257,8 @@
     {/if}
   {:else}
     <div class="header">
-      <h2>Create Invoice</h2>
-      <Button variant="ghost" on:click={() => view = 'list'}>
+      <h2>{view === 'create' ? 'Create' : 'Edit'} Invoice</h2>
+      <Button variant="ghost" on:click={() => { view = 'list'; resetForm(); }}>
         Cancel
       </Button>
     </div>
@@ -322,16 +391,27 @@
       </Card>
 
       <div class="form-actions">
-        <Button variant="ghost" on:click={() => view = 'list'}>
+        <Button variant="ghost" on:click={() => { view = 'list'; resetForm(); }}>
           Cancel
         </Button>
         <Button type="submit">
-          Create Invoice
+          {view === 'create' ? 'Create' : 'Save'} Invoice
         </Button>
       </div>
     </form>
   {/if}
 </div>
+
+<!-- Invoice Detail Modal -->
+{#if showDetailModal && selectedInvoice}
+  <InvoiceDetailModal
+    invoice={selectedInvoice}
+    onClose={closeDetailModal}
+    onEdit={handleEditFromDetail}
+    onVoid={handleVoidFromDetail}
+    {mode}
+  />
+{/if}
 
 <style>
   .invoices-view {
@@ -458,5 +538,20 @@
   .badge.overdue {
     background: #fadbd8;
     color: #e74c3c;
+  }
+
+  .badge.void {
+    background: #ecf0f1;
+    color: #95a5a6;
+    text-decoration: line-through;
+  }
+
+  .clickable-row {
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .clickable-row:hover {
+    background-color: #f8f9fa !important;
   }
 </style>
