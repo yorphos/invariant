@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] - 2026-01-25
+## [Unreleased]
 
 ### ⚡ Phase 5.5: Performance & Integrity Improvements
 
@@ -45,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.2.0] - 2026-01-24
+## [0.2.0]
 
 ### 🛡️ Phase 4: Audit Hardening & Compliance
 
@@ -265,7 +265,7 @@ With this fix:
 
 ---
 
-## [0.1.0] - 2026-01-24
+## [0.1.0]
 
 ### 🎉 Initial MVP Release
 
