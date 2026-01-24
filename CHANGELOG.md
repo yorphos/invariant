@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.1]
+
+### Fixed
+- **Critical database initialization bug**: table settings has no column named description
+- Added `description` column to `settings` table in migration 001
+- Updated default settings INSERT statements to include descriptions
+- Users experiencing startup errors should delete the database folder and restart
+
+### Added
+- Comprehensive migration validation tests (12 new tests in src/tests/unit/migrations.test.ts)
+- Tests verify migration structure, table/column existence, foreign keys, indexes, and constraints
+- CI now catches schema inconsistencies before they reach users
+
+### 📊 Test Coverage
+- 513 tests passing (was 501, +12 migration tests)
+- All builds passing
+
+---
+
 ## [0.3.7]
 
 ### 🔧 Signing Fix (Password)

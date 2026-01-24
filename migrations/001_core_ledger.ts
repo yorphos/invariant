@@ -9,14 +9,15 @@ export const migration001: Migration = {
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
+      description TEXT,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     -- Insert default settings
-    INSERT OR IGNORE INTO settings (key, value) VALUES 
-      ('mode', 'beginner'),
-      ('locale', 'CA'),
-      ('fiscal_year_start', '01-01');
+    INSERT OR IGNORE INTO settings (key, value, description) VALUES 
+      ('mode', 'beginner', 'Application mode (beginner, pro)'),
+      ('locale', 'CA', 'Locale for currency and date formats'),
+      ('fiscal_year_start', '01-01', 'Fiscal year start date (MM-DD)');
 
     -- Account table (Chart of Accounts)
     CREATE TABLE IF NOT EXISTS account (
