@@ -1,6 +1,6 @@
 [package]
 name = "invariant"
-version = "0.3.7"
+version = "0.3.8"
 description = "Professional offline-first accounting software for small businesses"
 authors = ["yorphos"]
 license = "UNLICENSED"
