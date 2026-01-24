@@ -218,11 +218,9 @@ invariant/
 │   ├── 017_receipt_attachments.ts        # Phase 5: Receipt attachments
 │   └── index.ts                 # Migration registry
 └── docs/                        # Documentation
-    ├── project.md               # Original specification
-    ├── mvp-completion.md        # Implementation summary
-    ├── quick-start.md
-    ├── roadmap.md
-    └── troubleshooting.md
+    ├── project.md               # Original architecture specification
+    ├── roadmap.md               # Development roadmap and phase tracking
+    └── troubleshooting.md       # Debugging and problem-solving guide
 ```
 
 ### Design Principles
@@ -336,6 +334,26 @@ Available reports:
 - Profit & Loss (Revenue - Expenses)
 - Trial Balance (All accounts)
 
+### Beginner vs Pro Mode
+
+**Beginner Mode (Default):**
+- Guided workflows for common tasks
+- Prevents editing posted transactions
+- Warns about unusual account usage
+- Recommends best practices
+- Blocks potentially incorrect operations
+
+**Pro Mode:**
+- Full chart of accounts editing
+- Direct journal entry creation
+- Bypass workflow recommendations
+- Override warnings
+- Advanced features unlocked
+
+**To switch modes:**
+1. Click "Settings" in the sidebar
+2. Click "Switch to Pro Mode" (or "Switch to Beginner Mode")
+
 ---
 
 ## 🔧 Development
@@ -353,9 +371,28 @@ npm run tauri build     # Build distributable binaries
 
 # Quality Checks
 npm run check           # Run TypeScript type checking
+npm run test:run        # Run test suite
 npm run lint            # Run linter (if configured)
 npm run format          # Format code (if configured)
 ```
+
+### Development Workflow
+
+**Frontend changes** (TypeScript/Svelte):
+- Edit files in `src/`
+- Changes hot-reload automatically
+- Check console for errors
+
+**Backend changes** (Rust):
+- Edit files in `src-tauri/src/`
+- Stop the dev server (Ctrl+C)
+- Run `npm run tauri dev` again to recompile
+
+**Database changes** (migrations):
+- Create a new file in `migrations/` (e.g., `018_my_feature.ts`)
+- Export the migration in `migrations/index.ts`
+- Restart app to apply migration
+- Follow append-only principle (never edit shipped migrations)
 
 ### Database Migrations
 
