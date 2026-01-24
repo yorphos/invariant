@@ -1,5 +1,7 @@
 mod db;
 
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -18,6 +20,11 @@ pub fn run() {
                         .build(),
                 )?;
             }
+            
+            // Show the main window after setup is complete
+            let window = app.get_webview_window("main").unwrap();
+            window.show().unwrap();
+            
             Ok(())
         })
         .run(tauri::generate_context!())
