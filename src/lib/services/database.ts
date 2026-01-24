@@ -1,5 +1,6 @@
 import Database from '@tauri-apps/plugin-sql';
 import { appDataDir } from '@tauri-apps/api/path';
+import { seedDefaultAccounts } from './seed';
 
 let dbInstance: Database | null = null;
 
@@ -71,7 +72,6 @@ async function runMigrations(): Promise<void> {
 }
 
 async function seedDefaultData(): Promise<void> {
-  const { seedDefaultAccounts } = await import('./seed');
   await seedDefaultAccounts();
 }
 
