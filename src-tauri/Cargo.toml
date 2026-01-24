@@ -1,10 +1,10 @@
 [package]
-name = "app"
+name = "invariant"
 version = "0.2.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+description = "Professional offline-first accounting software for small businesses"
+authors = ["yorphos"]
+license = "UNLICENSED"
+repository = "https://github.com/yorphos/invariant"
 edition = "2021"
 rust-version = "1.77.2"
 

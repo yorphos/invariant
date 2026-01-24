@@ -5,7 +5,7 @@
 Invariant Accounting is a desktop application that brings enterprise-grade double-entry bookkeeping to your local machine. Built with modern web technologies wrapped in a native desktop shell, it provides the power of traditional accounting software without the complexity, cost, or cloud dependency.
 
 [![Status](https://img.shields.io/badge/Status-Phase%207%20Complete-brightgreen)]()
-[![License](https://img.shields.io/badge/License-TBD-blue)]()
+[![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
 [![Tests](https://img.shields.io/badge/Tests-501%20Passing-success)]()
 [![Migrations](https://img.shields.io/badge/Migrations-16-blue)]()
@@ -594,26 +594,22 @@ All business logic belongs in `src/lib/domain/`:
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-Invariant Accounting is in active development. Contributions are welcome!
-
-### Areas for Contribution
-1. **Feature Development**: Implement roadmap features
-2. **Testing**: Add unit and e2e tests
-3. **Documentation**: Improve guides and API docs
-4. **Localization**: Add support for other languages
-5. **Platform Support**: Test and improve cross-platform compatibility
-6. **Bug Fixes**: Report and fix issues
-
-### Development Setup
-See [Getting Started](#-getting-started) above. Submit PRs against the `main` branch.
+Invariant Accounting is proprietary software. External contributions are not
+accepted at this time. However, bug reports and feature requests are welcome
+via [GitHub Issues](https://github.com/yorphos/invariant/issues).
 
 ---
 
-## 📝 License
+## License
 
-License to be determined. Currently proprietary during development.
+This software is proprietary and copyrighted by yorphos. All rights reserved.
+
+You may view and fork this repository for personal reference only. Commercial use,
+modification, and distribution are prohibited without explicit permission.
+
+See [LICENSE](LICENSE) for full terms. For licensing inquiries: mail@yrp.sh
 
 ---
 

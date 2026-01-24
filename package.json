@@ -3,6 +3,12 @@
   "private": true,
   "version": "0.2.0",
   "type": "module",
+  "license": "UNLICENSED",
+  "author": "yorphos",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yorphos/invariant.git"
+  },
   "scripts": {
     "dev": "tauri dev",
     "dev:vite": "vite",
