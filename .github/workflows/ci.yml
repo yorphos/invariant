@@ -1,5 +1,9 @@
 # Continuous Integration - Tests, type checking, and version sync on every push/PR
 # This workflow runs quickly to catch issues early without building full installers
+#
+# COST NOTE: This workflow uses ONLY Linux runners to minimize GitHub Actions costs.
+# Private repo pricing: Linux=1x, Windows=2x, macOS=10x (3000 minutes/month free)
+# Full multi-platform builds only happen during releases.
 
 name: CI
 
@@ -70,6 +74,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Cache Vite build
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.vite
+            .svelte-kit
+          key: vite-${{ runner.os }}-${{ hashFiles('src/**', 'vite.config.ts', 'svelte.config.js', 'tsconfig.json') }}
+          restore-keys: |
+            vite-${{ runner.os }}-
+
       - name: Run TypeScript check
         run: npm run check
 
@@ -79,31 +93,18 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-  # Verify Tauri builds work on all platforms (without creating installers)
+  # Verify Tauri builds work (Linux only for cost efficiency)
+  # Multi-platform builds are done during releases only
   build-check:
-    name: Build Check (${{ matrix.platform }})
+    name: Build Check (Linux)
     needs: [version-check, test]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: ubuntu-22.04
-            rust_target: ''
-          - platform: macos-latest
-            rust_target: 'aarch64-apple-darwin'
-          - platform: macos-latest
-            rust_target: 'x86_64-apple-darwin'
-          - platform: windows-latest
-            rust_target: ''
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install dependencies (Ubuntu)
-        if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
@@ -116,8 +117,6 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -127,8 +126,18 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Cache Vite build
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.vite
+            .svelte-kit
+          key: vite-${{ runner.os }}-${{ hashFiles('src/**', 'vite.config.ts', 'svelte.config.js', 'tsconfig.json') }}
+          restore-keys: |
+            vite-${{ runner.os }}-
+
       # Build in debug mode (faster) just to verify compilation works
       - name: Verify Tauri build
         run: |
           npm run build
-          cargo build --manifest-path src-tauri/Cargo.toml ${{ matrix.rust_target && format('--target {0}', matrix.rust_target) || '' }}
+          cargo build --manifest-path src-tauri/Cargo.toml
