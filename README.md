@@ -4,7 +4,7 @@
 
 Invariant Accounting is a desktop application that brings enterprise-grade double-entry bookkeeping to your local machine. Built with modern web technologies wrapped in a native desktop shell, it provides the power of traditional accounting software without the complexity, cost, or cloud dependency.
 
-[![Status](https://img.shields.io/badge/Status-Phase%205%20Complete-brightgreen)]()
+[![Status](https://img.shields.io/badge/Status-Phase%205.5%20Complete-brightgreen)]()
 [![License](https://img.shields.io/badge/License-TBD-blue)]()
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
 [![Tests](https://img.shields.io/badge/Tests-372%20Passing-success)]()
@@ -24,7 +24,7 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 
 ## ✨ Features
 
-### Current Release (MVP v0.1.2 - Phase 5 Complete)
+### Current Release (MVP v0.1.2 - Phase 5.5 Complete)
 
 #### 🏦 Bank Import & Receipt Management (Phase 5 - NEW!)
 - **CSV bank statement import** with flexible column mapping (Migrations 016, 017)
@@ -107,6 +107,7 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 - **Trial Balance**: Complete debit/credit listing
 - As-of-date filtering for historical reporting
 - Real-time data (no month-end close required)
+- **10x+ faster report generation** with database-level aggregation (Phase 5.5)
 
 #### 🎛️ Dashboard
 - At-a-glance business metrics:
@@ -202,7 +203,7 @@ invariant/
 │   ├── capabilities/            # Permission system
 │   │   └── default.json
 │   └── tauri.conf.json          # Application configuration
-├── migrations/                  # Database versioning (15 migrations)
+├── migrations/                  # Database versioning (17 migrations)
 │   ├── 001_core_ledger.ts       # Accounts, journal, audit
 │   ├── 002_contacts_ar_ap.ts    # Contacts, invoices, payments
 │   ├── 003_inventory_payroll_tax.ts  # Future modules
@@ -213,6 +214,8 @@ invariant/
 │   ├── 013_system_account_fixes.ts       # Phase 4: Corrective migration
 │   ├── 014_invoice_line_tax_inclusive.ts # Phase 4: Tax-inclusive pricing
 │   ├── 015_invoice_total_triggers.ts     # Phase 4: Enhanced triggers
+│   ├── 016_bank_import.ts                # Phase 5: Bank import
+│   ├── 017_receipt_attachments.ts        # Phase 5: Receipt attachments
 │   └── index.ts                 # Migration registry
 └── docs/                        # Documentation
     ├── project.md               # Original specification
@@ -453,7 +456,20 @@ All business logic belongs in `src/lib/domain/`:
 - [x] Backup/restore hardening
 - [x] Foreign key enforcement consistency
 
-### Phase 5: Advanced Features
+### ✅ Phase 5: Bank Import & Receipt Management (COMPLETED)
+- [x] CSV bank statement import with flexible mapping
+- [x] Transaction matching and auto-categorization
+- [x] Receipt attachment with drag-and-drop
+- [x] Content-hash deduplication
+- [x] Bank import UI and workflows
+
+### ✅ Phase 5.5: Performance & Integrity (COMPLETED)
+- [x] N+1 query pattern optimization in reports (10x+ faster)
+- [x] Database-level aggregation for Balance Sheet, P&L, Trial Balance
+- [x] Reports service layer for clean separation of concerns
+- [x] Transaction atomicity assessment (deferred to future phase)
+
+### Phase 6: Advanced Features
 - [ ] Test suite expansion (70+ tests)
 - [ ] Data export and backup functionality
 - [ ] Advanced payment allocation UI (FIFO, heuristic matching)

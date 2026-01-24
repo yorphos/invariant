@@ -25,7 +25,20 @@ This test infrastructure validates the core accounting principles and business l
 src/tests/
 ├── setup.ts                              # Global test configuration
 └── unit/
-    └── accounting-principles.test.ts     # Core accounting logic tests
+    ├── accounting-principles.test.ts     # Core accounting logic (37 tests)
+    ├── ap-operations.test.ts             # Accounts Payable (32 tests)
+    ├── ar-matching.test.ts               # A/R payment matching (19 tests)
+    ├── bank-import.test.ts               # Bank import logic (21 tests)
+    ├── bank-reconciliation.test.ts       # Reconciliation (22 tests)
+    ├── batch-operations.test.ts          # Batch workflows (32 tests)
+    ├── chart-of-accounts.test.ts         # COA operations (27 tests)
+    ├── csv-export.test.ts                # CSV export (21 tests)
+    ├── currency-operations.test.ts       # Multi-currency (36 tests)
+    ├── expense-operations.test.ts        # Expense tracking (19 tests)
+    ├── inventory-operations.test.ts      # Inventory logic (39 tests)
+    ├── payroll-operations.test.ts        # Payroll processing (35 tests)
+    ├── period-close.test.ts              # Period close (9 tests)
+    └── policy-engine.test.ts             # Policy rules (23 tests)
 ```
 
 ## Running Tests
@@ -47,10 +60,23 @@ npm run test:coverage
 ## Test Results
 
 ```
-✓ src/tests/unit/accounting-principles.test.ts (28 tests) 8ms
+✓ src/tests/unit/accounting-principles.test.ts (37 tests)
+✓ src/tests/unit/ap-operations.test.ts (32 tests)
+✓ src/tests/unit/ar-matching.test.ts (19 tests)
+✓ src/tests/unit/bank-import.test.ts (21 tests)
+✓ src/tests/unit/bank-reconciliation.test.ts (22 tests)
+✓ src/tests/unit/batch-operations.test.ts (32 tests)
+✓ src/tests/unit/chart-of-accounts.test.ts (27 tests)
+✓ src/tests/unit/csv-export.test.ts (21 tests)
+✓ src/tests/unit/currency-operations.test.ts (36 tests)
+✓ src/tests/unit/expense-operations.test.ts (19 tests)
+✓ src/tests/unit/inventory-operations.test.ts (39 tests)
+✓ src/tests/unit/payroll-operations.test.ts (35 tests)
+✓ src/tests/unit/period-close.test.ts (9 tests)
+✓ src/tests/unit/policy-engine.test.ts (23 tests)
 
-Test Files  1 passed (1)
-     Tests  28 passed (28)
+Test Files  14 passed (14)
+     Tests  372 passed (372)
 ```
 
 All tests pass successfully! ✅
@@ -361,18 +387,26 @@ jobs:
 
 ## Test Statistics
 
-**Total Tests:** 28 tests  
-**Success Rate:** 100% (28/28 passing)  
-**Execution Time:** ~8ms  
-**Test File:** 1 file  
+**Total Tests:** 372 tests  
+**Success Rate:** 100% (372/372 passing)  
+**Execution Time:** Fast (all tests run in seconds)  
+**Test Files:** 14 files  
 
 ### Coverage by Category
-- Double-Entry Bookkeeping: 3 tests ✅
-- Invoice Calculations: 5 tests ✅
-- Payment Allocation: 11 tests ✅
-- Account Balances: 2 tests ✅
-- Server Validation: 7 tests ✅
-- Financial Accuracy: 3 tests ✅ (some overlap)
+- Accounting Principles: 37 tests ✅
+- Accounts Payable: 32 tests ✅
+- A/R Matching: 19 tests ✅
+- Bank Import: 21 tests ✅
+- Bank Reconciliation: 22 tests ✅
+- Batch Operations: 32 tests ✅
+- Chart of Accounts: 27 tests ✅
+- CSV Export: 21 tests ✅
+- Currency Operations: 36 tests ✅
+- Expense Operations: 19 tests ✅
+- Inventory Operations: 39 tests ✅
+- Payroll Operations: 35 tests ✅
+- Period Close: 9 tests ✅
+- Policy Engine: 23 tests ✅
 
 ### Principles Covered
 - ✅ Double-Entry Bookkeeping
@@ -381,23 +415,28 @@ jobs:
 - ✅ Server-Side Validation
 - ✅ Financial Accuracy
 - ✅ Security (Amount Manipulation Detection)
+- ✅ Bank Import & Matching Logic
+- ✅ Multi-Currency Conversion
+- ✅ Inventory FIFO/LIFO
+- ✅ Payroll Tax Calculations
+- ✅ Period Close Enforcement
 
 ---
 
 ## Future Enhancements
 
 ### Short Term
-1. Add expense calculation tests
-2. Add account type validation tests
-3. Add contact type change validation tests
-4. Increase test coverage to 90%+
+1. Expand test coverage to 500+ tests
+2. Add integration tests for complex workflows
+3. Add performance benchmarks for critical operations
+4. Increase code coverage metrics
 
 ### Long Term
-1. Add database integration tests (with mocking)
-2. Add UI component tests
+1. Add database integration tests (with mocking or test database)
+2. Add UI component tests with Svelte Testing Library
 3. Add end-to-end workflow tests
-4. Add performance benchmarks
-5. Set up automated coverage reporting
+4. Add visual regression testing
+5. Set up automated coverage reporting and quality gates
 
 ---
 
@@ -414,5 +453,5 @@ jobs:
 
 For questions about the test infrastructure, create an issue in the repository.
 
-**Last Updated:** January 24, 2026  
-**Test Status:** ✅ All 28 tests passing
+**Last Updated:** January 25, 2026  
+**Test Status:** ✅ All 372 tests passing
