@@ -443,6 +443,129 @@
     loading = false;
   }
 
+  // Inventory Valuation
+  interface InventoryValuationLine {
+    sku: string;
+    name: string;
+    quantity: number;
+    average_cost: number;
+    total_value: number;
+  }
+  let inventoryValuation: InventoryValuationLine[] = [];
+
+  async function loadInventoryValuation() {
+    loading = true;
+    try {
+      const db = await getDatabase();
+      
+      // Get all items
+      const items = await db.select<Array<{
+        id: number;
+        sku: string;
+        name: string;
+      }>>(
+        `SELECT id, sku, name FROM item WHERE is_active = 1 ORDER BY sku`
+      );
+      
+      const valuation: InventoryValuationLine[] = [];
+      
+      for (const item of items) {
+        // Calculate quantity on hand
+        const qtyResult = await db.select<Array<{ qty: number }>>(
+          `SELECT COALESCE(SUM(quantity), 0) as qty
+           FROM inventory_movement
+           WHERE item_id = ?
+             AND movement_date <= ?`,
+          [item.id, asOfDate]
+        );
+        
+        const qty = qtyResult[0]?.qty || 0;
+        
+        if (qty === 0) continue; // Skip items with no inventory
+        
+        // Get all purchases to calculate average cost (simplified FIFO-based valuation)
+        const purchases = await db.select<Array<{
+          quantity: number;
+          unit_cost: number;
+        }>>(
+          `SELECT quantity, unit_cost
+           FROM inventory_movement
+           WHERE item_id = ?
+             AND movement_type IN ('purchase', 'adjustment')
+             AND quantity > 0
+             AND movement_date <= ?
+           ORDER BY movement_date ASC`,
+          [item.id, asOfDate]
+        );
+        
+        // Calculate average cost
+        let totalCost = 0;
+        let totalQty = 0;
+        for (const p of purchases) {
+          totalCost += p.quantity * (p.unit_cost || 0);
+          totalQty += p.quantity;
+        }
+        
+        const avgCost = totalQty > 0 ? totalCost / totalQty : 0;
+        const totalValue = qty * avgCost;
+        
+        valuation.push({
+          sku: item.sku,
+          name: item.name,
+          quantity: qty,
+          average_cost: avgCost,
+          total_value: totalValue
+        });
+      }
+      
+      inventoryValuation = valuation.sort((a, b) => b.total_value - a.total_value);
+    } catch (e) {
+      console.error('Failed to load inventory valuation:', e);
+    }
+    loading = false;
+  }
+
+  // Inventory Movements Report
+  interface InventoryMovementLine {
+    movement_date: string;
+    item_sku: string;
+    item_name: string;
+    movement_type: string;
+    quantity: number;
+    unit_cost: number | null;
+    notes: string | null;
+  }
+  let inventoryMovements: InventoryMovementLine[] = [];
+
+  async function loadInventoryMovements() {
+    loading = true;
+    try {
+      const db = await getDatabase();
+      
+      const movements = await db.select<InventoryMovementLine[]>(
+        `SELECT 
+          im.movement_date,
+          i.sku as item_sku,
+          i.name as item_name,
+          im.movement_type,
+          im.quantity,
+          im.unit_cost,
+          im.notes
+        FROM inventory_movement im
+        JOIN item i ON i.id = im.item_id
+        WHERE im.movement_date BETWEEN ? AND ?
+        ORDER BY im.movement_date DESC, im.id DESC
+        LIMIT 500`,
+        [incomeStartDate, incomeEndDate]
+      );
+      
+      inventoryMovements = movements;
+    } catch (e) {
+      console.error('Failed to load inventory movements:', e);
+    }
+    loading = false;
+  }
+
   // Automatically reload reports when dates change
   $: if (asOfDate) {
     loadBalanceSheet();
@@ -450,10 +573,12 @@
     loadARIntegrityCheck();
     loadARAging();
     loadAPAging();
+    loadInventoryValuation();
   }
   
   $: if (incomeStartDate && incomeEndDate) {
     loadIncomeStatement();
+    loadInventoryMovements();
   }
 
   function formatCurrency(amount: number): string {
@@ -987,6 +1112,136 @@
       {/if}
     </Card>
   {/if}
+
+  <!-- Inventory Valuation Report -->
+  {#if inventoryValuation.length > 0}
+    <Card title="Inventory Valuation" padding={false}>
+      <div class="report-header">
+        <div>
+          <h3>Inventory Valuation</h3>
+          <p>As of: {asOfDate}</p>
+        </div>
+        <Button 
+          size="sm" 
+          on:click={() => {
+            const csv = toCSV(
+              inventoryValuation.map(item => ({
+                SKU: item.sku,
+                Item: item.name,
+                Quantity: item.quantity.toFixed(2),
+                'Avg Cost': formatCurrencyForCSV(item.average_cost),
+                'Total Value': formatCurrencyForCSV(item.total_value)
+              }))
+            );
+            downloadCSV(csv, `inventory-valuation-${asOfDate}.csv`);
+          }}
+        >
+          Export CSV
+        </Button>
+      </div>
+      {#if loading}
+        <div class="section">Loading...</div>
+      {:else}
+        <div class="section">
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Item Name</th>
+                <th class="amount">Quantity</th>
+                <th class="amount">Avg Cost</th>
+                <th class="amount">Total Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each inventoryValuation as item}
+                <tr>
+                  <td>{item.sku}</td>
+                  <td>{item.name}</td>
+                  <td class="amount">{item.quantity.toFixed(2)}</td>
+                  <td class="amount">{formatCurrency(item.average_cost)}</td>
+                  <td class="amount">{formatCurrency(item.total_value)}</td>
+                </tr>
+              {/each}
+              <tr class="total-row">
+                <td colspan="4"><strong>Total Inventory Value</strong></td>
+                <td class="amount">
+                  <strong>{formatCurrency(inventoryValuation.reduce((sum, i) => sum + i.total_value, 0))}</strong>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      {/if}
+    </Card>
+  {/if}
+
+  <!-- Inventory Movements Report -->
+  {#if inventoryMovements.length > 0}
+    <Card title="Inventory Movements" padding={false}>
+      <div class="report-header">
+        <div>
+          <h3>Inventory Movements</h3>
+          <p>Period: {incomeStartDate} to {incomeEndDate}</p>
+        </div>
+        <Button 
+          size="sm" 
+          on:click={() => {
+            const csv = toCSV(
+              inventoryMovements.map(mov => ({
+                Date: mov.movement_date,
+                SKU: mov.item_sku,
+                Item: mov.item_name,
+                Type: mov.movement_type,
+                Quantity: mov.quantity.toFixed(2),
+                'Unit Cost': mov.unit_cost ? formatCurrencyForCSV(mov.unit_cost) : '',
+                Notes: mov.notes || ''
+              }))
+            );
+            downloadCSV(csv, `inventory-movements-${incomeStartDate}-${incomeEndDate}.csv`);
+          }}
+        >
+          Export CSV
+        </Button>
+      </div>
+      {#if loading}
+        <div class="section">Loading...</div>
+      {:else}
+        <div class="section">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>SKU</th>
+                <th>Item Name</th>
+                <th>Type</th>
+                <th class="amount">Quantity</th>
+                <th class="amount">Unit Cost</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each inventoryMovements as mov}
+                <tr>
+                  <td>{mov.movement_date}</td>
+                  <td>{mov.item_sku}</td>
+                  <td>{mov.item_name}</td>
+                  <td class="movement-type-{mov.movement_type}">{mov.movement_type}</td>
+                  <td class="amount" class:negative={mov.quantity < 0}>
+                    {mov.quantity > 0 ? '+' : ''}{mov.quantity.toFixed(2)}
+                  </td>
+                  <td class="amount">
+                    {mov.unit_cost ? formatCurrency(mov.unit_cost) : '-'}
+                  </td>
+                  <td>{mov.notes || '-'}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
+    </Card>
+  {/if}
 </div>
 
 <style>
@@ -1198,5 +1453,29 @@
   .aging-table .total-row {
     background: #f8f9fa;
     border-top: 3px double #2c3e50;
+  }
+
+  .negative {
+    color: #d32f2f;
+  }
+
+  .movement-type-purchase {
+    color: #4caf50;
+    font-weight: 600;
+  }
+
+  .movement-type-sale {
+    color: #f44336;
+    font-weight: 600;
+  }
+
+  .movement-type-adjustment {
+    color: #ff9800;
+    font-weight: 600;
+  }
+
+  .movement-type-transfer {
+    color: #2196f3;
+    font-weight: 600;
   }
 </style>

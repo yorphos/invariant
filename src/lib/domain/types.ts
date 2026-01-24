@@ -255,3 +255,60 @@ export interface UnreconciledTransaction {
   credit_amount: number;
   running_balance: number;
 }
+
+export type ItemType = 'product' | 'service' | 'bundle';
+export type MovementType = 'purchase' | 'sale' | 'adjustment' | 'transfer';
+
+export interface Item {
+  id?: number;
+  sku: string;
+  name: string;
+  description?: string;
+  type: ItemType;
+  unit_of_measure?: string;
+  default_price?: number;
+  cost?: number;
+  tax_code_id?: number;
+  inventory_account_id?: number;
+  revenue_account_id?: number;
+  cogs_account_id?: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface InventoryMovement {
+  id?: number;
+  item_id: number;
+  movement_type: MovementType;
+  quantity: number;
+  unit_cost?: number;
+  reference_type?: string;
+  reference_id?: number;
+  event_id?: number;
+  movement_date: string;
+  notes?: string;
+  created_at?: string;
+}
+
+export interface InventoryLayer {
+  movement_id: number;
+  purchase_date: string;
+  quantity_remaining: number;
+  unit_cost: number;
+}
+
+export interface COGSCalculation {
+  cogs_amount: number;
+  quantity_sold: number;
+  layers_consumed: InventoryLayer[];
+  remaining_layers: InventoryLayer[];
+}
+
+export interface InventoryBalance {
+  item_id: number;
+  quantity_on_hand: number;
+  total_cost: number;
+  average_cost: number;
+  fifo_layers: InventoryLayer[];
+}

@@ -14,6 +14,7 @@
   import AccountsView from './lib/views/AccountsView.svelte';
   import ReconciliationView from './lib/views/ReconciliationView.svelte';
   import BatchOperationsView from './lib/views/BatchOperationsView.svelte';
+  import InventoryView from './lib/views/InventoryView.svelte';
   import { backupDatabase, restoreDatabase } from './lib/services/backup';
   import { 
     getFiscalYears, 
@@ -26,7 +27,7 @@
   let mode: PolicyMode = 'beginner';
   let dbReady = false;
   let error = '';
-  let activeView: 'dashboard' | 'accounts' | 'contacts' | 'invoices' | 'payments' | 'bills' | 'expenses' | 'reports' | 'reconciliation' | 'batch' | 'settings' = 'dashboard';
+  let activeView: 'dashboard' | 'accounts' | 'contacts' | 'invoices' | 'payments' | 'bills' | 'expenses' | 'reports' | 'reconciliation' | 'batch' | 'inventory' | 'settings' = 'dashboard';
   
   // Period close state
   let fiscalYears: FiscalYear[] = [];
@@ -224,6 +225,12 @@
           Batch Operations
         </button>
         <button 
+          class:active={activeView === 'inventory'}
+          onclick={() => setView('inventory')}
+        >
+          Inventory
+        </button>
+        <button 
           class:active={activeView === 'settings'}
           onclick={() => setView('settings')}
         >
@@ -258,6 +265,8 @@
         <ReconciliationView {mode} />
       {:else if activeView === 'batch'}
         <BatchOperationsView {mode} />
+      {:else if activeView === 'inventory'}
+        <InventoryView {mode} />
       {:else if activeView === 'settings'}
         <div class="view">
           <h2>Settings</h2>
