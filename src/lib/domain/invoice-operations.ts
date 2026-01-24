@@ -1,6 +1,7 @@
 import { persistenceService } from '../services/persistence';
 import { PostingEngine } from '../domain/posting-engine';
 import { calculateTax } from '../services/tax';
+import { getSystemAccount } from '../services/system-accounts';
 import type { Invoice, InvoiceLine, PolicyContext } from '../domain/types';
 
 const postingEngine = new PostingEngine();
@@ -106,11 +107,7 @@ export async function createInvoice(
 
     // Get required accounts first (fail fast if missing)
     const accounts = await persistenceService.getAccounts();
-    const arAccount = accounts.find(a => a.code === '1100'); // Accounts Receivable
-
-    if (!arAccount) {
-      throw new Error('Required account not found. Please ensure account 1100 (A/R) exists.');
-    }
+    const arAccount = await getSystemAccount('accounts_receivable');
     
     // Tax account comes from tax rate lookup
     const taxAccount = taxAccountId ? accounts.find(a => a.id === taxAccountId) : null;
@@ -269,11 +266,7 @@ export async function voidInvoice(
     
     // Get required accounts
     const accounts = await persistenceService.getAccounts();
-    const arAccount = accounts.find(a => a.code === '1100'); // Accounts Receivable
-    
-    if (!arAccount) {
-      throw new Error('Required account not found (A/R)');
-    }
+    const arAccount = await getSystemAccount('accounts_receivable');
     
     // Get tax account from invoice's tax code
     let taxAccount = null;
