@@ -171,7 +171,7 @@
             label="Amount"
             bind:value={formAmount}
             required
-            min="0"
+            min="0.01"
             step="0.01"
           />
 

@@ -21,8 +21,13 @@ export async function createExpense(
     if (expenseData.amount <= 0) {
       throw new Error('Expense amount must be greater than 0');
     }
+    
+    // Validate description is not empty
+    if (!expenseData.description || expenseData.description.trim() === '') {
+      throw new Error('Expense description is required');
+    }
 
-    // Validate that accounts exist (fail fast)
+    // Validate that accounts exist and have correct types
     const accounts = await persistenceService.getAccounts();
     const expenseAccount = accounts.find(a => a.id === expenseData.expense_account_id);
     const paymentAccount = accounts.find(a => a.id === expenseData.payment_account_id);
@@ -32,6 +37,22 @@ export async function createExpense(
     }
     if (!paymentAccount) {
       throw new Error(`Payment account ID ${expenseData.payment_account_id} not found`);
+    }
+    
+    // Validate account types
+    if (expenseAccount.type !== 'expense') {
+      throw new Error(`Account "${expenseAccount.name}" must be an expense account. Selected account is of type "${expenseAccount.type}".`);
+    }
+    if (paymentAccount.type !== 'asset') {
+      throw new Error(`Payment account "${paymentAccount.name}" must be an asset account (cash/bank). Selected account is of type "${paymentAccount.type}".`);
+    }
+    
+    // Validate accounts are active
+    if (!expenseAccount.is_active) {
+      throw new Error(`Expense account "${expenseAccount.name}" is inactive`);
+    }
+    if (!paymentAccount.is_active) {
+      throw new Error(`Payment account "${paymentAccount.name}" is inactive`);
     }
 
     // Create transaction event

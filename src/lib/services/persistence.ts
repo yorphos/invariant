@@ -180,6 +180,61 @@ export class PersistenceService {
 
   async updateContact(id: number, contact: Partial<Omit<Contact, 'id' | 'created_at' | 'updated_at'>>): Promise<void> {
     const db = await getDatabase();
+    
+    // Validate contact type changes
+    if (contact.type !== undefined) {
+      const existingContact = await db.select<Contact[]>(
+        'SELECT * FROM contact WHERE id = ?',
+        [id]
+      );
+      
+      if (existingContact.length === 0) {
+        throw new Error('Contact not found');
+      }
+      
+      const currentType = existingContact[0].type;
+      const newType = contact.type;
+      
+      // Always allow changing TO 'both'
+      if (newType !== 'both' && currentType !== newType) {
+        // Check if we're removing 'customer' capability
+        if ((currentType === 'customer' || currentType === 'both') && newType === 'vendor') {
+          // Check for existing invoices
+          const invoiceCount = await db.select<Array<{ count: number }>>(
+            'SELECT COUNT(*) as count FROM invoice WHERE contact_id = ?',
+            [id]
+          );
+          if (invoiceCount[0].count > 0) {
+            throw new Error('Cannot change to vendor-only: contact has existing invoices. Change to "Both" instead.');
+          }
+          
+          // Check for existing payments
+          const paymentCount = await db.select<Array<{ count: number }>>(
+            'SELECT COUNT(*) as count FROM payment WHERE contact_id = ?',
+            [id]
+          );
+          if (paymentCount[0].count > 0) {
+            throw new Error('Cannot change to vendor-only: contact has existing payments. Change to "Both" instead.');
+          }
+        }
+        
+        // Check if we're removing 'vendor' capability
+        if ((currentType === 'vendor' || currentType === 'both') && newType === 'customer') {
+          // Check for existing expenses (vendor references in transaction events)
+          const expenseCount = await db.select<Array<{ count: number }>>(
+            `SELECT COUNT(*) as count 
+             FROM transaction_event 
+             WHERE event_type = 'expense_recorded' 
+             AND json_extract(notes, '$.vendor_id') = ?`,
+            [id.toString()]
+          );
+          if (expenseCount[0].count > 0) {
+            throw new Error('Cannot change to customer-only: contact has existing expenses. Change to "Both" instead.');
+          }
+        }
+      }
+    }
+    
     const fields: string[] = [];
     const values: any[] = [];
 

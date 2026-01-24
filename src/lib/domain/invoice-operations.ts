@@ -18,8 +18,47 @@ export async function createInvoice(
   context: PolicyContext
 ) {
   try {
-    // Calculate totals
-    const subtotal = lines.reduce((sum, line) => sum + line.amount, 0);
+    // Validate date logic
+    if (new Date(invoiceData.due_date) < new Date(invoiceData.issue_date)) {
+      throw new Error('Due date must be on or after issue date');
+    }
+    
+    // Recalculate all line amounts server-side (don't trust client)
+    const recalculatedLines = lines.map(line => {
+      // Validate required fields
+      if (!line.description || line.description.trim() === '') {
+        throw new Error('Line item description is required');
+      }
+      if (!line.account_id) {
+        throw new Error(`Line item "${line.description}" must have an account assigned`);
+      }
+      if (!line.quantity || line.quantity <= 0) {
+        throw new Error(`Line item "${line.description}" must have a quantity greater than 0`);
+      }
+      if (!line.unit_price || line.unit_price <= 0) {
+        throw new Error(`Line item "${line.description}" must have a unit price greater than 0`);
+      }
+      
+      // Recalculate amount server-side
+      const calculatedAmount = line.quantity * line.unit_price;
+      
+      // Validate client-provided amount matches (allow 1 cent tolerance for rounding)
+      if (line.amount && Math.abs(calculatedAmount - line.amount) > 0.01) {
+        throw new Error(
+          `Amount mismatch for "${line.description}": ` +
+          `${line.quantity} × $${line.unit_price} = $${calculatedAmount.toFixed(2)}, ` +
+          `but received $${line.amount.toFixed(2)}`
+        );
+      }
+      
+      return {
+        ...line,
+        amount: calculatedAmount // Use server-calculated amount
+      };
+    });
+    
+    // Calculate totals from recalculated amounts
+    const subtotal = recalculatedLines.reduce((sum, line) => sum + line.amount, 0);
     const taxAmount = subtotal * 0.13; // 13% HST
     const totalAmount = subtotal + taxAmount;
 
@@ -40,16 +79,14 @@ export async function createInvoice(
       throw new Error('Required accounts not found. Please ensure accounts 1100 (A/R) and 2220 (HST Payable) exist.');
     }
 
-    // Validate that all line item accounts exist and amounts are positive
-    for (const line of lines) {
-      if (line.amount <= 0) {
-        throw new Error(`Line item "${line.description}" must have an amount greater than 0`);
+    // Validate that all line item accounts exist and are revenue accounts
+    for (const line of recalculatedLines) {
+      const account = accounts.find(a => a.id === line.account_id);
+      if (!account) {
+        throw new Error(`Account ID ${line.account_id} not found for line item: ${line.description}`);
       }
-      if (line.account_id) {
-        const accountExists = accounts.find(a => a.id === line.account_id);
-        if (!accountExists) {
-          throw new Error(`Account ID ${line.account_id} not found for line item: ${line.description}`);
-        }
+      if (account.type !== 'revenue') {
+        throw new Error(`Account "${account.name}" must be a revenue account for invoice line items`);
       }
     }
 
@@ -72,7 +109,7 @@ export async function createInvoice(
         total_amount: totalAmount,
         paid_amount: 0,
       },
-      lines
+      recalculatedLines // Use recalculated lines
     );
 
     // Create journal entries (AR posting)
@@ -88,26 +125,25 @@ export async function createInvoice(
         credit_amount: 0,
         description: `Invoice ${invoiceData.invoice_number}`,
       },
-      // Credit tax
-      {
-        account_id: taxAccount.id,
-        debit_amount: 0,
-        credit_amount: taxAmount,
-        description: 'HST collected',
-      },
     ];
 
-    // Credit each revenue line
-    for (const line of lines) {
-      if (line.account_id) {
-        journalLines.push({
-          account_id: line.account_id,
-          debit_amount: 0,
-          credit_amount: line.amount,
-          description: line.description,
-        });
-      }
+    // Credit revenue accounts (one per line item)
+    for (const line of recalculatedLines) {
+      journalLines.push({
+        account_id: line.account_id!, // Safe: validated above
+        debit_amount: 0,
+        credit_amount: line.amount,
+        description: line.description,
+      });
     }
+    
+    // Credit tax
+    journalLines.push({
+      account_id: taxAccount.id,
+      debit_amount: 0,
+      credit_amount: taxAmount,
+      description: 'HST collected',
+    });
 
     const journalEntryId = await persistenceService.createJournalEntry(
       {

@@ -256,7 +256,7 @@
                   label="Quantity"
                   bind:value={line.quantity}
                   required
-                  min="0"
+                  min="0.01"
                   step="0.01"
                 />
 
@@ -265,7 +265,7 @@
                   label="Unit Price"
                   bind:value={line.unit_price}
                   required
-                  min="0"
+                  min="0.01"
                   step="0.01"
                 />
 

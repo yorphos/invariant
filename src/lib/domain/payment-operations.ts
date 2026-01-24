@@ -31,32 +31,108 @@ export async function createPayment(
     if (!cashAccount) {
       throw new Error('Required account not found. Please ensure account 1010 (Cash) exists.');
     }
-    
-    // For allocated payments, we need A/R account
-    // For unallocated payments, we need Customer Deposits account
-    if (allocations.length > 0 && !arAccount) {
+    if (!arAccount) {
       throw new Error('Required account not found. Please ensure account 1100 (A/R) exists.');
     }
-    if (allocations.length === 0 && !customerDepositsAccount) {
+    if (!customerDepositsAccount) {
       throw new Error('Required account not found. Please ensure account 2150 (Customer Deposits) exists.');
     }
 
-    // Validate that all invoice IDs exist and allocation amounts are positive
-    if (allocations.length > 0) {
-      const invoices = await persistenceService.getInvoices();
-      for (const allocation of allocations) {
-        if (allocation.amount <= 0) {
-          throw new Error(`Allocation amount must be greater than 0`);
+    // Get all open invoices for FIFO allocation
+    let allOpenInvoices = await persistenceService.getOpenInvoices();
+    
+    // If contact_id is specified, filter to that contact
+    if (paymentData.contact_id) {
+      allOpenInvoices = allOpenInvoices.filter(inv => inv.contact_id === paymentData.contact_id);
+    }
+    
+    // Sort by issue_date for FIFO (oldest first)
+    allOpenInvoices.sort((a, b) => new Date(a.issue_date).getTime() - new Date(b.issue_date).getTime());
+
+    // If no invoices selected, use FIFO across all open invoices
+    let finalAllocations: Array<{ invoice_id: number; amount: number }>;
+    
+    if (allocations.length === 0) {
+      // Auto-allocate using FIFO
+      finalAllocations = [];
+      let remainingAmount = paymentData.amount;
+      
+      for (const invoice of allOpenInvoices) {
+        if (remainingAmount <= 0) break;
+        
+        const outstanding = invoice.total_amount - invoice.paid_amount;
+        const allocationAmount = Math.min(remainingAmount, outstanding);
+        
+        if (allocationAmount > 0) {
+          finalAllocations.push({
+            invoice_id: invoice.id!,
+            amount: allocationAmount
+          });
+          remainingAmount -= allocationAmount;
         }
-        const invoiceExists = invoices.find(inv => inv.id === allocation.invoice_id);
-        if (!invoiceExists) {
-          throw new Error(`Invoice ID ${allocation.invoice_id} not found`);
+      }
+    } else {
+      // User selected specific invoices - apply FIFO to selected invoices
+      finalAllocations = [];
+      let remainingAmount = paymentData.amount;
+      
+      // Get the selected invoice details and sort by date
+      const selectedInvoiceIds = allocations.map(a => a.invoice_id);
+      const selectedInvoices = allOpenInvoices.filter(inv => selectedInvoiceIds.includes(inv.id!));
+      
+      for (const invoice of selectedInvoices) {
+        if (remainingAmount <= 0) break;
+        
+        const outstanding = invoice.total_amount - invoice.paid_amount;
+        const allocationAmount = Math.min(remainingAmount, outstanding);
+        
+        if (allocationAmount > 0) {
+          finalAllocations.push({
+            invoice_id: invoice.id!,
+            amount: allocationAmount
+          });
+          remainingAmount -= allocationAmount;
         }
       }
     }
 
-    // Calculate allocated amount
-    const allocatedAmount = allocations.reduce((sum, a) => sum + a.amount, 0);
+    // Validate all allocations
+    const invoices = await persistenceService.getInvoices();
+    let totalAllocated = 0;
+    
+    for (const allocation of finalAllocations) {
+      // Validate allocation amount is positive
+      if (allocation.amount <= 0) {
+        throw new Error(`Allocation amount must be greater than 0`);
+      }
+      
+      // Validate invoice exists
+      const invoice = invoices.find(inv => inv.id === allocation.invoice_id);
+      if (!invoice) {
+        throw new Error(`Invoice ID ${allocation.invoice_id} not found`);
+      }
+      
+      // Validate invoice won't be overpaid
+      const newPaidAmount = invoice.paid_amount + allocation.amount;
+      if (newPaidAmount > invoice.total_amount + 0.01) { // Allow 1 cent rounding tolerance
+        throw new Error(
+          `Allocation of $${allocation.amount.toFixed(2)} would overpay invoice ${invoice.invoice_number}. ` +
+          `Outstanding: $${(invoice.total_amount - invoice.paid_amount).toFixed(2)}`
+        );
+      }
+      
+      totalAllocated += allocation.amount;
+    }
+    
+    // Validate payment isn't over-allocated
+    if (totalAllocated > paymentData.amount + 0.01) { // Allow 1 cent rounding tolerance
+      throw new Error(
+        `Cannot allocate $${totalAllocated.toFixed(2)} when payment is only $${paymentData.amount.toFixed(2)}`
+      );
+    }
+
+    // Calculate allocated amount (might be less than payment amount)
+    const allocatedAmount = totalAllocated;
 
     // Create transaction event
     const eventId = await persistenceService.createTransactionEvent({
@@ -71,22 +147,21 @@ export async function createPayment(
       ...paymentData,
       event_id: eventId,
       allocated_amount: allocatedAmount,
-      status: allocatedAmount === paymentData.amount ? 'allocated' : 'partial',
+      status: Math.abs(allocatedAmount - paymentData.amount) < 0.01 ? 'allocated' : 'partial',
     });
 
     // Create allocations
-    for (const allocation of allocations) {
+    for (const allocation of finalAllocations) {
       await persistenceService.createAllocation({
         payment_id: paymentId,
         invoice_id: allocation.invoice_id,
         amount: allocation.amount,
-        allocation_method: 'manual',
+        allocation_method: finalAllocations.length === allocations.length ? 'manual' : 'fifo',
       });
     }
 
     // Create journal entry
-    // For allocated payments: DR Cash, CR Accounts Receivable
-    // For unallocated payments: DR Cash, CR Customer Deposits
+    // CRITICAL FIX: Use allocatedAmount (not paymentData.amount) for allocated portion
     const journalLines = [
       {
         account_id: cashAccount.id,
@@ -96,20 +171,23 @@ export async function createPayment(
       },
     ];
 
-    if (allocations.length > 0) {
-      // Payment allocated to invoices - reduce A/R
+    if (allocatedAmount > 0) {
+      // Payment allocated to invoices - reduce A/R by allocated amount
       journalLines.push({
-        account_id: arAccount!.id, // Safe because we validated above
+        account_id: arAccount.id,
         debit_amount: 0,
-        credit_amount: paymentData.amount,
-        description: `Payment applied to invoices`,
+        credit_amount: allocatedAmount, // FIXED: was paymentData.amount
+        description: `Payment applied to ${finalAllocations.length} invoice(s)`,
       });
-    } else {
-      // Unallocated payment - record as customer deposit (liability)
+    }
+    
+    // If there's unallocated amount, record as customer deposit
+    const unallocatedAmount = paymentData.amount - allocatedAmount;
+    if (unallocatedAmount > 0.01) {
       journalLines.push({
-        account_id: customerDepositsAccount!.id, // Safe because we validated above
+        account_id: customerDepositsAccount.id,
         debit_amount: 0,
-        credit_amount: paymentData.amount,
+        credit_amount: unallocatedAmount,
         description: `Unallocated payment - customer deposit`,
       });
     }
@@ -147,7 +225,7 @@ export async function createPayment(
       } else if (errorMessage.includes('FOREIGN KEY')) {
         errorMessage = 'Foreign key constraint error. Please ensure all referenced data exists.';
       } else if (errorMessage.includes('UNIQUE')) {
-        errorMessage = 'This invoice number already exists. Please use a different number.';
+        errorMessage = 'This payment number already exists. Please use a different number.';
       } else if (errorMessage.includes('balanced')) {
         errorMessage = 'Journal entry is not balanced. This is an internal error - please report it.';
       }
