@@ -48,6 +48,28 @@ export class PersistenceService {
     await this.setSetting('mode', mode);
   }
 
+  async getUpdateChannel(): Promise<'stable' | 'beta'> {
+    const channel = await this.getSetting('update_channel');
+    return (channel === 'beta' ? 'beta' : 'stable') as 'stable' | 'beta';
+  }
+
+  async setUpdateChannel(channel: 'stable' | 'beta'): Promise<void> {
+    await this.setSetting('update_channel', channel);
+  }
+
+  async getLastUpdateCheck(): Promise<string | null> {
+    return await this.getSetting('last_update_check');
+  }
+
+  async setLastUpdateCheck(timestamp: string): Promise<void> {
+    await this.setSetting('last_update_check', timestamp);
+  }
+
+  async getCurrentVersion(): Promise<string> {
+    // This will be injected by Tauri
+    return '0.2.0';
+  }
+
   // Account operations
   async getAccounts(includeInactive: boolean = false): Promise<Account[]> {
     const db = await getDatabase();

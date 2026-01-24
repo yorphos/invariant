@@ -4,11 +4,11 @@
 
 Invariant Accounting is a desktop application that brings enterprise-grade double-entry bookkeeping to your local machine. Built with modern web technologies wrapped in a native desktop shell, it provides the power of traditional accounting software without the complexity, cost, or cloud dependency.
 
-[![Status](https://img.shields.io/badge/Status-Phase%207%20Complete-brightgreen)]()
+[![Status](https://img.shields.io/badge/Status-Phase%208%20Complete-brightgreen)]()
 [![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
 [![Tests](https://img.shields.io/badge/Tests-501%20Passing-success)]()
-[![Migrations](https://img.shields.io/badge/Migrations-16-blue)]()
+[![Migrations](https://img.shields.io/badge/Migrations-17-blue)]()
 
 ---
 
@@ -24,9 +24,18 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 
 ## ✨ Features
 
-### Current Release (Phase 7 Complete)
+### Current Release (Phase 8 Complete)
 
-#### 🔧 Dynamic Account Management (Phase 7 - Latest)
+#### 🔄 Auto-Update System (Phase 8 - Latest)
+- **Automatic Update Checking** - Check for updates on app startup
+- **Manual Update Check** - "Check for Updates" button in Settings
+- **Update Channel Selection** (Pro Mode) - Choose Stable or Beta releases
+- **Update Modal UI** - Beautiful notification with release notes and progress
+- **Cryptographic Signature Verification** - Signed updates with minisign
+- **Silent Installation** (Windows) - Passive install with progress bar
+- **GitHub Actions Integration** - Automated signed releases
+
+#### 🔧 Dynamic Account Management (Phase 7)
 - **Editable Account Codes** - Change account codes when editing accounts
   - Code uniqueness validation prevents duplicates
   - Confirmation dialog for system account changes
@@ -253,7 +262,7 @@ invariant/
 │   ├── capabilities/            # Permission system
 │   │   └── default.json
 │   └── tauri.conf.json          # Application configuration
-├── migrations/                  # Database versioning (16 migrations)
+├── migrations/                  # Database versioning (17 migrations)
 │   ├── 001_core_ledger.ts       # Accounts, journal, audit
 │   ├── 002_contacts_ar_ap.ts    # Contacts, invoices, payments
 │   ├── 003-016                  # Additional feature migrations
@@ -336,7 +345,7 @@ On first run, Invariant will:
    - macOS: `~/Library/Application Support/invariant`
    - Linux: `~/.local/share/invariant`
 
-2. **Run Migrations**: Apply all 16 schema migrations automatically
+2. **Run Migrations**: Apply all 17 schema migrations automatically
 
 3. **Seed Data**: Insert default chart of accounts (50+ accounts)
 
@@ -562,21 +571,29 @@ All business logic belongs in `src/lib/domain/`:
 - [x] Database reset functionality (Pro Mode)
 - [x] Comprehensive test suite (501 tests)
 
+#### Phase 8: Auto-Update System
+- [x] Automatic update checking on startup
+- [x] Manual update check button
+- [x] Update channel selection (Stable/Beta)
+- [x] Update modal with release notes
+- [x] Cryptographic signature verification
+- [x] GitHub Actions release automation
+
 ### 🚧 Future Phases
 
-#### Phase 8: Advanced Features
+#### Phase 9: Advanced Features
 - [ ] Additional file format support (OFX, QBO)
 - [ ] Advanced auto-categorization rules
 - [ ] Custom report builder
 - [ ] Date range filtering for reports
 
-#### Phase 9: Extended Functionality
+#### Phase 10: Extended Functionality
 - [ ] Multi-currency support with exchange rates
 - [ ] Inventory tracking and COGS calculation
 - [ ] Payroll processing with tax withholdings
 - [ ] Budgeting and forecasting
 
-#### Phase 10: Collaboration
+#### Phase 11: Collaboration
 - [ ] Multi-user support with permissions
 - [ ] Optional cloud sync (encrypted)
 - [ ] Accountant collaboration mode

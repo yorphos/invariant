@@ -20,6 +20,7 @@
   import JournalEntryView from './lib/views/JournalEntryView.svelte';
   import ToastContainer from './lib/ui/ToastContainer.svelte';
   import Modal from './lib/ui/Modal.svelte';
+  import UpdateModal from './lib/ui/UpdateModal.svelte';
   import { toasts } from './lib/stores/toast';
   import { backupDatabase, restoreDatabase, resetDatabase, RESET_CONFIRMATION_TEXT, isResetConfirmationValid } from './lib/services/backup';
   import { 
@@ -35,6 +36,12 @@
     type SystemAccountRole
   } from './lib/services/system-accounts';
   import type { Account } from './lib/domain/types';
+  import { 
+    checkForUpdate, 
+    downloadAndInstallUpdate,
+    type UpdateMetadata,
+    type DownloadProgress
+  } from './lib/services/updater';
 
   let mode: PolicyMode = 'beginner';
   let dbReady = false;
@@ -62,6 +69,12 @@
   let resetConfirmationInput = '';
   let resetInProgress = false;
 
+  // Update state
+  let updateAvailable: UpdateMetadata | null = null;
+  let showUpdateModal = false;
+  let downloadProgress: DownloadProgress | null = null;
+  let skippedVersion: string | null = null; // Session-only skip tracking
+
   onMount(async () => {
     try {
       await getDatabase();
@@ -69,6 +82,9 @@
       dbReady = true;
       await loadFiscalYears();
       await loadSystemAccounts();
+      
+      // Check for updates after initialization (non-blocking)
+      checkForUpdatesOnStartup();
     } catch (e) {
       error = `Failed to initialize database: ${e}`;
       console.error(error);
@@ -242,6 +258,94 @@
       toasts.error(`Reset failed: ${e}`);
     } finally {
       resetInProgress = false;
+    }
+  }
+
+  // Update checking functions
+  async function checkForUpdatesOnStartup() {
+    try {
+      const channel = await persistenceService.getUpdateChannel();
+      const update = await checkForUpdate(channel);
+      
+      if (update) {
+        // Check if this version was skipped in this session
+        if (skippedVersion === update.version) {
+          console.log(`Update ${update.version} was skipped this session`);
+          return;
+        }
+        
+        updateAvailable = update;
+        showUpdateModal = true;
+        
+        // Update last check timestamp
+        await persistenceService.setLastUpdateCheck(new Date().toISOString());
+      }
+    } catch (e) {
+      // Silently fail - don't block app startup
+      console.error('Update check failed:', e);
+    }
+  }
+
+  async function handleManualUpdateCheck() {
+    try {
+      toasts.info('Checking for updates...');
+      const channel = await persistenceService.getUpdateChannel();
+      const update = await checkForUpdate(channel);
+      
+      if (update) {
+        updateAvailable = update;
+        showUpdateModal = true;
+        skippedVersion = null; // Reset skip if manually checking
+        
+        await persistenceService.setLastUpdateCheck(new Date().toISOString());
+      } else {
+        toasts.success('You are running the latest version!');
+      }
+    } catch (e) {
+      toasts.error(`Update check failed: ${e}`);
+    }
+  }
+
+  async function handleInstallUpdate() {
+    if (!updateAvailable) return;
+    
+    try {
+      downloadProgress = { downloaded: 0, contentLength: null };
+      
+      await downloadAndInstallUpdate((progress) => {
+        downloadProgress = progress;
+      });
+      
+      // On Windows, the app will exit automatically
+      // On macOS/Linux, show success message
+      toasts.success('Update installed! The app will restart now.');
+    } catch (e) {
+      toasts.error(`Update installation failed: ${e}`);
+      downloadProgress = null;
+    }
+  }
+
+  function handleSkipUpdate() {
+    if (updateAvailable) {
+      skippedVersion = updateAvailable.version;
+      toasts.info(`Skipped version ${updateAvailable.version} for this session`);
+    }
+    showUpdateModal = false;
+    updateAvailable = null;
+    downloadProgress = null;
+  }
+
+  function handleRemindLater() {
+    showUpdateModal = false;
+  }
+
+  async function handleUpdateChannelChange(newChannel: string) {
+    const channel = newChannel as 'stable' | 'beta';
+    try {
+      await persistenceService.setUpdateChannel(channel);
+      toasts.success(`Update channel changed to ${channel}`);
+    } catch (e) {
+      toasts.error(`Failed to change update channel: ${e}`);
     }
   }
 
@@ -502,6 +606,74 @@
             <div class="info">
               <p><strong>Backup:</strong> Save a copy of your database to a location of your choice.</p>
               <p><strong>Restore:</strong> Replace your current database with a backup. <em>This will delete all current data!</em></p>
+            </div>
+          </div>
+
+          <div class="setting-group">
+            <h3>Application Updates</h3>
+            <p>
+              Keep your application up-to-date with the latest features and bug fixes.
+            </p>
+            
+            {#await persistenceService.getCurrentVersion()}
+              <p>Current version: Loading...</p>
+            {:then version}
+              <p>Current version: <strong>v{version || '0.2.0'}</strong></p>
+            {:catch}
+              <p>Current version: <strong>v0.2.0</strong></p>
+            {/await}
+
+            {#await persistenceService.getLastUpdateCheck()}
+              <p class="update-check-time">Last checked: Never</p>
+            {:then lastCheck}
+              {#if lastCheck}
+                <p class="update-check-time">Last checked: {new Date(lastCheck).toLocaleString()}</p>
+              {:else}
+                <p class="update-check-time">Last checked: Never</p>
+              {/if}
+            {:catch}
+              <p class="update-check-time">Last checked: Never</p>
+            {/await}
+
+            <div class="button-group">
+              <button onclick={handleManualUpdateCheck}>
+                Check for Updates
+              </button>
+            </div>
+
+            {#if mode === 'pro'}
+              <div class="update-channel-selector">
+                <h4>Update Channel</h4>
+                <p class="channel-info">Choose which updates to receive:</p>
+                {#await persistenceService.getUpdateChannel()}
+                  <select disabled>
+                    <option>Loading...</option>
+                  </select>
+                {:then channel}
+                  <select 
+                    value={channel}
+                    onchange={(e) => handleUpdateChannelChange(e.currentTarget.value)}
+                  >
+                    <option value="stable">Stable (Recommended)</option>
+                    <option value="beta">Beta (Early Access)</option>
+                  </select>
+                  
+                  <div class="channel-description">
+                    {#if channel === 'stable'}
+                      <p><strong>Stable:</strong> Production-ready releases with thorough testing.</p>
+                    {:else}
+                      <p><strong>Beta:</strong> Early access to new features. May contain bugs.</p>
+                    {/if}
+                  </div>
+                {:catch}
+                  <p class="error-text">Failed to load update channel preference.</p>
+                {/await}
+              </div>
+            {/if}
+
+            <div class="info">
+              <p>Updates are downloaded from GitHub Releases and cryptographically verified before installation.</p>
+              <p>The app will notify you when updates are available on startup.</p>
             </div>
           </div>
 
@@ -946,6 +1118,18 @@
     </button>
   </div>
 </Modal>
+
+<!-- Update Modal -->
+{#if updateAvailable}
+  <UpdateModal 
+    open={showUpdateModal}
+    updateInfo={updateAvailable}
+    downloadProgress={downloadProgress}
+    onInstall={handleInstallUpdate}
+    onSkip={handleSkipUpdate}
+    onRemindLater={handleRemindLater}
+  />
+{/if}
 
 <ToastContainer />
 

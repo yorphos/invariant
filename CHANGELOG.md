@@ -11,6 +11,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0]
+
+### 🔄 Phase 8: Auto-Update System
+
+#### 🚀 Added
+- **Automatic Update Checking** - Check for updates on app startup (non-blocking)
+  - Checks GitHub Releases for new versions
+  - Skips check if run within last 12 hours
+  - Desktop platforms only (Windows, macOS, Linux)
+
+- **Manual Update Check** - "Check for Updates" button in Settings
+  - Force update check regardless of last check time
+  - Shows update modal if newer version available
+  - Shows toast notification if already up to date
+
+- **Update Channel Selection** (Pro Mode) - Choose between Stable and Beta releases
+  - Stable channel: Production releases only (default)
+  - Beta channel: Pre-release builds for early testing
+  - Preference stored in database settings table
+
+- **Update Modal UI** - Beautiful update notification with progress tracking
+  - Release version and release notes from GitHub
+  - Download progress bar with percentage
+  - Three action buttons:
+    - "Skip This Version" (session-only, not persisted)
+    - "Remind Me Later" (dismiss modal)
+    - "Install Now" (download and install update)
+  - Markdown rendering for release notes
+
+- **Cryptographic Signature Verification** - Updates signed with minisign (Ed25519)
+  - Public key embedded in app configuration
+  - Prevents tampering with update files
+  - Signature verification happens automatically
+
+- **Silent Installation** (Windows) - Passive install mode with progress bar
+  - No user interaction required during install
+  - Progress shown in installer window
+  - App restarts automatically after update
+
+- **GitHub Actions Integration** - Automated release workflow
+  - Detects version changes in tauri.conf.json
+  - Builds signed installers for all platforms
+  - Creates GitHub Release with artifacts
+  - Uploads `latest.json` for update discovery
+
+#### 🔧 Technical Details
+- **New files**:
+  - `src-tauri/src/updater.rs` - Rust backend for update operations
+  - `src/lib/services/updater.ts` - TypeScript frontend service
+  - `src/lib/ui/UpdateModal.svelte` - Update notification UI
+  - `migrations/017_update_channel.ts` - Database schema for update preferences
+- **Modified files**:
+  - `src-tauri/tauri.conf.json` - Added updater plugin configuration
+  - `src-tauri/Cargo.toml` - Added `tauri-plugin-updater` and `thiserror` dependencies
+  - `src-tauri/src/lib.rs` - Registered updater module with `cfg(desktop)` conditional compilation
+  - `src/lib/services/persistence.ts` - Added update preference methods
+  - `src/App.svelte` - Integrated update checking, modal, and settings UI
+  - `.github/workflows/release.yml` - Added `TAURI_SIGNING_PRIVATE_KEY` environment variable
+- **Dependencies**:
+  - `tauri-plugin-updater` 2.9.0 - Tauri's official update plugin
+  - `thiserror` 2.0.18 - Rust error handling
+- **Migrations**: 17 total (was 16)
+- **Test count**: 501 passing (16 test files)
+
+#### 📊 Update Distribution
+- **GitHub Endpoint**: `https://github.com/yorphos/invariant/releases/latest/download/latest.json`
+- **Stable Channel**: Points to latest release
+- **Beta Channel**: Points to latest pre-release
+- **Supported Platforms**: Windows, macOS (Intel + Apple Silicon), Linux
+
+#### 🔒 Security
+- **Code Signing**: All releases signed with minisign (Ed25519)
+- **Signature Verification**: Automatic verification before installation
+- **HTTPS Only**: All downloads over encrypted connection
+- **No Auto-Install**: User must explicitly click "Install Now"
+
+#### 💡 User Experience
+- **Non-Intrusive**: Startup check runs in background, doesn't block UI
+- **Informative**: Shows release notes before installing
+- **Flexible**: Skip version, remind later, or install immediately
+- **Safe**: Cryptographic verification prevents malicious updates
+
+#### 🎯 Impact
+Users can now receive automatic updates without manually downloading and reinstalling the application. This ensures users stay on the latest version with bug fixes, security patches, and new features.
+
+---
+
 ## [0.2.0]
 
 ### 🔧 Phase 7: Dynamic Account Code Management
