@@ -3,6 +3,7 @@
   export let size: 'sm' | 'md' | 'lg' = 'md';
   export let disabled = false;
   export let type: 'button' | 'submit' = 'button';
+  export let onclick: ((e: MouseEvent) => void) | undefined = undefined;
 </script>
 
 <button 
@@ -10,6 +11,7 @@
   {type}
   {disabled}
   on:click
+  on:click={onclick}
 >
   <slot />
 </button>

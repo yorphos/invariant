@@ -9,6 +9,9 @@
   export let step: string | undefined = undefined;
   export let min: string | number | undefined = undefined;
   export let max: string | number | undefined = undefined;
+  export let helperText: string | undefined = undefined;
+  export let oninput: ((e: Event & { currentTarget: HTMLInputElement }) => void) | undefined = undefined;
+  export let onchange: ((e: Event & { currentTarget: HTMLInputElement }) => void) | undefined = undefined;
 
   // Generate unique ID for label-input association
   const id = `input-${Math.random().toString(36).substr(2, 9)}`;
@@ -32,10 +35,15 @@
     {max}
     bind:value
     on:input
+    on:input={oninput}
     on:change
+    on:change={onchange}
     on:blur
     class:error={error}
   />
+  {#if helperText}
+    <span class="helper-text">{helperText}</span>
+  {/if}
   {#if error}
     <span class="error-message">{error}</span>
   {/if}
@@ -85,5 +93,10 @@
   .error-message {
     font-size: 13px;
     color: #e74c3c;
+  }
+
+  .helper-text {
+    font-size: 12px;
+    color: #6b7280;
   }
 </style>

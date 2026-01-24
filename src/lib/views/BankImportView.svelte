@@ -13,7 +13,7 @@
     type BankStatementTransaction,
     type CategorizationRule
   } from '../services/bank-import';
-  import type { Account, PolicyMode } from '../domain/types';
+  import type { Account, PolicyMode, BankTransactionType } from '../domain/types';
   import Button from '../ui/Button.svelte';
   import Input from '../ui/Input.svelte';
   import Select from '../ui/Select.svelte';
@@ -21,6 +21,7 @@
   import Table from '../ui/Table.svelte';
   import Modal from '../ui/Modal.svelte';
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   export let mode: PolicyMode;
 
   type ViewState = 'list' | 'import' | 'transactions' | 'rules';
@@ -52,7 +53,7 @@
     payee_pattern: '',
     amount_min: undefined as number | undefined,
     amount_max: undefined as number | undefined,
-    transaction_type: '' as '' | 'debit' | 'credit' | 'check' | 'deposit' | 'fee' | 'interest' | 'withdrawal' | 'transfer' | 'other',
+    transaction_type: undefined as BankTransactionType | undefined,
     assign_account_id: undefined as number | undefined,
     assign_contact_id: undefined as number | undefined,
     assign_category: '',
@@ -95,7 +96,7 @@
     loading = false;
   }
 
-  async function handleFileSelect(event: Event) {
+  function handleFileSelect(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     
@@ -170,7 +171,7 @@
         payee_pattern: rule.payee_pattern || '',
         amount_min: rule.amount_min,
         amount_max: rule.amount_max,
-        transaction_type: rule.transaction_type || '',
+        transaction_type: rule.transaction_type,
         assign_account_id: rule.assign_account_id,
         assign_contact_id: rule.assign_contact_id,
         assign_category: rule.assign_category || '',
@@ -186,7 +187,7 @@
         payee_pattern: '',
         amount_min: undefined,
         amount_max: undefined,
-        transaction_type: '',
+        transaction_type: undefined,
         assign_account_id: undefined,
         assign_contact_id: undefined,
         assign_category: '',
@@ -207,7 +208,7 @@
       if (editingRule) {
         await updateCategorizationRule(editingRule.id!, ruleForm);
       } else {
-        await createCategorizationRule(ruleForm as any);
+        await createCategorizationRule(ruleForm as Omit<CategorizationRule, 'id' | 'created_at' | 'updated_at' | 'times_applied'>);
       }
       
       categorizationRules = await getCategorizationRules();
@@ -246,21 +247,36 @@
 
   function getStatusBadgeClass(status: string): string {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'failed': return 'bg-red-100 text-red-800';
-      case 'processing': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'completed': return 'badge badge-success';
+      case 'failed': return 'badge badge-danger';
+      case 'processing': return 'badge badge-warning';
+      default: return 'badge badge-secondary';
     }
   }
 
   function getMatchStatusBadgeClass(status: string): string {
     switch (status) {
-      case 'auto_matched': return 'bg-green-100 text-green-800';
-      case 'manual_matched': return 'bg-blue-100 text-blue-800';
-      case 'imported': return 'bg-purple-100 text-purple-800';
-      case 'ignored': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-yellow-100 text-yellow-800';
+      case 'auto_matched': return 'badge badge-success';
+      case 'manual_matched': return 'badge badge-primary';
+      case 'imported': return 'badge badge-info';
+      case 'ignored': return 'badge badge-secondary';
+      default: return 'badge badge-warning';
     }
+  }
+
+  function handleAccountChange(e: Event) {
+    selectedAccountId = parseInt((e.target as HTMLSelectElement).value);
+    loadImports();
+  }
+
+  function handleTransactionTypeChange(e: Event) {
+    const value = (e.target as HTMLSelectElement).value;
+    ruleForm.transaction_type = value ? value as BankTransactionType : undefined;
+  }
+
+  function handleAssignAccountChange(e: Event) {
+    const value = (e.target as HTMLSelectElement).value;
+    ruleForm.assign_account_id = value ? parseInt(value) : undefined;
   }
 </script>
 
@@ -268,13 +284,13 @@
   <div class="header">
     <h1>Bank Import</h1>
     <div class="actions">
-      <Button onclick={() => currentView = 'list'} variant={currentView === 'list' ? 'primary' : 'secondary'}>
+      <Button on:click={() => currentView = 'list'} variant={currentView === 'list' ? 'primary' : 'secondary'}>
         Imports
       </Button>
-      <Button onclick={() => currentView = 'import'} variant={currentView === 'import' ? 'primary' : 'secondary'}>
+      <Button on:click={() => currentView = 'import'} variant={currentView === 'import' ? 'primary' : 'secondary'}>
         New Import
       </Button>
-      <Button onclick={() => currentView = 'rules'} variant={currentView === 'rules' ? 'primary' : 'secondary'}>
+      <Button on:click={() => currentView = 'rules'} variant={currentView === 'rules' ? 'primary' : 'secondary'}>
         Rules
       </Button>
     </div>
@@ -285,17 +301,13 @@
       <div class="filter-bar">
         <Select
           label="Bank Account"
-          value={selectedAccountId}
-          onchange={(e) => {
-            selectedAccountId = parseInt(e.currentTarget.value);
-            loadImports();
-          }}
-        >
-          <option value="0">Select Account</option>
-          {#each bankAccounts as account}
-            <option value={account.id}>{account.name} ({account.code})</option>
-          {/each}
-        </Select>
+          bind:value={selectedAccountId}
+          options={[
+            { value: 0, label: 'Select Account' },
+            ...bankAccounts.map(a => ({ value: a.id!, label: `${a.name} (${a.code})` }))
+          ]}
+          on:change={handleAccountChange}
+        />
       </div>
 
       {#if loading}
@@ -303,25 +315,20 @@
       {:else if imports.length === 0}
         <p class="empty-state">No imports found. Click "New Import" to get started.</p>
       {:else}
-        <Table
-          headers={['Date', 'File', 'Transactions', 'Matched', 'Status', 'Actions']}
-          rows={imports.map(imp => [
-            formatDate(imp.import_date || ''),
-            imp.file_name,
-            `${imp.imported_transactions} / ${imp.total_transactions}`,
-            imp.matched_transactions.toString(),
-            { 
-              type: 'badge',
-              text: imp.status,
-              class: getStatusBadgeClass(imp.status)
-            },
-            {
-              type: 'button',
-              text: 'View',
-              onclick: () => viewImportTransactions(imp)
-            }
-          ])}
-        />
+        <Table headers={['Date', 'File', 'Transactions', 'Matched', 'Status', 'Actions']}>
+          {#each imports as imp}
+            <tr>
+              <td>{formatDate(imp.import_date || '')}</td>
+              <td>{imp.file_name}</td>
+              <td>{imp.imported_transactions} / {imp.total_transactions}</td>
+              <td>{imp.matched_transactions}</td>
+              <td><span class={getStatusBadgeClass(imp.status)}>{imp.status}</span></td>
+              <td>
+                <Button size="sm" on:click={() => viewImportTransactions(imp)}>View</Button>
+              </td>
+            </tr>
+          {/each}
+        </Table>
       {/if}
     </Card>
   {/if}
@@ -331,14 +338,12 @@
       <div class="import-form">
         <Select
           label="Bank Account*"
-          value={selectedAccountId}
-          onchange={(e) => selectedAccountId = parseInt(e.currentTarget.value)}
-        >
-          <option value="0">Select Account</option>
-          {#each bankAccounts as account}
-            <option value={account.id}>{account.name} ({account.code})</option>
-          {/each}
-        </Select>
+          bind:value={selectedAccountId}
+          options={[
+            { value: 0, label: 'Select Account' },
+            ...bankAccounts.map(a => ({ value: a.id!, label: `${a.name} (${a.code})` }))
+          ]}
+        />
 
         <div class="file-upload">
           <label for="csv-file">CSV File*</label>
@@ -346,7 +351,7 @@
             id="csv-file"
             type="file"
             accept=".csv"
-            onchange={handleFileSelect}
+            on:change={handleFileSelect}
           />
           {#if importFileName}
             <p class="file-name">Selected: {importFileName}</p>
@@ -365,12 +370,12 @@
 
         <div class="button-group">
           <Button
-            onclick={handleImport}
+            on:click={handleImport}
             disabled={importing || selectedAccountId === 0 || !csvFileText}
           >
             {importing ? 'Importing...' : 'Import'}
           </Button>
-          <Button variant="secondary" onclick={() => currentView = 'list'}>
+          <Button variant="secondary" on:click={() => currentView = 'list'}>
             Cancel
           </Button>
         </div>
@@ -403,27 +408,26 @@
       {:else if importTransactions.length === 0}
         <p class="empty-state">No transactions found.</p>
       {:else}
-        <Table
-          headers={['Date', 'Description', 'Amount', 'Payee', 'Status', 'Suggested Account']}
-          rows={importTransactions.map(txn => [
-            formatDate(txn.transaction_date),
-            txn.description,
-            formatAmount(txn.amount),
-            txn.payee || '-',
-            {
-              type: 'badge',
-              text: txn.match_status,
-              class: getMatchStatusBadgeClass(txn.match_status)
-            },
-            txn.suggested_account_id 
-              ? accounts.find(a => a.id === txn.suggested_account_id)?.name || '-'
-              : '-'
-          ])}
-        />
+        <Table headers={['Date', 'Description', 'Amount', 'Payee', 'Status', 'Suggested Account']}>
+          {#each importTransactions as txn}
+            <tr>
+              <td>{formatDate(txn.transaction_date)}</td>
+              <td>{txn.description}</td>
+              <td>{formatAmount(txn.amount)}</td>
+              <td>{txn.payee || '-'}</td>
+              <td><span class={getMatchStatusBadgeClass(txn.match_status)}>{txn.match_status}</span></td>
+              <td>
+                {txn.suggested_account_id 
+                  ? accounts.find(a => a.id === txn.suggested_account_id)?.name || '-'
+                  : '-'}
+              </td>
+            </tr>
+          {/each}
+        </Table>
       {/if}
 
       <div class="button-group">
-        <Button onclick={() => currentView = 'list'}>
+        <Button on:click={() => currentView = 'list'}>
           Back to Imports
         </Button>
       </div>
@@ -433,7 +437,7 @@
   {#if currentView === 'rules'}
     <Card title="Auto-Categorization Rules">
       <div class="button-group">
-        <Button onclick={() => openRuleModal()}>
+        <Button on:click={() => openRuleModal()}>
           Add New Rule
         </Button>
       </div>
@@ -443,30 +447,21 @@
       {:else if categorizationRules.length === 0}
         <p class="empty-state">No rules defined. Click "Add New Rule" to create one.</p>
       {:else}
-        <Table
-          headers={['Name', 'Priority', 'Active', 'Pattern', 'Applied', 'Actions']}
-          rows={categorizationRules.map(rule => [
-            rule.rule_name,
-            rule.priority.toString(),
-            rule.is_active ? '✓' : '✗',
-            rule.description_pattern || rule.payee_pattern || '-',
-            rule.times_applied.toString(),
-            {
-              type: 'actions',
-              buttons: [
-                {
-                  text: 'Edit',
-                  onclick: () => openRuleModal(rule)
-                },
-                {
-                  text: 'Delete',
-                  onclick: () => deleteRule(rule.id!),
-                  variant: 'danger'
-                }
-              ]
-            }
-          ])}
-        />
+        <Table headers={['Name', 'Priority', 'Active', 'Pattern', 'Applied', 'Actions']}>
+          {#each categorizationRules as rule}
+            <tr>
+              <td>{rule.rule_name}</td>
+              <td>{rule.priority}</td>
+              <td>{rule.is_active ? '✓' : '✗'}</td>
+              <td>{rule.description_pattern || rule.payee_pattern || '-'}</td>
+              <td>{rule.times_applied}</td>
+              <td class="action-buttons">
+                <Button size="sm" on:click={() => openRuleModal(rule)}>Edit</Button>
+                <Button size="sm" variant="danger" on:click={() => deleteRule(rule.id!)}>Delete</Button>
+              </td>
+            </tr>
+          {/each}
+        </Table>
       {/if}
     </Card>
   {/if}
@@ -474,30 +469,28 @@
 
 {#if showRuleModal}
   <Modal
+    open={showRuleModal}
     title={editingRule ? 'Edit Rule' : 'New Rule'}
-    onclose={() => showRuleModal = false}
+    onClose={() => showRuleModal = false}
     size="large"
   >
     <div class="rule-form">
       <Input
         label="Rule Name*"
-        value={ruleForm.rule_name}
-        oninput={(e) => ruleForm.rule_name = e.currentTarget.value}
+        bind:value={ruleForm.rule_name}
       />
 
       <Input
         type="number"
         label="Priority"
-        value={ruleForm.priority}
-        oninput={(e) => ruleForm.priority = parseInt(e.currentTarget.value)}
+        bind:value={ruleForm.priority}
       />
 
       <div class="checkbox-field">
         <input
           type="checkbox"
           id="is-active"
-          checked={ruleForm.is_active}
-          onchange={(e) => ruleForm.is_active = e.currentTarget.checked}
+          bind:checked={ruleForm.is_active}
         />
         <label for="is-active">Active</label>
       </div>
@@ -506,15 +499,13 @@
 
       <Input
         label="Description Pattern (regex)"
-        value={ruleForm.description_pattern}
-        oninput={(e) => ruleForm.description_pattern = e.currentTarget.value}
+        bind:value={ruleForm.description_pattern}
         placeholder="e.g., (?i)amazon|aws"
       />
 
       <Input
         label="Payee Pattern (regex)"
-        value={ruleForm.payee_pattern}
-        oninput={(e) => ruleForm.payee_pattern = e.currentTarget.value}
+        bind:value={ruleForm.payee_pattern}
         placeholder="e.g., (?i)starbucks"
       />
 
@@ -522,64 +513,60 @@
         <Input
           type="number"
           label="Min Amount"
-          value={ruleForm.amount_min}
-          oninput={(e) => ruleForm.amount_min = e.currentTarget.value ? parseFloat(e.currentTarget.value) : undefined}
+          bind:value={ruleForm.amount_min}
         />
         <Input
           type="number"
           label="Max Amount"
-          value={ruleForm.amount_max}
-          oninput={(e) => ruleForm.amount_max = e.currentTarget.value ? parseFloat(e.currentTarget.value) : undefined}
+          bind:value={ruleForm.amount_max}
         />
       </div>
 
       <Select
         label="Transaction Type"
-        value={ruleForm.transaction_type}
-        onchange={(e) => ruleForm.transaction_type = e.currentTarget.value as any}
-      >
-        <option value="">Any</option>
-        <option value="debit">Debit</option>
-        <option value="credit">Credit</option>
-        <option value="check">Check</option>
-        <option value="deposit">Deposit</option>
-        <option value="fee">Fee</option>
-        <option value="interest">Interest</option>
-        <option value="withdrawal">Withdrawal</option>
-        <option value="transfer">Transfer</option>
-        <option value="other">Other</option>
-      </Select>
+        value={ruleForm.transaction_type || ''}
+        options={[
+          { value: '', label: 'Any' },
+          { value: 'debit', label: 'Debit' },
+          { value: 'credit', label: 'Credit' },
+          { value: 'check', label: 'Check' },
+          { value: 'deposit', label: 'Deposit' },
+          { value: 'fee', label: 'Fee' },
+          { value: 'interest', label: 'Interest' },
+          { value: 'withdrawal', label: 'Withdrawal' },
+          { value: 'transfer', label: 'Transfer' },
+          { value: 'other', label: 'Other' }
+        ]}
+        on:change={handleTransactionTypeChange}
+      />
 
       <h3>Actions</h3>
 
       <Select
         label="Assign to Account"
         value={ruleForm.assign_account_id || 0}
-        onchange={(e) => ruleForm.assign_account_id = e.currentTarget.value ? parseInt(e.currentTarget.value) : undefined}
-      >
-        <option value="0">None</option>
-        {#each accounts as account}
-          <option value={account.id}>{account.name} ({account.code})</option>
-        {/each}
-      </Select>
+        options={[
+          { value: 0, label: 'None' },
+          ...accounts.map(a => ({ value: a.id!, label: `${a.name} (${a.code})` }))
+        ]}
+        on:change={handleAssignAccountChange}
+      />
 
       <Input
         label="Assign Category"
-        value={ruleForm.assign_category}
-        oninput={(e) => ruleForm.assign_category = e.currentTarget.value}
+        bind:value={ruleForm.assign_category}
       />
 
       <Input
         label="Notes Template"
-        value={ruleForm.notes_template}
-        oninput={(e) => ruleForm.notes_template = e.currentTarget.value}
+        bind:value={ruleForm.notes_template}
       />
 
       <div class="button-group">
-        <Button onclick={saveRule} disabled={loading}>
+        <Button on:click={saveRule} disabled={loading}>
           {loading ? 'Saving...' : 'Save Rule'}
         </Button>
-        <Button variant="secondary" onclick={() => showRuleModal = false}>
+        <Button variant="secondary" on:click={() => showRuleModal = false}>
           Cancel
         </Button>
       </div>
@@ -728,5 +715,50 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  /* Badge styles */
+  .badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 0.25rem;
+    text-transform: capitalize;
+  }
+
+  .badge-success {
+    background-color: #d1fae5;
+    color: #065f46;
+  }
+
+  .badge-danger {
+    background-color: #fee2e2;
+    color: #991b1b;
+  }
+
+  .badge-warning {
+    background-color: #fef3c7;
+    color: #92400e;
+  }
+
+  .badge-primary {
+    background-color: #dbeafe;
+    color: #1e40af;
+  }
+
+  .badge-info {
+    background-color: #e0e7ff;
+    color: #3730a3;
+  }
+
+  .badge-secondary {
+    background-color: #e5e7eb;
+    color: #374151;
   }
 </style>

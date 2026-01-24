@@ -313,28 +313,28 @@ describe('Chart of Accounts - Account Templates', () => {
 
 describe('Chart of Accounts - Mode Restrictions', () => {
   it('should restrict account editing in beginner mode', () => {
-    const mode = 'beginner' as const;
+    const mode: string = 'beginner';
     const canEditAccounts = mode === 'pro';
 
     expect(canEditAccounts).toBe(false);
   });
 
   it('should allow account editing in pro mode', () => {
-    const mode = 'pro' as const;
+    const mode: string = 'pro';
     const canEditAccounts = mode === 'pro';
 
     expect(canEditAccounts).toBe(true);
   });
 
   it('should restrict account creation in beginner mode', () => {
-    const mode = 'beginner' as const;
+    const mode: string = 'beginner';
     const canCreateAccounts = mode === 'pro';
 
     expect(canCreateAccounts).toBe(false);
   });
 
   it('should allow account creation in pro mode', () => {
-    const mode = 'pro' as const;
+    const mode: string = 'pro';
     const canCreateAccounts = mode === 'pro';
 
     expect(canCreateAccounts).toBe(true);

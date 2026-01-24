@@ -3,10 +3,14 @@
   export let title = '';
   export let size: 'small' | 'medium' | 'large' | 'xlarge' = 'medium';
   export let onClose: () => void = () => {};
+  // Alias for Svelte 5 style naming
+  export let onclose: (() => void) | undefined = undefined;
+
+  $: closeHandler = onclose || onClose;
 
   function handleBackdropClick(e: MouseEvent) {
     if (e.target === e.currentTarget) {
-      onClose();
+      closeHandler();
     }
   }
 </script>
@@ -16,7 +20,7 @@
     <div class="modal {size}">
       <div class="modal-header">
         <h2>{title}</h2>
-        <button class="close-btn" on:click={onClose} aria-label="Close">
+        <button class="close-btn" on:click={closeHandler} aria-label="Close">
           &times;
         </button>
       </div>

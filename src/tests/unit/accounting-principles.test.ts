@@ -383,15 +383,15 @@ describe('Invoice Void Operations', () => {
   });
   
   it('should prevent voiding an invoice with payments', () => {
-    const paidAmount = 50.00;
+    const paidAmount: number = 50.00;
     const canVoid = paidAmount === 0;
     
     expect(canVoid).toBe(false);
   });
   
   it('should allow voiding an invoice with no payments', () => {
-    const paidAmount = 0;
-    const invoiceStatus = 'sent';
+    const paidAmount: number = 0;
+    const invoiceStatus: string = 'sent';
     const canVoid = paidAmount === 0 && invoiceStatus !== 'void';
     
     expect(canVoid).toBe(true);
@@ -417,22 +417,22 @@ describe('Invoice Void Operations', () => {
 
 describe('Invoice Edit Operations', () => {
   it('should prevent editing invoices with payments', () => {
-    const paidAmount = 100.00;
+    const paidAmount: number = 100.00;
     const canEdit = paidAmount === 0;
     
     expect(canEdit).toBe(false);
   });
   
   it('should prevent editing voided invoices', () => {
-    const status = 'void';
+    const status: string = 'void';
     const canEdit = status !== 'void';
     
     expect(canEdit).toBe(false);
   });
   
   it('should allow editing invoices with no payments', () => {
-    const paidAmount = 0;
-    const status = 'sent';
+    const paidAmount: number = 0;
+    const status: string = 'sent';
     const canEdit = paidAmount === 0 && status !== 'void';
     
     expect(canEdit).toBe(true);

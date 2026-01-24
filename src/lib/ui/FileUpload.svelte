@@ -84,6 +84,13 @@
       fileInput.click();
     }
   }
+
+  function handleKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      triggerFileInput();
+    }
+  }
 </script>
 
 <div class="file-upload-group">
@@ -91,6 +98,7 @@
     <label for={id}>{label}</label>
   {/if}
   
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div 
     class="drop-zone" 
     class:drag-over={dragOver}
@@ -99,6 +107,10 @@
     ondragover={handleDragOver}
     ondragleave={handleDragLeave}
     onclick={triggerFileInput}
+    onkeydown={handleKeyDown}
+    role="button"
+    tabindex={disabled ? -1 : 0}
+    aria-label="Drop files here or click to browse"
   >
     <input
       {id}

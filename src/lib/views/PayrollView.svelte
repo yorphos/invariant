@@ -602,10 +602,10 @@
 
         <div class="button-group">
           {#if selectedRun.status === 'draft'}
-            <Button on:click={() => handleApproveRun(selectedRun)}>Approve & Post</Button>
+            <Button on:click={() => selectedRun && handleApproveRun(selectedRun)}>Approve & Post</Button>
           {/if}
           {#if selectedRun.status !== 'void' && selectedRun.status !== 'paid'}
-            <Button variant="secondary" on:click={() => handleVoidRun(selectedRun)}>Void</Button>
+            <Button variant="secondary" on:click={() => selectedRun && handleVoidRun(selectedRun)}>Void</Button>
           {/if}
           <Button variant="secondary" on:click={closeDetailModal}>Close</Button>
         </div>

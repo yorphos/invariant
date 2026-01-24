@@ -6,6 +6,7 @@
   export let required = false;
   export let error = '';
   export let placeholder = 'Select...';
+  export let onchange: ((e: Event & { currentTarget: HTMLSelectElement }) => void) | undefined = undefined;
 
   // Generate unique ID for label-select association
   const id = `select-${Math.random().toString(36).substr(2, 9)}`;
@@ -24,14 +25,19 @@
     {disabled}
     {required}
     on:change
+    on:change={onchange}
     class:error={error}
   >
     {#if placeholder}
       <option value="" disabled>{placeholder}</option>
     {/if}
-    {#each options as option}
-      <option value={option.value}>{option.label}</option>
-    {/each}
+    {#if options.length > 0}
+      {#each options as option}
+        <option value={option.value}>{option.label}</option>
+      {/each}
+    {:else}
+      <slot />
+    {/if}
   </select>
   {#if error}
     <span class="error-message">{error}</span>
