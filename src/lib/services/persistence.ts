@@ -17,6 +17,20 @@ import type {
  * High-level API for domain operations
  */
 export class PersistenceService {
+  // Transaction management
+  async executeInTransaction<T>(operations: () => Promise<T>): Promise<T> {
+    const db = await getDatabase();
+    try {
+      await db.execute('BEGIN TRANSACTION');
+      const result = await operations();
+      await db.execute('COMMIT');
+      return result;
+    } catch (error) {
+      await db.execute('ROLLBACK');
+      throw error;
+    }
+  }
+
   // Settings operations
   async getSetting(key: string): Promise<string | null> {
     const db = await getDatabase();
