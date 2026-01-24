@@ -507,8 +507,8 @@
 
 <!-- Payroll Run Detail Modal -->
 {#if showDetailModal && selectedRun}
-  <div class="modal-overlay" on:click={closeDetailModal} role="button" tabindex="-1">
-    <div class="modal-content" on:click={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
+  <div class="modal-overlay" on:click={closeDetailModal} on:keydown={(e) => e.key === 'Escape' && closeDetailModal()} role="button" tabindex="-1">
+    <div class="modal-content" on:click={(e) => e.stopPropagation()} on:keydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
       <Card title={`Payroll Run: ${selectedRun.run_number}`}>
         <div class="detail-section">
           <p><strong>Period:</strong> {selectedRun.period_start} to {selectedRun.period_end}</p>

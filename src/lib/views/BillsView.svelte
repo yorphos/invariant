@@ -382,8 +382,8 @@
 
 <!-- Bill Detail Modal -->
 {#if showDetailModal && selectedBill}
-  <div class="modal-overlay" on:click={closeDetailModal}>
-    <div class="modal-content" on:click|stopPropagation>
+  <div class="modal-overlay" on:click={closeDetailModal} on:keydown={(e) => e.key === 'Escape' && closeDetailModal()} role="button" tabindex="-1">
+    <div class="modal-content" on:click|stopPropagation on:keydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
       <div class="modal-header">
         <h3>Bill Details</h3>
         <button class="close-btn" on:click={closeDetailModal}>&times;</button>

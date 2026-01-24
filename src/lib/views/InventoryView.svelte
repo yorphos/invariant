@@ -570,8 +570,8 @@
 
 <!-- Item Detail Modal -->
 {#if showDetailModal && selectedItem}
-  <div class="modal-overlay" on:click={closeDetailModal} role="button" tabindex="-1">
-    <div class="modal-content" on:click={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
+  <div class="modal-overlay" on:click={closeDetailModal} on:keydown={(e) => e.key === 'Escape' && closeDetailModal()} role="button" tabindex="-1">
+    <div class="modal-content" on:click={(e) => e.stopPropagation()} on:keydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
       <Card title={`Item: ${selectedItem.name}`}>
         <div class="detail-section">
           <p><strong>SKU:</strong> {selectedItem.sku}</p>

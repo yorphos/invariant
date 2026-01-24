@@ -488,8 +488,8 @@ PAY-0002,Beta Inc,2026-01-24,2500.00,check,CHK456,Payment for invoices,INV-0002;
 
 <!-- Operation Result Modal -->
 {#if showResult && operationResult}
-  <div class="modal-overlay" on:click={closeResultModal}>
-    <div class="modal-content" on:click|stopPropagation>
+  <div class="modal-overlay" on:click={closeResultModal} on:keydown={(e) => e.key === 'Escape' && closeResultModal()} role="button" tabindex="-1">
+    <div class="modal-content" on:click|stopPropagation on:keydown={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
       <div class="modal-header">
         <h3>Batch Operation Results</h3>
         <button class="close-button" on:click={closeResultModal}>✕</button>

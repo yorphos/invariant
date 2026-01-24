@@ -9,16 +9,20 @@
   export let step: string | undefined = undefined;
   export let min: string | number | undefined = undefined;
   export let max: string | number | undefined = undefined;
+
+  // Generate unique ID for label-input association
+  const id = `input-${Math.random().toString(36).substr(2, 9)}`;
 </script>
 
 <div class="input-group">
   {#if label}
-    <label>
+    <label for={id}>
       {label}
       {#if required}<span class="required">*</span>{/if}
     </label>
   {/if}
   <input
+    {id}
     {type}
     {placeholder}
     {disabled}

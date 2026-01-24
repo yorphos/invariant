@@ -721,6 +721,5 @@
   <PaymentDetailModal
     payment={selectedPayment}
     onClose={closeDetailModal}
-    {mode}
   />
 {/if}

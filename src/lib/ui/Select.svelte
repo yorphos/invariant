@@ -6,16 +6,20 @@
   export let required = false;
   export let error = '';
   export let placeholder = 'Select...';
+
+  // Generate unique ID for label-select association
+  const id = `select-${Math.random().toString(36).substr(2, 9)}`;
 </script>
 
 <div class="select-group">
   {#if label}
-    <label>
+    <label for={id}>
       {label}
       {#if required}<span class="required">*</span>{/if}
     </label>
   {/if}
   <select
+    {id}
     bind:value
     {disabled}
     {required}

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { persistenceService } from '../services/persistence';
-  import type { Payment, Allocation, Invoice, Contact, JournalEntry, JournalLine, Account, PolicyMode } from '../domain/types';
+  import type { Payment, Allocation, Invoice, Contact, JournalEntry, JournalLine, Account } from '../domain/types';
   import Modal from './Modal.svelte';
   import Button from './Button.svelte';
   import Card from './Card.svelte';
@@ -9,7 +9,6 @@
 
   export let payment: Payment;
   export let onClose: () => void;
-  export let mode: PolicyMode;
 
   let loading = true;
   let allocations: Allocation[] = [];
