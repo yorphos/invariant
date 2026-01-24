@@ -3,6 +3,7 @@
   import { persistenceService } from '../services/persistence';
   import { seedDefaultAccounts } from '../services/seed';
   import type { Account, PolicyMode, AccountType } from '../domain/types';
+  import { toasts } from '../stores/toast';
   import Button from '../ui/Button.svelte';
   import Input from '../ui/Input.svelte';
   import Select from '../ui/Select.svelte';
@@ -51,16 +52,16 @@
       await seedDefaultAccounts();
       await loadAccounts();
       showInitModal = false;
-      alert('Chart of Accounts initialized successfully with default accounts!');
+      toasts.success('Chart of Accounts initialized successfully with default accounts!');
     } catch (e) {
       console.error('Failed to initialize accounts:', e);
-      alert('Failed to initialize accounts: ' + e);
+      toasts.error('Failed to initialize accounts: ' + e);
     }
   }
 
   function openCreateModal() {
     if (mode === 'beginner') {
-      alert('Creating custom accounts requires Pro Mode. Please switch to Pro Mode in Settings.');
+      toasts.warning('Creating custom accounts requires Pro Mode. Please switch to Pro Mode in Settings.');
       return;
     }
 
@@ -75,7 +76,7 @@
 
   function openEditModal(account: Account) {
     if (mode === 'beginner') {
-      alert('Editing accounts requires Pro Mode. Please switch to Pro Mode in Settings.');
+      toasts.warning('Editing accounts requires Pro Mode. Please switch to Pro Mode in Settings.');
       return;
     }
 
@@ -115,13 +116,13 @@
       closeModal();
     } catch (e) {
       console.error('Failed to save account:', e);
-      alert('Failed to save account: ' + e);
+      toasts.error('Failed to save account: ' + e);
     }
   }
 
   async function toggleAccountStatus(account: Account) {
     if (mode === 'beginner') {
-      alert('Managing account status requires Pro Mode.');
+      toasts.warning('Managing account status requires Pro Mode.');
       return;
     }
 
@@ -133,7 +134,7 @@
       await loadAccounts();
     } catch (e) {
       console.error('Failed to update account status:', e);
-      alert('Failed to update account status: ' + e);
+      toasts.error('Failed to update account status: ' + e);
     }
   }
 

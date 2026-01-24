@@ -18,6 +18,8 @@
   import InventoryView from './lib/views/InventoryView.svelte';
   import PayrollView from './lib/views/PayrollView.svelte';
   import JournalEntryView from './lib/views/JournalEntryView.svelte';
+  import ToastContainer from './lib/ui/ToastContainer.svelte';
+  import { toasts } from './lib/stores/toast';
   import { backupDatabase, restoreDatabase } from './lib/services/backup';
   import { 
     getFiscalYears, 
@@ -139,10 +141,10 @@
     try {
       const success = await backupDatabase();
       if (success) {
-        alert('Database backed up successfully!');
+        toasts.success('Database backed up successfully!');
       }
     } catch (e) {
-      alert(`Backup failed: ${e}`);
+      toasts.error(`Backup failed: ${e}`);
     }
   }
 
@@ -154,7 +156,7 @@
         location.reload();
       }
     } catch (e) {
-      alert(`Restore failed: ${e}`);
+      toasts.error(`Restore failed: ${e}`);
     }
   }
 
@@ -164,7 +166,7 @@
       selectedYearToClose = year;
       closingPreview = await previewClosingEntries(year);
     } catch (e) {
-      alert(`Failed to preview closing entries: ${e}`);
+      toasts.error(`Failed to preview closing entries: ${e}`);
       closingPreview = null;
       selectedYearToClose = null;
     } finally {
@@ -191,16 +193,16 @@
       const result = await closeFiscalYear(selectedYearToClose, { mode });
       
       if (result.ok) {
-        alert(`Fiscal year ${selectedYearToClose} closed successfully!\n\nNet Income: $${result.net_income?.toFixed(2) || '0.00'}`);
+        toasts.success(`Fiscal year ${selectedYearToClose} closed successfully! Net Income: $${result.net_income?.toFixed(2) || '0.00'}`);
         closingPreview = null;
         selectedYearToClose = null;
         await loadFiscalYears();
       } else {
         const errorMsg = result.warnings.map(w => w.message).join('\n');
-        alert(`Failed to close fiscal year:\n\n${errorMsg}`);
+        toasts.error(`Failed to close fiscal year:\n${errorMsg}`);
       }
     } catch (e) {
-      alert(`Failed to close fiscal year: ${e}`);
+      toasts.error(`Failed to close fiscal year: ${e}`);
     } finally {
       closingInProgress = false;
     }
@@ -588,6 +590,8 @@
     </main>
   {/if}
 </div>
+
+<ToastContainer />
 
 <style>
   .app {
