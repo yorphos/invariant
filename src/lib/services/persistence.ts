@@ -45,8 +45,13 @@ export class PersistenceService {
   }
 
   // Account operations
-  async getAccounts(): Promise<Account[]> {
+  async getAccounts(includeInactive: boolean = false): Promise<Account[]> {
     const db = await getDatabase();
+    if (includeInactive) {
+      return await db.select<Account[]>(
+        'SELECT * FROM account ORDER BY code'
+      );
+    }
     return await db.select<Account[]>(
       'SELECT * FROM account WHERE is_active = 1 ORDER BY code'
     );
@@ -77,6 +82,50 @@ export class PersistenceService {
       [account.code, account.name, account.type, account.parent_id, account.is_active ? 1 : 0]
     );
     return result.lastInsertId ?? 0;
+  }
+
+  async updateAccount(id: number, account: Partial<Omit<Account, 'id' | 'created_at' | 'updated_at'>>): Promise<void> {
+    const db = await getDatabase();
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (account.code !== undefined) {
+      fields.push('code = ?');
+      values.push(account.code);
+    }
+    if (account.name !== undefined) {
+      fields.push('name = ?');
+      values.push(account.name);
+    }
+    if (account.type !== undefined) {
+      fields.push('type = ?');
+      values.push(account.type);
+    }
+    if (account.parent_id !== undefined) {
+      fields.push('parent_id = ?');
+      values.push(account.parent_id);
+    }
+    if (account.is_active !== undefined) {
+      fields.push('is_active = ?');
+      values.push(account.is_active ? 1 : 0);
+    }
+
+    if (fields.length > 0) {
+      fields.push('updated_at = datetime("now")');
+      await db.execute(
+        `UPDATE account SET ${fields.join(', ')} WHERE id = ?`,
+        [...values, id]
+      );
+    }
+  }
+
+  async hasAccountTransactions(accountId: number): Promise<boolean> {
+    const db = await getDatabase();
+    const result = await db.select<Array<{ count: number }>>(
+      'SELECT COUNT(*) as count FROM journal_line WHERE account_id = ?',
+      [accountId]
+    );
+    return result[0].count > 0;
   }
 
   // Transaction event operations

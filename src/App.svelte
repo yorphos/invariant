@@ -10,11 +10,12 @@
   import ExpensesView from './lib/views/ExpensesView.svelte';
   import ReportsView from './lib/views/ReportsView.svelte';
   import DashboardView from './lib/views/DashboardView.svelte';
+  import AccountsView from './lib/views/AccountsView.svelte';
 
   let mode: PolicyMode = 'beginner';
   let dbReady = false;
   let error = '';
-  let activeView: 'dashboard' | 'contacts' | 'invoices' | 'payments' | 'expenses' | 'reports' | 'settings' = 'dashboard';
+  let activeView: 'dashboard' | 'accounts' | 'contacts' | 'invoices' | 'payments' | 'expenses' | 'reports' | 'settings' = 'dashboard';
 
   onMount(async () => {
     try {
@@ -58,6 +59,12 @@
           onclick={() => setView('dashboard')}
         >
           Dashboard
+        </button>
+        <button 
+          class:active={activeView === 'accounts'}
+          onclick={() => setView('accounts')}
+        >
+          Chart of Accounts
         </button>
         <button 
           class:active={activeView === 'contacts'}
@@ -106,6 +113,8 @@
     <main>
       {#if activeView === 'dashboard'}
         <DashboardView {mode} onNavigate={setView} />
+      {:else if activeView === 'accounts'}
+        <AccountsView {mode} />
       {:else if activeView === 'contacts'}
         <ContactsView />
       {:else if activeView === 'invoices'}

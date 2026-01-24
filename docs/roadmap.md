@@ -31,12 +31,12 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-## Phase 1.5: Tier 1 UX Improvements ✅ (COMPLETED - January 2026)
+## Phase 1.5: Tier 1 UX Improvements ✅ (COMPLETED)
 
 **Goal**: Essential user experience features to make the MVP production-ready.
 
 ### 1.5.1 Invoice Voiding & Editing
-**Priority**: High | **Effort**: 2 days | **Status**: ✅ Complete
+**Priority**: High | **Status**: ✅ Complete
 
 - [x] `voidInvoice()` function with reversal journal entries
 - [x] `editInvoice()` function (void-and-recreate pattern)
@@ -54,7 +54,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 1.5.2 Invoice & Payment Detail Views
-**Priority**: High | **Effort**: 3 days | **Status**: ✅ Complete
+**Priority**: High | **Status**: ✅ Complete
 
 - [x] `InvoiceDetailModal` component with full details
 - [x] `PaymentDetailModal` component with allocation breakdown
@@ -74,7 +74,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 1.5.3 PDF Invoice Generation
-**Priority**: High | **Effort**: 2 days | **Status**: ✅ Complete
+**Priority**: High | **Status**: ✅ Complete
 
 - [x] Install jsPDF library
 - [x] Create `pdf-generator.ts` utility
@@ -93,20 +93,20 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-## Phase 2: Core Workflows 🚧 (NEXT UP)
+## Phase 2: Core Workflows ✅ (COMPLETED)
 
 **Goal**: Implement the most common small business accounting tasks.
 
 ### 2.1 Chart of Accounts Setup
-**Priority**: High | **Effort**: 1-2 days
+**Priority**: High | **Status**: ✅ Complete
 
-- [ ] Default account templates (service business, retail, freelance)
-- [ ] Account creation form
-- [ ] Account list/tree view
-- [ ] Account editing (pro mode)
-- [ ] Account activation/deactivation
+- [x] Default account templates (service business, retail, freelance)
+- [x] Account creation form
+- [x] Account list/tree view
+- [x] Account editing (pro mode)
+- [x] Account activation/deactivation
 
-**Acceptance Criteria:**
+**Acceptance Criteria:** ✅
 - User can initialize accounts on first run
 - Can add custom accounts
 - Hierarchical account structure visible
@@ -114,18 +114,18 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 2.2 Invoice Management
-**Priority**: High | **Effort**: 3-5 days
+**Priority**: High | **Status**: ✅ Complete
 
-- [ ] Invoice creation wizard (beginner mode)
-- [ ] Invoice form (pro mode shortcut)
-- [ ] Line item entry with tax calculation
-- [ ] Customer selection/creation inline
-- [ ] Invoice list with filters (unpaid, overdue, paid)
-- [ ] Invoice detail view
-- [ ] Generate posting when invoice saved
-- [ ] Update invoice status based on payments
+- [x] Invoice creation wizard (beginner mode)
+- [x] Invoice form (pro mode shortcut)
+- [x] Line item entry with tax calculation
+- [x] Customer selection/creation inline
+- [x] Invoice list with filters (unpaid, overdue, paid)
+- [x] Invoice detail view
+- [x] Generate posting when invoice saved
+- [x] Update invoice status based on payments
 
-**Acceptance Criteria:**
+**Acceptance Criteria:** ✅
 - User can create invoice end-to-end
 - Tax calculated automatically
 - A/R account updated correctly
@@ -134,17 +134,17 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 2.3 Payment Recording
-**Priority**: High | **Effort**: 3-4 days
+**Priority**: High | **Status**: ✅ Complete
 
-- [ ] Payment entry form
-- [ ] Smart allocation suggestions (use A/R matching engine)
-- [ ] Manual allocation override
-- [ ] Multi-invoice allocation
-- [ ] Payment list and search
-- [ ] Generate posting when payment recorded
-- [ ] Update invoice paid amounts
+- [x] Payment entry form
+- [x] Smart allocation suggestions (use A/R matching engine)
+- [x] Manual allocation override
+- [x] Multi-invoice allocation
+- [x] Payment list and search
+- [x] Generate posting when payment recorded
+- [x] Update invoice paid amounts
 
-**Acceptance Criteria:**
+**Acceptance Criteria:** ✅
 - Payment automatically matches invoices
 - User can override suggestions
 - Partial payments supported
@@ -153,16 +153,16 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 2.4 Expense Tracking
-**Priority**: High | **Effort**: 2-3 days
+**Priority**: High | **Status**: ✅ Complete
 
-- [ ] Expense entry form
-- [ ] Vendor selection/creation
-- [ ] Category/account selection with suggestions
-- [ ] Receipt attachment (future: for now just notes)
-- [ ] Expense list with filters
-- [ ] Generate posting when expense saved
+- [x] Expense entry form
+- [x] Vendor selection/creation
+- [x] Category/account selection with suggestions
+- [x] Receipt attachment (future: for now just notes)
+- [x] Expense list with filters
+- [x] Generate posting when expense saved
 
-**Acceptance Criteria:**
+**Acceptance Criteria:** ✅
 - User can record expense quickly
 - Account suggestions work
 - Expense account debited, cash/bank credited
@@ -170,24 +170,24 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 2.5 Basic Reports
-**Priority**: High | **Effort**: 3-4 days
+**Priority**: High | **Status**: ✅ Complete
 
-- [ ] Profit & Loss (Income Statement)
+- [x] Profit & Loss (Income Statement)
   - Revenue section
   - Expense section
   - Net income calculation
   - Date range filter
-- [ ] Balance Sheet
+- [x] Balance Sheet
   - Assets section
   - Liabilities section
   - Equity section
   - As-of date
-- [ ] Trial Balance
+- [x] Trial Balance
   - All accounts with debit/credit balances
   - Verify balance = 0
-- [ ] Report export (CSV, PDF future)
+- [x] Report export (CSV, PDF future)
 
-**Acceptance Criteria:**
+**Acceptance Criteria:** ✅
 - Reports calculate correctly
 - Match hand-calculated test data
 - Date ranges work properly
@@ -197,31 +197,252 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ## Phase 3: Enhanced Features 📋 (PLANNED)
 
-### 3.1 Bank Reconciliation
-**Priority**: Medium | **Effort**: 4-5 days
+### 3.1 Comprehensive Test Suite Expansion ⭐⭐⭐⭐⭐
+**Priority**: HIGH | **Impact**: VERY HIGH
 
-- [ ] Mark transactions as cleared
-- [ ] Reconciliation wizard
-- [ ] Statement date and balance entry
-- [ ] Auto-match bank statement lines to transactions
-- [ ] Outstanding items list
-- [ ] Reconciliation report
+**Why**: Only 37 tests currently, all focused on business logic. Need broader coverage to ensure data integrity and prevent future regressions.
+
+**What to Build**:
+
+- Expand unit tests (target: 70+ tests):
+  - Expense operation tests (8-10 tests)
+  - Contact type validation tests (5-7 tests)
+  - Policy engine tests (10 tests)
+  - AR matching tests (10 tests)
+- Add integration tests (mock Tauri SQL):
+  - Full invoice → payment → reports flow
+  - Database trigger testing
+  - Migration testing
+- Add validation tests:
+  - All server-side validation rules
+  - Edge cases (leap years, timezone issues)
+  - Security tests (SQL injection attempts)
+
+**User Impact**: Confidence in data integrity. Prevents future regressions.
+
+**Technical Notes**:
+- May need to mock @tauri-apps/plugin-sql for integration tests
+- Follow patterns in TESTING.md
+
+**Acceptance Criteria:**
+- 70+ total tests passing
+- Coverage of all major business logic
+- Security validation tests included
+- Integration test framework established
 
 ---
 
-### 3.2 Vendor Bills (A/P)
-**Priority**: Medium | **Effort**: 3-4 days
+### 3.2 Data Export & Backup ⭐⭐⭐⭐
+**Priority**: HIGH | **Impact**: HIGH
 
-- [ ] Bill entry form
-- [ ] Bill payment tracking
-- [ ] Bill aging report
-- [ ] Payment scheduling
-- [ ] A/P journal entries
+**Why**: Users need ability to backup data and export for accountant review.
+
+**What to Build**:
+
+- Export Reports to CSV/Excel:
+  - Balance Sheet export
+  - P&L export
+  - Trial Balance export
+  - Transaction list export
+- Database Backup:
+  - "Backup Database" button (copies SQLite file to user-chosen location)
+  - "Restore from Backup" button
+  - Auto-backup on startup (keep last 7 days)
+- Journal Entry Export:
+  - Export all journal entries to CSV (for accountant import)
+
+**User Impact**: Peace of mind for data safety. Enables accountant collaboration.
+
+**Technical Notes**:
+- Use Tauri's file save/open dialogs
+- SQLite backup is just file copy
+- CSV export is straightforward with standard format
+
+**Acceptance Criteria:**
+- User can export all major reports to CSV
+- Database backup/restore works reliably
+- Auto-backup on startup implemented
+- Journal entries exportable for accountant review
 
 ---
 
-### 3.3 Inventory Tracking
-**Priority**: Medium | **Effort**: 5-7 days
+### 3.3 Advanced Payment Allocation UI ⭐⭐⭐⭐
+**Priority**: MEDIUM | **Impact**: HIGH
+
+**Why**: Current UI is basic - user manually selects invoices. The AR matching engine exists but isn't fully utilized in the UI.
+
+**What to Build**:
+
+- Smart Suggestions:
+  - Show FIFO-recommended allocations (oldest first)
+  - Show amount-match suggestions (payment exactly matches invoice)
+  - Show reference-match suggestions (payment ref matches invoice number)
+  - Confidence scores displayed
+- Allocation Helpers:
+  - "Apply FIFO" button (auto-allocate oldest first)
+  - "Apply to Selected" button
+  - Drag-to-reorder allocation priorities
+  - Visual indication of over/under allocation
+  - Running totals (allocated vs. remaining)
+- Partial Payment UX:
+  - Clear UI for partially paying multiple invoices
+  - Warning if payment doesn't fully cover any invoice
+
+**User Impact**: Saves time, reduces errors, makes payment entry faster.
+
+**Technical Notes**:
+- AR matching engine already exists (ar-matching.ts)
+- Just needs better UI integration
+
+**Acceptance Criteria:**
+- FIFO suggestions shown automatically
+- One-click allocation buttons work
+- Visual feedback for allocation status
+- Partial payment handling clear and intuitive
+
+---
+
+### 3.4 Date Range Filtering for Reports ⭐⭐⭐⭐
+**Priority**: MEDIUM | **Impact**: HIGH
+
+**Why**: Currently reports show all-time data. Users need monthly, quarterly, yearly views.
+
+**What to Build**:
+
+- Date Range Picker:
+  - Start date and end date inputs
+  - Quick buttons: "This Month", "Last Month", "This Quarter", "This Year", "Last Year", "All Time"
+- Report Updates:
+  - P&L: filter transactions by date range
+  - Balance Sheet: as-of date (already exists, enhance UX)
+  - Trial Balance: as-of date
+  - Dashboard metrics: date range filter
+- Comparison Reports:
+  - "Compare to Previous Period" toggle
+  - Shows current vs. prior (e.g., this month vs. last month)
+
+**User Impact**: Essential for monthly/quarterly financial review. Required for tax filing.
+
+**Technical Notes**:
+- SQL queries need WHERE entry_date BETWEEN ? AND ?
+- Watch for off-by-one errors (inclusive vs. exclusive dates)
+
+**Acceptance Criteria:**
+- Date range picker on all major reports
+- Quick date selection buttons work
+- Period comparison functionality implemented
+- Reports calculate correctly for selected ranges
+
+---
+
+### 3.5 Batch Operations ⭐⭐⭐
+**Priority**: MEDIUM | **Impact**: MEDIUM
+
+**Why**: Users with many transactions need bulk actions (e.g., monthly invoice generation, bulk payment import).
+
+**What to Build**:
+
+- Batch Invoice Creation:
+  - Select multiple contacts
+  - Apply same line items to all (e.g., monthly retainer)
+  - Generate all at once
+- Batch Payment Entry:
+  - Import payments from CSV (bank statement)
+  - Auto-match to invoices by reference
+  - Review & confirm before posting
+- Bulk Status Changes:
+  - Mark multiple invoices as "sent"
+  - Void multiple transactions
+
+**User Impact**: Saves hours for subscription/retainer businesses or high-volume users.
+
+**Technical Notes**:
+- Needs transaction wrapping (all-or-nothing)
+- CSV parsing for import
+- Error handling for partial failures
+
+**Acceptance Criteria:**
+- Batch invoice creation works for multiple customers
+- CSV payment import with matching
+- Bulk status updates function correctly
+- Transaction atomicity maintained
+
+---
+
+### 3.6 Bank Reconciliation ⭐⭐⭐⭐
+**Priority**: MEDIUM | **Impact**: HIGH
+
+**Why**: Essential for verifying books match bank statements. Required for accurate accounting.
+
+**What to Build**:
+
+- Reconciliation Workflow:
+  - Select bank account
+  - Enter statement date and ending balance
+  - List of unreconciled transactions (payments, expenses)
+  - Checkboxes to mark as "cleared"
+  - Running balance calculation
+  - Reconcile button (locks matched transactions)
+- Reconciliation Report:
+  - Cleared vs. outstanding transactions
+  - Difference (should be $0.00)
+- Mark as Cleared:
+  - Add cleared flag to journal_entry table
+  - Migration to add field
+
+**User Impact**: Critical for catching bank errors, fraud detection, and month-end close.
+
+**Technical Notes**:
+- Schema change needed (add cleared and reconciliation_id to journal_entry)
+- Migration 006_bank_reconciliation.ts
+
+**Acceptance Criteria:**
+- User can reconcile bank accounts
+- Cleared transactions marked correctly
+- Reconciliation difference calculated
+- Schema migration successful
+
+---
+
+### 3.7 Vendor Bills & Accounts Payable ⭐⭐⭐⭐
+**Priority**: MEDIUM | **Impact**: MEDIUM-HIGH
+
+**Why**: Currently only track expenses (paid immediately). No support for bills to pay later.
+
+**What to Build**:
+
+- Bill Creation:
+  - Similar to invoice, but for purchases
+  - Multi-line bills with expense accounts
+  - Due date tracking
+  - Status: draft → received → partial → paid
+  - Journal entry: DR Expense, CR Accounts Payable
+- Bill Payment:
+  - Select bills to pay
+  - Create payment
+  - Journal entry: DR A/P, CR Cash
+- A/P Reports:
+  - Bills due report
+  - Vendor aging report
+  - A/P balance
+
+**User Impact**: Enables accrual accounting (vs. cash-only). Important for businesses with credit terms from suppliers.
+
+**Technical Notes**:
+- Schema mostly exists (bill table is stubbed in migration 002)
+- Mirror invoice/payment architecture
+- Need bill_line table similar to invoice_line
+
+**Acceptance Criteria:**
+- User can create and manage bills
+- Bill payment workflow complete
+- A/P reports functional
+- Accrual accounting properly implemented
+
+---
+
+### 3.8 Inventory Tracking
+**Priority**: Medium
 
 - [ ] Item/SKU management
 - [ ] Purchase orders
@@ -233,8 +454,8 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-### 3.4 Payroll Processing
-**Priority**: Medium | **Effort**: 5-7 days
+### 3.9 Payroll Processing
+**Priority**: Medium
 
 - [ ] Employee management
 - [ ] Pay run creation
@@ -247,8 +468,8 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-### 3.5 Multi-Currency Support
-**Priority**: Low | **Effort**: 4-6 days
+### 3.10 Multi-Currency Support
+**Priority**: Low
 
 - [ ] Currency table
 - [ ] Exchange rate management
@@ -262,7 +483,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ## Phase 4: Advanced Features 🔮 (FUTURE)
 
 ### 4.1 Bank Import
-**Priority**: Medium | **Effort**: 3-4 days
+**Priority**: Medium
 
 - [ ] QBO file import
 - [ ] CSV import with mapping
@@ -272,7 +493,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 4.2 Receipt/Document Management
-**Priority**: Low | **Effort**: 3-4 days
+**Priority**: Low
 
 - [ ] File upload and storage
 - [ ] Content-hash naming (prevent duplicates)
@@ -283,7 +504,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 4.3 Cloud Sync (Optional)
-**Priority**: Low | **Effort**: 7-10 days
+**Priority**: Low
 
 - [ ] Sync server design (separate project)
 - [ ] Delta sync protocol
@@ -294,7 +515,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 4.4 Budgeting
-**Priority**: Low | **Effort**: 4-5 days
+**Priority**: Low
 
 - [ ] Budget creation per account
 - [ ] Monthly/quarterly budgets
@@ -304,7 +525,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 4.5 Multi-Company
-**Priority**: Low | **Effort**: 3-4 days
+**Priority**: Low
 
 - [ ] Company/entity table
 - [ ] Switch between companies
@@ -314,7 +535,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 4.6 User Management & Permissions
-**Priority**: Low | **Effort**: 5-7 days
+**Priority**: Low
 
 - [ ] User accounts
 - [ ] Role-based permissions
@@ -326,7 +547,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ## Phase 5: Polish & Production 🚀 (BEFORE RELEASE)
 
 ### 5.1 Testing
-**Priority**: Critical | **Effort**: 7-10 days
+**Priority**: Critical
 
 - [ ] Unit tests for posting engine
 - [ ] Unit tests for A/R matching
@@ -337,7 +558,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 5.2 Error Handling & Validation
-**Priority**: High | **Effort**: 3-4 days
+**Priority**: High
 
 - [ ] Comprehensive input validation
 - [ ] User-friendly error messages
@@ -347,7 +568,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 5.3 Performance Optimization
-**Priority**: Medium | **Effort**: 3-4 days
+**Priority**: Medium
 
 - [ ] Database indexing review
 - [ ] Query optimization
@@ -358,7 +579,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 5.4 Documentation
-**Priority**: High | **Effort**: 3-5 days
+**Priority**: High
 
 - [ ] User guide
 - [ ] Video tutorials
@@ -369,7 +590,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 5.5 Distribution & Updates
-**Priority**: High | **Effort**: 4-5 days
+**Priority**: High
 
 - [ ] Code signing certificates
 - [ ] Build pipeline (GitHub Actions)
@@ -380,7 +601,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 ---
 
 ### 5.6 Accessibility
-**Priority**: Medium | **Effort**: 2-3 days
+**Priority**: Medium
 
 - [ ] Keyboard navigation
 - [ ] Screen reader support
@@ -392,7 +613,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ## Milestones
 
-### Milestone 1: MVP Foundation ✅ (COMPLETED - January 2026)
+### Milestone 1: MVP Foundation ✅ (COMPLETED)
 - [x] Foundation infrastructure
 - [x] Database schema and migrations
 - [x] Core domain logic
@@ -404,15 +625,13 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 - [ ] Test suite expansion (70+ tests)
 - [ ] Data export and backup
 - [ ] Date range filtering
-- [ ] Phase 3.1, 3.2 features
-- **Target**: Q2 2026
+- [ ] Enhanced features from Phase 3
 
 ### Milestone 3: Beta Release
 - [ ] All Phase 2 complete
-- [ ] Phase 3.1, 3.2 complete
+- [ ] Core Phase 3 features complete
 - [ ] Testing suite
 - [ ] Documentation
-- **Target**: Q3 2026
 
 ### Milestone 4: Production Release v1.0
 - [ ] All core features
@@ -420,7 +639,6 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 - [ ] Polish
 - [ ] Documentation
 - [ ] Distribution pipeline
-- **Target**: Q4 2026
 
 ---
 
@@ -465,16 +683,8 @@ If you're looking to contribute, high-impact areas:
 
 ## Notes
 
-- Estimates assume 1 developer working full-time
-- Adjust for team size and availability
+- Priorities and estimates are subject to change based on user feedback
 - Each phase should be releasable incrementally
 - User feedback will adjust priorities
 - Beginner mode workflows should be prioritized over pro mode features
-
-## Last Updated
-January 24, 2026
-
-**Recent Milestones:**
-- ✅ January 24, 2026: Completed Tier 1 UX improvements (invoice void/edit, detail views, PDF generation)
-- ✅ Tests: 37/37 passing
-- ✅ Commit: 7138752 - "feat: Implement Tier 1 features"
+- Focus on data integrity and accounting principles above all else
