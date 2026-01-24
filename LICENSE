@@ -1,46 +1,69 @@
 Proprietary Software License
 
-Copyright (c) 2024-2026 yorphos. All Rights Reserved.
+Copyright (c) 2026 yorphos. All Rights Reserved.
 
 This software and associated documentation files (the "Software") are the
-proprietary property of yorphos. The Software is protected by copyright
-laws and international treaty provisions.
+proprietary commercial property of yorphos. The Software is protected by
+copyright laws and international treaty provisions.
 
 TERMS AND CONDITIONS
 
-1. VIEWING AND REFERENCE
-   You may view and fork this repository for personal reference and
-   educational purposes only.
+1. SOURCE CODE VIEWING RIGHTS
+   You may:
+   - View the source code in this repository
+   - Fork this repository for inspection and security auditing purposes
+   - Reference the source code for educational purposes
 
-2. RESTRICTIONS
-   You may NOT, without prior written permission from the copyright holder:
-   - Use the Software for any commercial or non-commercial purpose
-   - Modify, adapt, or create derivative works based on the Software
+   This does NOT grant you the right to use, compile, or execute the Software.
+
+2. BINARY USAGE RESTRICTIONS
+   Execution of this Software is ONLY permitted through:
+   - Official binary releases distributed by yorphos
+   - A valid commercial license obtained from the copyright holder
+   
+   Compiling, building, or creating executable binaries from the source code
+   without a commercial license is strictly prohibited.
+
+3. PROHIBITED ACTIONS
+   Without a valid commercial license and explicit written permission, you may NOT:
+   - Use, execute, or run the Software in any form
+   - Compile, build, or create binaries from the source code
+   - Modify, adapt, or create derivative works
    - Distribute, sublicense, sell, or transfer the Software
-   - Remove or alter any proprietary notices or labels on the Software
-   - Use any part of the Software in your own projects
+   - Remove or alter proprietary notices or labels
+   - Use any portion of the Software in other projects
+   - Submit contributions, patches, or pull requests (not accepted)
 
-3. NO WARRANTY
+4. COMMERCIAL LICENSING
+   This Software is a commercial product. To use this Software, you must:
+   - Obtain a valid license from yorphos
+   - Download official licensed binaries from authorized sources
+   - Comply with all terms of your commercial license agreement
+
+5. NO WARRANTY
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
    OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 
-4. LIMITATION OF LIABILITY
+6. LIMITATION OF LIABILITY
    IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR
    OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
    ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
    OTHER DEALINGS IN THE SOFTWARE.
 
-5. LICENSING INQUIRIES
-   For licensing inquiries, commercial use requests, or permission to use
-   this Software, please contact:
+7. LICENSING INQUIRIES
+   To purchase a commercial license or for licensing inquiries:
 
    Email: mail@yrp.sh
    GitHub: https://github.com/yorphos/invariant/issues
 
-6. TERMINATION
+8. TERMINATION
    Any unauthorized use of this Software automatically terminates any
-   permissions granted under this license.
+   permissions granted under this license and may subject you to legal action.
 
-By accessing this repository, you acknowledge that you have read and
-understood this license and agree to be bound by its terms.
+9. ACKNOWLEDGMENT
+   By accessing this repository, you acknowledge that:
+   - This is commercial software requiring a paid license for use
+   - You have read and understood this license
+   - You agree to be bound by its terms
+   - Viewing the source code does not grant usage rights

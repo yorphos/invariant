@@ -596,9 +596,11 @@ All business logic belongs in `src/lib/domain/`:
 
 ## Contributing
 
-Invariant Accounting is proprietary software. External contributions are not
-accepted at this time. However, bug reports and feature requests are welcome
-via [GitHub Issues](https://github.com/yorphos/invariant/issues).
+This is proprietary commercial software. Contributions, patches, and pull
+requests are not accepted.
+
+Bug reports and feature requests are welcome via
+[GitHub Issues](https://github.com/yorphos/invariant/issues).
 
 ---
 
