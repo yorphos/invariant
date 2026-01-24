@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getDatabase } from '../services/database';
+  import { getBalanceSheetData, getProfitAndLossData, getTrialBalanceData } from '../services/reports';
+  import type { AccountBalance } from '../services/reports';
   import type { Account } from '../domain/types';
   import Card from '../ui/Card.svelte';
   import Input from '../ui/Input.svelte';
@@ -16,13 +18,6 @@
   // Income Statement uses date range (period)
   let incomeStartDate = '';
   let incomeEndDate = '';
-
-  interface AccountBalance {
-    account: Account;
-    debit_total: number;
-    credit_total: number;
-    balance: number;
-  }
 
   // Separate balances for different report types
   let balanceSheetBalances: AccountBalance[] = [];
@@ -88,51 +83,9 @@
   async function loadBalanceSheet() {
     loading = true;
     try {
-      const db = await getDatabase();
-      
-      // Get all asset, liability, equity accounts
-      const accounts = await db.select<Account[]>(
-        `SELECT * FROM account 
-         WHERE is_active = 1 
-         AND type IN ('asset', 'liability', 'equity')
-         ORDER BY code`
-      );
-
-      const accountBalances: AccountBalance[] = [];
-
-      for (const account of accounts) {
-        const lines = await db.select<Array<{ debit_total: number; credit_total: number }>>(
-          `SELECT 
-            COALESCE(SUM(debit_amount), 0) as debit_total,
-            COALESCE(SUM(credit_amount), 0) as credit_total
-          FROM journal_line jl
-          JOIN journal_entry je ON jl.journal_entry_id = je.id
-          WHERE jl.account_id = ? 
-            AND je.status = 'posted'
-            AND DATE(je.entry_date) <= ?`,
-          [account.id, asOfDate]
-        );
-
-        const debit_total = lines[0]?.debit_total || 0;
-        const credit_total = lines[0]?.credit_total || 0;
-
-        // Calculate balance based on account type
-        let balance: number;
-        if (account.type === 'asset') {
-          balance = debit_total - credit_total;
-        } else {
-          balance = credit_total - debit_total;
-        }
-
-        accountBalances.push({
-          account,
-          debit_total,
-          credit_total,
-          balance
-        });
-      }
-
-      balanceSheetBalances = accountBalances.filter(b => Math.abs(b.balance) > 0.01);
+      // Use optimized service layer with grouped aggregate query
+      const data = await getBalanceSheetData(asOfDate);
+      balanceSheetBalances = [...data.assets, ...data.liabilities, ...data.equity];
     } catch (e) {
       console.error('Failed to load balance sheet:', e);
       alert('Failed to load balance sheet: ' + e);
@@ -143,53 +96,9 @@
   async function loadIncomeStatement() {
     loading = true;
     try {
-      const db = await getDatabase();
-      
-      // Get all revenue and expense accounts
-      const accounts = await db.select<Account[]>(
-        `SELECT * FROM account 
-         WHERE is_active = 1 
-         AND type IN ('revenue', 'expense')
-         ORDER BY code`
-      );
-
-      const accountBalances: AccountBalance[] = [];
-
-      for (const account of accounts) {
-        // **KEY CHANGE**: Filter by date RANGE for income statement
-        const lines = await db.select<Array<{ debit_total: number; credit_total: number }>>(
-          `SELECT 
-            COALESCE(SUM(debit_amount), 0) as debit_total,
-            COALESCE(SUM(credit_amount), 0) as credit_total
-          FROM journal_line jl
-          JOIN journal_entry je ON jl.journal_entry_id = je.id
-          WHERE jl.account_id = ? 
-            AND je.status = 'posted'
-            AND DATE(je.entry_date) >= ?
-            AND DATE(je.entry_date) <= ?`,
-          [account.id, incomeStartDate, incomeEndDate]
-        );
-
-        const debit_total = lines[0]?.debit_total || 0;
-        const credit_total = lines[0]?.credit_total || 0;
-
-        // Calculate balance based on account type
-        let balance: number;
-        if (account.type === 'expense') {
-          balance = debit_total - credit_total;
-        } else {
-          balance = credit_total - debit_total;
-        }
-
-        accountBalances.push({
-          account,
-          debit_total,
-          credit_total,
-          balance
-        });
-      }
-
-      incomeStatementBalances = accountBalances.filter(b => Math.abs(b.balance) > 0.01);
+      // Use optimized service layer with grouped aggregate query
+      const data = await getProfitAndLossData(incomeStartDate, incomeEndDate);
+      incomeStatementBalances = [...data.revenue, ...data.expenses];
     } catch (e) {
       console.error('Failed to load income statement:', e);
       alert('Failed to load income statement: ' + e);
@@ -200,48 +109,9 @@
   async function loadTrialBalance() {
     loading = true;
     try {
-      const db = await getDatabase();
-      
-      // Get all accounts with their balances
-      const accounts = await db.select<Account[]>(
-        'SELECT * FROM account WHERE is_active = 1 ORDER BY code'
-      );
-
-      const accountBalances: AccountBalance[] = [];
-
-      for (const account of accounts) {
-        const lines = await db.select<Array<{ debit_total: number; credit_total: number }>>(
-          `SELECT 
-            COALESCE(SUM(debit_amount), 0) as debit_total,
-            COALESCE(SUM(credit_amount), 0) as credit_total
-          FROM journal_line jl
-          JOIN journal_entry je ON jl.journal_entry_id = je.id
-          WHERE jl.account_id = ? 
-            AND je.status = 'posted'
-            AND DATE(je.entry_date) <= ?`,
-          [account.id, asOfDate]
-        );
-
-        const debit_total = lines[0]?.debit_total || 0;
-        const credit_total = lines[0]?.credit_total || 0;
-
-        // Calculate balance based on account type
-        let balance: number;
-        if (account.type === 'asset' || account.type === 'expense') {
-          balance = debit_total - credit_total;
-        } else {
-          balance = credit_total - debit_total;
-        }
-
-        accountBalances.push({
-          account,
-          debit_total,
-          credit_total,
-          balance
-        });
-      }
-
-      trialBalances = accountBalances.filter(b => Math.abs(b.balance) > 0.01);
+      // Use optimized service layer with grouped aggregate query
+      const data = await getTrialBalanceData(asOfDate);
+      trialBalances = data.accounts;
     } catch (e) {
       console.error('Failed to load trial balance:', e);
       alert('Failed to load trial balance: ' + e);
@@ -590,24 +460,24 @@
 
   // Balance Sheet totals
   $: totalAssets = balanceSheetBalances
-    .filter(b => b.account.type === 'asset')
+    .filter(b => b.account_type === 'asset')
     .reduce((sum, b) => sum + b.balance, 0);
 
   $: totalLiabilities = balanceSheetBalances
-    .filter(b => b.account.type === 'liability')
+    .filter(b => b.account_type === 'liability')
     .reduce((sum, b) => sum + b.balance, 0);
 
   $: totalEquity = balanceSheetBalances
-    .filter(b => b.account.type === 'equity')
+    .filter(b => b.account_type === 'equity')
     .reduce((sum, b) => sum + b.balance, 0);
 
   // Income Statement totals (from period-filtered data)
   $: totalRevenue = incomeStatementBalances
-    .filter(b => b.account.type === 'revenue')
+    .filter(b => b.account_type === 'revenue')
     .reduce((sum, b) => sum + b.balance, 0);
 
   $: totalExpenses = incomeStatementBalances
-    .filter(b => b.account.type === 'expense')
+    .filter(b => b.account_type === 'expense')
     .reduce((sum, b) => sum + b.balance, 0);
 
   $: netIncome = totalRevenue - totalExpenses;
@@ -657,29 +527,29 @@
 
   function exportBalanceSheet() {
     const assets = balanceSheetBalances
-      .filter(b => b.account.type === 'asset')
+      .filter(b => b.account_type === 'asset')
       .map(b => ({
         Type: 'Asset',
-        Code: b.account.code,
-        Account: b.account.name,
+        Code: b.account_code,
+        Account: b.account_name,
         Balance: formatCurrencyForCSV(b.balance),
       }));
 
     const liabilities = balanceSheetBalances
-      .filter(b => b.account.type === 'liability')
+      .filter(b => b.account_type === 'liability')
       .map(b => ({
         Type: 'Liability',
-        Code: b.account.code,
-        Account: b.account.name,
+        Code: b.account_code,
+        Account: b.account_name,
         Balance: formatCurrencyForCSV(b.balance),
       }));
 
     const equity = balanceSheetBalances
-      .filter(b => b.account.type === 'equity')
+      .filter(b => b.account_type === 'equity')
       .map(b => ({
         Type: 'Equity',
-        Code: b.account.code,
-        Account: b.account.name,
+        Code: b.account_code,
+        Account: b.account_name,
         Balance: formatCurrencyForCSV(b.balance),
       }));
 
@@ -702,20 +572,20 @@
 
   function exportProfitLoss() {
     const revenue = incomeStatementBalances
-      .filter(b => b.account.type === 'revenue')
+      .filter(b => b.account_type === 'revenue')
       .map(b => ({
         Type: 'Revenue',
-        Code: b.account.code,
-        Account: b.account.name,
+        Code: b.account_code,
+        Account: b.account_name,
         Amount: formatCurrencyForCSV(b.balance),
       }));
 
     const expenses = incomeStatementBalances
-      .filter(b => b.account.type === 'expense')
+      .filter(b => b.account_type === 'expense')
       .map(b => ({
         Type: 'Expense',
-        Code: b.account.code,
-        Account: b.account.name,
+        Code: b.account_code,
+        Account: b.account_name,
         Amount: formatCurrencyForCSV(b.balance),
       }));
 
@@ -735,9 +605,9 @@
 
   function exportTrialBalance() {
     const data = trialBalances.map(b => ({
-      Code: b.account.code,
-      Account: b.account.name,
-      Type: b.account.type as string,
+      Code: b.account_code,
+      Account: b.account_name,
+      Type: b.account_type as string,
       Debit: b.debit_total > b.credit_total ? formatCurrencyForCSV(b.balance) : '0.00',
       Credit: b.credit_total > b.debit_total ? formatCurrencyForCSV(b.balance) : '0.00',
     }));
@@ -792,9 +662,9 @@
           <div class="section">
             <h4>Assets</h4>
             <Table headers={['Account', 'Balance']}>
-              {#each balanceSheetBalances.filter(b => b.account.type === 'asset') as item}
+              {#each balanceSheetBalances.filter(b => b.account_type === 'asset') as item}
                 <tr>
-                  <td>{item.account.code} - {item.account.name}</td>
+                  <td>{item.account_code} - {item.account_name}</td>
                   <td class="amount">{formatCurrency(item.balance)}</td>
                 </tr>
               {/each}
@@ -808,9 +678,9 @@
           <div class="section">
             <h4>Liabilities</h4>
             <Table headers={['Account', 'Balance']}>
-              {#each balanceSheetBalances.filter(b => b.account.type === 'liability') as item}
+              {#each balanceSheetBalances.filter(b => b.account_type === 'liability') as item}
                 <tr>
-                  <td>{item.account.code} - {item.account.name}</td>
+                  <td>{item.account_code} - {item.account_name}</td>
                   <td class="amount">{formatCurrency(item.balance)}</td>
                 </tr>
               {/each}
@@ -824,9 +694,9 @@
           <div class="section">
             <h4>Equity</h4>
             <Table headers={['Account', 'Balance']}>
-              {#each balanceSheetBalances.filter(b => b.account.type === 'equity') as item}
+              {#each balanceSheetBalances.filter(b => b.account_type === 'equity') as item}
                 <tr>
-                  <td>{item.account.code} - {item.account.name}</td>
+                  <td>{item.account_code} - {item.account_name}</td>
                   <td class="amount">{formatCurrency(item.balance)}</td>
                 </tr>
               {/each}
@@ -892,9 +762,9 @@
           <div class="section">
             <h4>Revenue</h4>
             <Table headers={['Account', 'Amount']}>
-              {#each incomeStatementBalances.filter(b => b.account.type === 'revenue') as item}
+              {#each incomeStatementBalances.filter(b => b.account_type === 'revenue') as item}
                 <tr>
-                  <td>{item.account.code} - {item.account.name}</td>
+                  <td>{item.account_code} - {item.account_name}</td>
                   <td class="amount">{formatCurrency(item.balance)}</td>
                 </tr>
               {/each}
@@ -908,9 +778,9 @@
           <div class="section">
             <h4>Expenses</h4>
             <Table headers={['Account', 'Amount']}>
-              {#each incomeStatementBalances.filter(b => b.account.type === 'expense') as item}
+              {#each incomeStatementBalances.filter(b => b.account_type === 'expense') as item}
                 <tr>
-                  <td>{item.account.code} - {item.account.name}</td>
+                  <td>{item.account_code} - {item.account_name}</td>
                   <td class="amount">{formatCurrency(item.balance)}</td>
                 </tr>
               {/each}
@@ -944,8 +814,8 @@
         <Table headers={['Code', 'Account', 'Debit', 'Credit']}>
           {#each trialBalances as item}
             <tr>
-              <td>{item.account.code}</td>
-              <td>{item.account.name}</td>
+              <td>{item.account_code}</td>
+              <td>{item.account_name}</td>
               <td class="amount">
                 {item.debit_total > item.credit_total ? formatCurrency(item.balance) : '-'}
               </td>
