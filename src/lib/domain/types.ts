@@ -354,3 +354,49 @@ export interface PayrollCalculation {
   net_pay: number;
   total_employer_cost: number;
 }
+
+// Multi-Currency Types
+export interface Currency {
+  id?: number;
+  code: string; // ISO 4217: USD, CAD, EUR, GBP, etc.
+  name: string; // US Dollar, Canadian Dollar, Euro, etc.
+  symbol: string; // $, €, £, etc.
+  decimal_places: number;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface ExchangeRate {
+  id?: number;
+  from_currency_id: number;
+  to_currency_id: number;
+  rate_date: string;
+  rate: number; // Exchange rate (from → to)
+  source?: string; // Source of rate (manual, API, bank, etc.)
+  created_at?: string;
+}
+
+export interface FXGainLoss {
+  id?: number;
+  transaction_date: string;
+  account_id: number;
+  currency_id: number;
+  foreign_amount: number;
+  home_amount: number;
+  exchange_rate: number;
+  settled_rate: number;
+  gain_loss_amount: number; // Positive = gain, Negative = loss
+  gain_loss_type: 'realized' | 'unrealized';
+  journal_entry_id?: number;
+  reference?: string;
+  notes?: string;
+  created_at?: string;
+}
+
+export interface MultiCurrencyTransaction {
+  home_currency_id: number;
+  foreign_currency_id: number;
+  foreign_amount: number;
+  exchange_rate: number;
+  home_amount: number; // foreign_amount × exchange_rate
+}

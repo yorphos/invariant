@@ -9,6 +9,7 @@ import { migration007 } from './007_system_accounts_config';
 import { migration008 } from './008_fiscal_periods';
 import { migration009 } from './009_bank_reconciliation';
 import { migration010 } from './010_vendor_bills';
+import { migration011 } from './011_multi_currency';
 
 export const allMigrations: Migration[] = [
   migration001,
@@ -21,4 +22,5 @@ export const allMigrations: Migration[] = [
   migration008,
   migration009,
   migration010,
+  migration011,
 ];
