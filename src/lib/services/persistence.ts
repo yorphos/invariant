@@ -178,6 +178,49 @@ export class PersistenceService {
     return result.lastInsertId ?? 0;
   }
 
+  async updateContact(id: number, contact: Partial<Omit<Contact, 'id' | 'created_at' | 'updated_at'>>): Promise<void> {
+    const db = await getDatabase();
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (contact.type !== undefined) {
+      fields.push('type = ?');
+      values.push(contact.type);
+    }
+    if (contact.name !== undefined) {
+      fields.push('name = ?');
+      values.push(contact.name);
+    }
+    if (contact.email !== undefined) {
+      fields.push('email = ?');
+      values.push(contact.email);
+    }
+    if (contact.phone !== undefined) {
+      fields.push('phone = ?');
+      values.push(contact.phone);
+    }
+    if (contact.address !== undefined) {
+      fields.push('address = ?');
+      values.push(contact.address);
+    }
+    if (contact.tax_id !== undefined) {
+      fields.push('tax_id = ?');
+      values.push(contact.tax_id);
+    }
+    if (contact.is_active !== undefined) {
+      fields.push('is_active = ?');
+      values.push(contact.is_active ? 1 : 0);
+    }
+
+    if (fields.length > 0) {
+      fields.push('updated_at = datetime("now")');
+      await db.execute(
+        `UPDATE contact SET ${fields.join(', ')} WHERE id = ?`,
+        [...values, id]
+      );
+    }
+  }
+
   // Invoice operations
   async createInvoice(
     invoice: Omit<Invoice, 'id' | 'created_at' | 'updated_at'>,
@@ -253,6 +296,61 @@ export class PersistenceService {
     return await db.select<Payment[]>(
       'SELECT * FROM payment ORDER BY payment_date DESC'
     );
+  }
+
+  async updatePayment(id: number, payment: Partial<Omit<Payment, 'id' | 'created_at' | 'updated_at'>>): Promise<void> {
+    const db = await getDatabase();
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (payment.payment_number !== undefined) {
+      fields.push('payment_number = ?');
+      values.push(payment.payment_number);
+    }
+    if (payment.contact_id !== undefined) {
+      fields.push('contact_id = ?');
+      values.push(payment.contact_id);
+    }
+    if (payment.event_id !== undefined) {
+      fields.push('event_id = ?');
+      values.push(payment.event_id);
+    }
+    if (payment.payment_date !== undefined) {
+      fields.push('payment_date = ?');
+      values.push(payment.payment_date);
+    }
+    if (payment.amount !== undefined) {
+      fields.push('amount = ?');
+      values.push(payment.amount);
+    }
+    if (payment.payment_method !== undefined) {
+      fields.push('payment_method = ?');
+      values.push(payment.payment_method);
+    }
+    if (payment.reference !== undefined) {
+      fields.push('reference = ?');
+      values.push(payment.reference);
+    }
+    if (payment.notes !== undefined) {
+      fields.push('notes = ?');
+      values.push(payment.notes);
+    }
+    if (payment.allocated_amount !== undefined) {
+      fields.push('allocated_amount = ?');
+      values.push(payment.allocated_amount);
+    }
+    if (payment.status !== undefined) {
+      fields.push('status = ?');
+      values.push(payment.status);
+    }
+
+    if (fields.length > 0) {
+      fields.push('updated_at = datetime("now")');
+      await db.execute(
+        `UPDATE payment SET ${fields.join(', ')} WHERE id = ?`,
+        [...values, id]
+      );
+    }
   }
 
   // Allocation operations

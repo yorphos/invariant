@@ -47,6 +47,17 @@
     showModal = true;
   }
 
+  function openEditModal(contact: Contact) {
+    editingContact = contact;
+    formType = contact.type;
+    formName = contact.name;
+    formEmail = contact.email || '';
+    formPhone = contact.phone || '';
+    formAddress = contact.address || '';
+    formTaxId = contact.tax_id || '';
+    showModal = true;
+  }
+
   function closeModal() {
     showModal = false;
     editingContact = null;
@@ -64,7 +75,14 @@
         is_active: true,
       };
 
-      await persistenceService.createContact(contactData);
+      if (editingContact && editingContact.id !== undefined) {
+        // Update existing contact
+        await persistenceService.updateContact(editingContact.id, contactData);
+      } else {
+        // Create new contact
+        await persistenceService.createContact(contactData);
+      }
+      
       await loadContacts();
       closeModal();
     } catch (e) {
@@ -94,7 +112,7 @@
     <Card padding={false}>
       <Table headers={['Name', 'Type', 'Email', 'Phone', 'Tax ID']}>
         {#each contacts as contact}
-          <tr>
+          <tr class="clickable-row" on:click={() => openEditModal(contact)}>
             <td>{contact.name}</td>
             <td>
               <span class="badge {contact.type}">{contact.type}</span>
@@ -109,7 +127,7 @@
   {/if}
 </div>
 
-<Modal open={showModal} title="New Contact" onClose={closeModal}>
+<Modal open={showModal} title={editingContact ? "Edit Contact" : "New Contact"} onClose={closeModal}>
   <form on:submit|preventDefault={handleSubmit}>
     <Select
       label="Type"
@@ -160,7 +178,7 @@
         Cancel
       </Button>
       <Button type="submit">
-        Create Contact
+        {editingContact ? 'Update Contact' : 'Create Contact'}
       </Button>
     </div>
   </form>
@@ -191,6 +209,15 @@
     font-size: 12px;
     font-weight: 500;
     text-transform: capitalize;
+  }
+
+  .clickable-row {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+
+  .clickable-row:hover {
+    background-color: #f8f9fa;
   }
 
   .badge.customer {
