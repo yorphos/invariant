@@ -1,0 +1,113 @@
+# Manual Release Build - Creates distributables for manual tag pushes
+# Triggered by: git push origin v* (tag push only)
+
+name: Release Manual
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-release:
+    name: Build (${{ matrix.name }})
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            platform: windows-latest
+            args: ''
+
+          - name: macOS (Apple Silicon)
+            platform: macos-latest
+            args: '--target aarch64-apple-darwin'
+
+          - name: macOS (Intel)
+            platform: macos-latest
+            args: '--target x86_64-apple-darwin'
+
+          - name: Linux
+            platform: ubuntu-22.04
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=${{ github.ref_name }}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building Invariant Accounting v$VERSION from manual tag push"
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Cache Vite build
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/.vite
+            .svelte-kit
+          key: vite-${{ runner.os }}-${{ hashFiles('src/**', 'vite.config.ts', 'svelte.config.js', 'tsconfig.json') }}
+          restore-keys: |
+            vite-${{ runner.os }}-
+
+      - name: Build Tauri app and create release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        with:
+          tagName: ${{ steps.version.outputs.version }}
+          releaseName: 'Invariant Accounting v${{ steps.version.outputs.version }}'
+          releaseBody: |
+            ## Invariant Accounting v${{ steps.version.outputs.version }}
+
+            Download the installer for your platform below.
+
+            ### Installation
+            - **Windows**: Download `.msi` (recommended) or `.exe` installer
+            - **macOS (Apple Silicon)**: Download `aarch64.dmg` for M1/M2/M3 Macs
+            - **macOS (Intel)**: Download `x64.dmg` for Intel Macs
+            - **Linux**: Download `.AppImage` (portable) or `.deb`/`.rpm` for your distro
+
+            ### Notes
+            - See the [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for what's new.
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
