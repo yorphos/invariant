@@ -29,6 +29,7 @@
   let formIssueDate = '';
   let formDueDate = '';
   let formNotes = '';
+  let taxRate = 0.13;
   let formLines: Array<{
     description: string;
     quantity: number;
@@ -36,9 +37,13 @@
     account_id: number | '';
   }> = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
 
+  let taxInclusivePricing = false;
+
   $: subtotal = formLines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
-  $: taxAmount = subtotal * 0.13; // Simple 13% tax (HST)
-  $: total = subtotal + taxAmount;
+  $: taxAmount = taxInclusivePricing
+    ? subtotal - (subtotal / (1 + taxRate))
+    : subtotal * taxRate;
+  $: total = taxInclusivePricing ? subtotal : subtotal + taxAmount;
 
   onMount(async () => {
     await loadData();
@@ -52,6 +57,8 @@
         persistenceService.getContacts(),
         persistenceService.getAccountsByType('revenue')
       ]);
+
+      taxRate = 0.13;
 
       // Generate next invoice number
       if (invoices.length === 0) {
@@ -108,6 +115,7 @@
         quantity: line.quantity,
         unit_price: line.unit_price,
         amount: line.quantity * line.unit_price,
+        is_tax_inclusive: taxInclusivePricing,
         account_id: Number(line.account_id),
       }));
 
@@ -166,6 +174,7 @@
     formContactId = '';
     formNotes = '';
     formLines = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
+    taxInclusivePricing = false;
   }
 
   function handleRowClick(invoice: Invoice) {
@@ -197,6 +206,8 @@
       unit_price: line.unit_price,
       account_id: line.account_id || '',
     }));
+    const firstLine = lines[0] as InvoiceLine & { is_tax_inclusive?: boolean } | undefined;
+    taxInclusivePricing = firstLine ? Boolean(firstLine.is_tax_inclusive) : false;
     
     showDetailModal = false;
     view = 'edit';
@@ -308,6 +319,12 @@
       </Card>
 
       <Card title="Line Items">
+        <div class="tax-mode-toggle">
+          <label class="toggle-label">
+            <input type="checkbox" bind:checked={taxInclusivePricing} />
+            <span>Prices include tax (HST)</span>
+          </label>
+        </div>
         {#each formLines as line, index}
           <div class="line-item">
             <div class="line-number">{index + 1}</div>
@@ -380,7 +397,7 @@
             <span>{formatCurrency(subtotal)}</span>
           </div>
           <div class="total-row">
-            <span>Tax (13% HST):</span>
+            <span>Tax ({(taxRate * 100).toFixed(1)}% HST):</span>
             <span>{formatCurrency(taxAmount)}</span>
           </div>
           <div class="total-row final">
@@ -444,6 +461,25 @@
     background: #f8f9fa;
     border-radius: 6px;
     margin-bottom: 16px;
+  }
+
+  .tax-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    background: #fff;
+    border: 1px solid #e5e8ec;
+    border-radius: 6px;
+  }
+
+  .toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #2c3e50;
   }
 
   .line-number {

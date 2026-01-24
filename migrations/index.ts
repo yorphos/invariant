@@ -10,6 +10,10 @@ import { migration008 } from './008_fiscal_periods';
 import { migration009 } from './009_bank_reconciliation';
 import { migration010 } from './010_vendor_bills';
 import { migration011 } from './011_multi_currency';
+import { migration012 } from './012_closed_period_enforcement';
+import { migration013 } from './013_system_account_fixes';
+import { migration014 } from './014_invoice_line_tax_inclusive';
+import { migration015 } from './015_invoice_total_triggers';
 
 export const allMigrations: Migration[] = [
   migration001,
@@ -23,4 +27,8 @@ export const allMigrations: Migration[] = [
   migration009,
   migration010,
   migration011,
+  migration012,
+  migration013,
+  migration014,
+  migration015,
 ];

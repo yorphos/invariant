@@ -377,16 +377,26 @@ export class PersistenceService {
     const invoiceResult = await db.execute(
       `INSERT INTO invoice (invoice_number, contact_id, event_id, issue_date, due_date, status, subtotal, tax_amount, total_amount, paid_amount, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [invoice.invoice_number, invoice.contact_id, invoice.event_id, invoice.issue_date, invoice.due_date, 
+      [invoice.invoice_number, invoice.contact_id, invoice.event_id, invoice.issue_date, invoice.due_date,
        invoice.status, invoice.subtotal, invoice.tax_amount, invoice.total_amount, invoice.paid_amount, invoice.notes]
     );
     const invoiceId = invoiceResult.lastInsertId ?? 0;
 
     for (const line of lines) {
       await db.execute(
-        `INSERT INTO invoice_line (invoice_id, line_number, description, quantity, unit_price, amount, tax_code_id, account_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [invoiceId, line.line_number, line.description, line.quantity, line.unit_price, line.amount, line.tax_code_id, line.account_id]
+        `INSERT INTO invoice_line (invoice_id, line_number, description, quantity, unit_price, amount, is_tax_inclusive, tax_code_id, account_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          invoiceId,
+          line.line_number,
+          line.description,
+          line.quantity,
+          line.unit_price,
+          line.amount,
+          line.is_tax_inclusive ? 1 : 0,
+          line.tax_code_id,
+          line.account_id,
+        ]
       );
     }
 
@@ -430,10 +440,14 @@ export class PersistenceService {
 
   async getInvoiceLines(invoiceId: number): Promise<InvoiceLine[]> {
     const db = await getDatabase();
-    return await db.select<InvoiceLine[]>(
+    const lines = await db.select<Array<InvoiceLine & { is_tax_inclusive?: number }>>(
       'SELECT * FROM invoice_line WHERE invoice_id = ? ORDER BY line_number',
       [invoiceId]
     );
+    return lines.map(line => ({
+      ...line,
+      is_tax_inclusive: Boolean(line.is_tax_inclusive),
+    }));
   }
 
   // Payment operations

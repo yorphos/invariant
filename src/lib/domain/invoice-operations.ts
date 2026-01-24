@@ -63,24 +63,32 @@ async function validateAndRecalculateInvoice(
     
     return {
       ...line,
-      amount: calculatedAmount // Use server-calculated amount
+      amount: calculatedAmount,
+      is_tax_inclusive: line.is_tax_inclusive ?? false,
     };
   });
   
   // Calculate totals from recalculated amounts
   const subtotal = recalculatedLines.reduce((sum, line) => sum + line.amount, 0);
+
+  const hasTaxInclusiveLines = recalculatedLines.some(line => line.is_tax_inclusive);
+  if (hasTaxInclusiveLines && recalculatedLines.some(line => !line.is_tax_inclusive)) {
+    throw new Error('All invoice lines must use the same tax inclusive setting');
+  }
   
   // Calculate tax using tax service (looks up rate from database)
-  const { taxAmount, accountId: taxAccountId } = await calculateTax(
+  const { taxAmount, taxRate, accountId: taxAccountId, netSubtotal } = await calculateTax(
     subtotal,
     invoiceData.tax_code_id,
-    invoiceData.issue_date
+    invoiceData.issue_date,
+    hasTaxInclusiveLines
   );
-  
-  const totalAmount = subtotal + taxAmount;
+
+  const effectiveSubtotal = netSubtotal;
+  const totalAmount = hasTaxInclusiveLines ? subtotal : subtotal + taxAmount;
 
   // Validate amounts are positive
-  if (subtotal <= 0) {
+  if (effectiveSubtotal <= 0) {
     throw new Error('Invoice subtotal must be greater than 0');
   }
   if (totalAmount <= 0) {
@@ -89,10 +97,12 @@ async function validateAndRecalculateInvoice(
   
   return {
     recalculatedLines,
-    subtotal,
+    subtotal: effectiveSubtotal,
     taxAmount,
     totalAmount,
     taxAccountId,
+    isTaxInclusive: hasTaxInclusiveLines,
+    taxRate,
   };
 }
 
@@ -102,7 +112,7 @@ export async function createInvoice(
   context: PolicyContext
 ) {
   try {
-    const { recalculatedLines, subtotal, taxAmount, totalAmount, taxAccountId } = 
+    const { recalculatedLines, subtotal, taxAmount, totalAmount, taxAccountId, taxRate, isTaxInclusive } =
       await validateAndRecalculateInvoice(invoiceData, lines);
 
     // Get required accounts first (fail fast if missing)
@@ -167,10 +177,13 @@ export async function createInvoice(
 
     // Credit revenue accounts (one per line item)
     for (const line of recalculatedLines) {
+      const revenueAmount = isTaxInclusive && taxRate > 0
+        ? line.amount / (1 + taxRate)
+        : line.amount;
       journalLines.push({
         account_id: line.account_id!, // Safe: validated above
         debit_amount: 0,
-        credit_amount: line.amount,
+        credit_amount: revenueAmount,
         description: line.description,
       });
     }

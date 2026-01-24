@@ -7,6 +7,7 @@
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { copyFile, readFile, writeFile } from '@tauri-apps/plugin-fs';
 import { appDataDir } from '@tauri-apps/api/path';
+import { closeDatabase, getDatabase } from './database';
 
 /**
  * Get the path to the database file
@@ -21,6 +22,7 @@ async function getDatabasePath(): Promise<string> {
  */
 export async function backupDatabase(): Promise<boolean> {
   try {
+    await closeDatabase();
     const dbPath = await getDatabasePath();
     
     // Get current date for default filename
@@ -44,9 +46,12 @@ export async function backupDatabase(): Promise<boolean> {
     // Copy database file to selected location
     await copyFile(dbPath, savePath);
 
+    await getDatabase();
+
     return true;
   } catch (error) {
     console.error('Failed to backup database:', error);
+    await getDatabase();
     throw new Error(`Backup failed: ${error}`);
   }
 }
@@ -58,6 +63,7 @@ export async function backupDatabase(): Promise<boolean> {
  */
 export async function restoreDatabase(): Promise<boolean> {
   try {
+    await closeDatabase();
     // Show confirmation dialog
     const confirmed = confirm(
       'WARNING: Restoring from backup will replace your current database. ' +
@@ -66,6 +72,7 @@ export async function restoreDatabase(): Promise<boolean> {
     );
 
     if (!confirmed) {
+      await getDatabase();
       return false;
     }
 
@@ -80,6 +87,7 @@ export async function restoreDatabase(): Promise<boolean> {
     });
 
     if (!openPath) {
+      await getDatabase();
       return false; // User cancelled
     }
 
@@ -97,11 +105,14 @@ export async function restoreDatabase(): Promise<boolean> {
     // Copy backup file to database location
     await copyFile(backupPath, dbPath);
 
+    await getDatabase();
+
     alert('Database restored successfully. Please restart the application.');
     
     return true;
   } catch (error) {
     console.error('Failed to restore database:', error);
+    await getDatabase();
     throw new Error(`Restore failed: ${error}`);
   }
 }

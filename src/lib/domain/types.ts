@@ -94,6 +94,7 @@ export interface InvoiceLine {
   quantity: number;
   unit_price: number;
   amount: number;
+  is_tax_inclusive?: boolean;
   tax_code_id?: number;
   account_id?: number;
 }

@@ -29,7 +29,7 @@ export const migration007: Migration = {
     INSERT INTO system_account (role, account_id, description)
     SELECT 'accounts_payable', a.id, 'Primary A/P account for vendor bills'
     FROM account a
-    WHERE a.code = '2100'
+    WHERE a.code = '2000'
     LIMIT 1;
 
     INSERT INTO system_account (role, account_id, description)
@@ -41,13 +41,13 @@ export const migration007: Migration = {
     INSERT INTO system_account (role, account_id, description)
     SELECT 'retained_earnings', a.id, 'Retained earnings from prior periods'
     FROM account a
-    WHERE a.code = '3200'
+    WHERE a.code = '3100'
     LIMIT 1;
 
     INSERT INTO system_account (role, account_id, description)
     SELECT 'current_year_earnings', a.id, 'Net income for current fiscal year'
     FROM account a
-    WHERE a.code = '3300'
+    WHERE a.code = '3900'
     LIMIT 1;
   `
 };

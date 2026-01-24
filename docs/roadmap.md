@@ -2,7 +2,7 @@
 
 This roadmap outlines the path from current MVP foundation to a production-ready accounting application.
 
-## 🎉 Current Status: Phase 3 100% Complete - Production Ready
+## 🎉 Current Status: Phase 4 Audit Hardening Complete
 
 **Latest Update**: January 24, 2026
 
@@ -21,10 +21,17 @@ This roadmap outlines the path from current MVP foundation to a production-ready
   - ✅ Inventory tracking with FIFO costing
   - ✅ Payroll processing (Canadian taxes)
   - ✅ Multi-currency support (8 currencies, FX gain/loss)
+- ✅ **Phase 4: Audit Hardening & Compliance** (100% COMPLETE!)
+  - ✅ Closed period enforcement triggers (Migration 012)
+  - ✅ System account mapping fixes (Migrations 007, 013)
+  - ✅ Tax-inclusive pricing support (Migrations 014, 015)
+  - ✅ Backup/restore hardening (backup.ts)
+  - ✅ Transaction foreign key enforcement (db.rs)
 
-**System Status**: Production-ready for real-world accounting work
+**System Status**: Production-ready with full audit compliance
 
-**Test Coverage**: 351 passing tests (9.5x increase)
+**Database Migrations**: 15 total (11 → 15 in Phase 4)
+**Test Coverage**: 351 passing tests (9.5x increase from Phase 1)
 **Build Status**: ✅ Successful
 
 ---
@@ -606,9 +613,143 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-## Phase 4: Advanced Features 🔮 (FUTURE)
+## Phase 4: Audit Hardening & Compliance ✅ (COMPLETED)
 
-### 4.1 Bank Import
+**Goal**: Address critical audit findings for data integrity, compliance, and operational safety.
+
+### 4.1 Closed Period Enforcement ✅ COMPLETE
+**Priority**: Critical | **Status**: ✅ Complete
+
+**What Was Built:**
+- ✅ Database triggers block posting into closed fiscal years
+- ✅ Two triggers: `prevent_posting_to_closed_period_insert` and `prevent_posting_to_closed_period_update`
+- ✅ Checks if `entry_date` falls within any closed `fiscal_year` (status = 'closed')
+- ✅ Raises error if attempt to insert/update journal entry in closed period
+- ✅ Preserves immutable audit trail after year close (accounting standards compliant)
+
+**Files Modified:**
+- `migrations/012_closed_period_enforcement.ts` - New triggers
+
+**Acceptance Criteria:** ✅
+- ✅ Closed fiscal year cannot accept new journal entries
+- ✅ Backdating into closed periods is blocked at DB level
+- ✅ Immutable audit trail maintained after period close
+
+**Related:** Migration 012 | Financial Audit Finding 3.2 (RESOLVED)
+
+---
+
+### 4.2 System Account Integrity ✅ COMPLETE
+**Priority**: High | **Status**: ✅ Complete
+
+**What Was Built:**
+- ✅ Fixed default system account mappings to match chart of accounts
+- ✅ Corrected A/P mapping from 2100 (Credit Card Payable) → 2000 (Accounts Payable)
+- ✅ Corrected Retained Earnings from 3200 → 3100
+- ✅ Corrected Current Year Earnings from 3300 → 3900
+- ✅ Added corrective migration for existing installations
+
+**Files Modified:**
+- `migrations/007_system_accounts_config.ts` - Fixed seed data for new installations
+- `migrations/013_system_account_fixes.ts` - Corrective migration for existing databases
+
+**Acceptance Criteria:** ✅
+- ✅ System accounts resolve to valid account codes
+- ✅ Period close uses correct equity accounts (3100, 3900)
+- ✅ A/P operations use correct account (2000)
+- ✅ No invalid account references in system_account table
+
+**Related:** Migrations 007, 013 | Technical Audit Finding 4.4 (RESOLVED)
+
+---
+
+### 4.3 Tax Inclusive Pricing ✅ COMPLETE
+**Priority**: Medium | **Status**: ✅ Complete
+
+**What Was Built:**
+- ✅ Added `is_tax_inclusive` flag to invoice_line table (INTEGER 0/1)
+- ✅ Tax service supports tax-inclusive calculation (`isTaxInclusive` parameter)
+- ✅ Backs out tax: `netSubtotal = total / (1 + rate)` when inclusive
+- ✅ Invoice operations validate all lines use same mode (prevent mixing)
+- ✅ Persistence layer stores/reads `is_tax_inclusive` flag (converts INTEGER ↔ boolean)
+- ✅ UI toggle: "Prices include tax (HST)" checkbox in InvoicesView
+- ✅ Reactive totals adjust automatically when mode changes
+- ✅ Rewrote invoice total triggers to handle both exclusive/inclusive modes
+
+**Files Modified:**
+- `migrations/014_invoice_line_tax_inclusive.ts` - Schema change
+- `migrations/015_invoice_total_triggers.ts` - Updated triggers for both modes
+- `migrations/002_contacts_ar_ap.ts` - Removed duplicate column declaration
+- `src/lib/domain/types.ts` - Added `is_tax_inclusive?: boolean` to InvoiceLine
+- `src/lib/services/tax.ts` - Added `isTaxInclusive` param, returns `netSubtotal`
+- `src/lib/domain/invoice-operations.ts` - Validates mode, calculates revenue correctly
+- `src/lib/services/persistence.ts` - Stores/reads flag, converts types
+- `src/lib/views/InvoicesView.svelte` - Added UI toggle, reactive calculations
+
+**User Impact:** 
+Retailers and service providers can now enter "$113 all-in" and system correctly records $100 revenue + $13 HST.
+
+**Acceptance Criteria:** ✅
+- ✅ Users can enter tax-inclusive prices
+- ✅ Tax is backed out correctly: `netSubtotal = total / (1 + rate)`
+- ✅ Journal entries record correct revenue amount (exclusive of tax)
+- ✅ UI displays both modes clearly
+- ✅ Triggers calculate totals correctly for both modes
+
+**Related:** Migrations 014, 015 | Financial Audit Finding 3.5 (RESOLVED)
+
+---
+
+### 4.4 Backup & Restore Hardening ✅ COMPLETE
+**Priority**: Medium | **Status**: ✅ Complete
+
+**What Was Built:**
+- ✅ Close database connections before file copy operations
+- ✅ Reopen database after backup/restore completes
+- ✅ Error paths also reopen DB to prevent broken state
+- ✅ Prevents partial backups from open file handles
+- ✅ Prevents corrupted backups under active use
+
+**Files Modified:**
+- `src/lib/services/backup.ts` - Added closeDatabase/reopenDatabase calls
+
+**Technical Detail:**
+SQLite file-level copies while connections are open can produce corrupted backups. Now `backupDatabase()` and `restoreDatabase()` close all connections before copying, then reopen after.
+
+**Acceptance Criteria:** ✅
+- ✅ Backups are consistent under active use
+- ✅ Restores safely replace the DB file
+- ✅ No corrupted backups from open handles
+
+**Related:** Technical Audit Finding 4.9 (RESOLVED)
+
+---
+
+### 4.5 Transaction Foreign Key Enforcement ✅ COMPLETE
+**Priority**: High | **Status**: ✅ Complete
+
+**What Was Built:**
+- ✅ Enabled `PRAGMA foreign_keys = ON` for Rust SQLx transaction pools
+- ✅ Ensures transaction path enforces constraints consistently
+- ✅ Prevents foreign key bypass via Rust DB access path
+
+**Files Modified:**
+- `src-tauri/src/db.rs` - Added explicit `PRAGMA foreign_keys = ON` in `execute_transaction()`
+
+**Technical Detail:**
+The Rust SQLx path (used for transactions) did not enable foreign key enforcement. Now all DB access paths (both Tauri plugin-sql and Rust SQLx) consistently enforce foreign keys.
+
+**Acceptance Criteria:** ✅
+- ✅ Foreign keys enforced for all transaction execution paths
+- ✅ No constraint bypass via dual DB access stacks
+
+**Related:** Technical Audit Finding 4.3 (RESOLVED)
+
+---
+
+## Phase 5: Advanced Features 🔮 (FUTURE)
+
+### 5.1 Bank Import
 **Priority**: Medium
 
 - [ ] QBO file import
@@ -618,7 +759,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-### 4.2 Receipt/Document Management
+### 5.2 Receipt/Document Management
 **Priority**: Low
 
 - [ ] File upload and storage
@@ -629,7 +770,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-### 4.3 Cloud Sync (Optional)
+### 5.3 Cloud Sync (Optional)
 **Priority**: Low
 
 - [ ] Sync server design (separate project)
@@ -640,7 +781,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-### 4.4 Budgeting
+### 5.4 Budgeting
 **Priority**: Low
 
 - [ ] Budget creation per account
@@ -650,7 +791,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-### 4.5 Multi-Company
+### 5.5 Multi-Company
 **Priority**: Low
 
 - [ ] Company/entity table
@@ -660,7 +801,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-### 4.6 User Management & Permissions
+### 5.6 User Management & Permissions
 **Priority**: Low
 
 - [ ] User accounts
@@ -670,9 +811,9 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-## Phase 5: Polish & Production 🚀 (BEFORE RELEASE)
+## Phase 6: Polish & Production 🚀 (BEFORE RELEASE)
 
-### 5.1 Testing
+### 6.1 Testing
 **Priority**: Critical
 
 - [ ] Unit tests for posting engine
@@ -683,7 +824,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-### 5.2 Error Handling & Validation
+### 6.2 Error Handling & Validation
 **Priority**: High
 
 - [ ] Comprehensive input validation
@@ -693,7 +834,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-### 5.3 Performance Optimization
+### 6.3 Performance Optimization
 **Priority**: Medium
 
 - [ ] Database indexing review
@@ -704,7 +845,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-### 5.4 Documentation
+### 6.4 Documentation
 **Priority**: High
 
 - [ ] User guide
@@ -715,7 +856,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-### 5.5 Distribution & Updates
+### 6.5 Distribution & Updates
 **Priority**: High
 
 - [ ] Code signing certificates
@@ -726,7 +867,7 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 
 ---
 
-### 5.6 Accessibility
+### 6.6 Accessibility
 **Priority**: Medium
 
 - [ ] Keyboard navigation
@@ -747,19 +888,25 @@ This roadmap outlines the path from current MVP foundation to a production-ready
 - [x] Essential workflows (invoices, payments, expenses)
 - [x] **Tier 1 UX improvements (void/edit, details, PDF)**
 
-### Milestone 2: Enhanced MVP (In Progress)
-- [ ] Test suite expansion (70+ tests)
-- [ ] Data export and backup
-- [ ] Date range filtering
-- [ ] Enhanced features from Phase 3
+### Milestone 2: Enhanced MVP ✅ (COMPLETED)
+- [x] Test suite expansion (351 tests)
+- [x] Data export and backup
+- [x] Date range filtering
+- [x] Enhanced features from Phase 3
 
-### Milestone 3: Beta Release
-- [ ] All Phase 2 complete
-- [ ] Core Phase 3 features complete
-- [ ] Testing suite
+### Milestone 3: Audit Hardened MVP ✅ (COMPLETED)
+- [x] Closed period enforcement
+- [x] System account integrity fixes
+- [x] Tax inclusive pricing
+- [x] Backup/restore hardening
+- [x] Transaction FK enforcement
+
+### Milestone 4: Beta Release
+- [ ] Phase 5 advanced features
+- [ ] Reporting performance
 - [ ] Documentation
 
-### Milestone 4: Production Release v1.0
+### Milestone 5: Production Release v1.0
 - [ ] All core features
 - [ ] Full testing
 - [ ] Polish

@@ -51,6 +51,12 @@ pub async fn execute_transaction(
         new_pool
     };
 
+    // Ensure foreign keys are enforced for this connection
+    sqlx::query("PRAGMA foreign_keys = ON")
+        .execute(&pool)
+        .await
+        .map_err(|e| format!("Failed to enable foreign keys: {}", e))?;
+
     // Begin transaction
     let mut tx = pool.begin().await.map_err(|e| format!("Failed to begin transaction: {}", e))?;
 

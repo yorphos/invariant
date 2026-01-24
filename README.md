@@ -4,9 +4,11 @@
 
 Invariant Accounting is a desktop application that brings enterprise-grade double-entry bookkeeping to your local machine. Built with modern web technologies wrapped in a native desktop shell, it provides the power of traditional accounting software without the complexity, cost, or cloud dependency.
 
-[![Status](https://img.shields.io/badge/Status-MVP%20Complete-brightgreen)]()
+[![Status](https://img.shields.io/badge/Status-Phase%204%20Complete-brightgreen)]()
 [![License](https://img.shields.io/badge/License-TBD-blue)]()
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
+[![Tests](https://img.shields.io/badge/Tests-351%20Passing-success)]()
+[![Migrations](https://img.shields.io/badge/Migrations-15-blue)]()
 
 ---
 
@@ -22,7 +24,14 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 
 ## ✨ Features
 
-### Current Release (MVP v0.1.0)
+### Current Release (MVP v0.1.1 - Phase 4 Complete)
+
+#### 🔒 Audit Hardening & Compliance (Phase 4 - NEW!)
+- **Closed period enforcement** with database triggers (Migration 012)
+- **Tax-inclusive pricing** support for retail scenarios (Migrations 014, 015)
+- **System account integrity** fixes for A/P and equity accounts (Migrations 007, 013)
+- **Safe backup/restore** operations under active use
+- **Foreign key enforcement** across all database access paths
 
 #### 📋 Contact Management
 - Create and manage customers and vendors
@@ -164,11 +173,17 @@ invariant/
 │   ├── capabilities/            # Permission system
 │   │   └── default.json
 │   └── tauri.conf.json          # Application configuration
-├── migrations/                  # Database versioning
+├── migrations/                  # Database versioning (15 migrations)
 │   ├── 001_core_ledger.ts       # Accounts, journal, audit
 │   ├── 002_contacts_ar_ap.ts    # Contacts, invoices, payments
 │   ├── 003_inventory_payroll_tax.ts  # Future modules
 │   ├── 004_integrity_triggers.ts     # Data integrity
+│   ├── 007_system_accounts_config.ts # System account mappings
+│   ├── 009_bank_reconciliation.ts    # Bank reconciliation
+│   ├── 012_closed_period_enforcement.ts  # Phase 4: Audit hardening
+│   ├── 013_system_account_fixes.ts       # Phase 4: Corrective migration
+│   ├── 014_invoice_line_tax_inclusive.ts # Phase 4: Tax-inclusive pricing
+│   ├── 015_invoice_total_triggers.ts     # Phase 4: Enhanced triggers
 │   └── index.ts                 # Migration registry
 └── docs/                        # Documentation
     ├── project.md               # Original specification
@@ -402,7 +417,14 @@ All business logic belongs in `src/lib/domain/`:
 - [x] Invoice and payment detail views
 - [x] PDF generation for invoices
 
-### Phase 2: Enhanced Features
+### ✅ Phase 4: Audit Hardening (COMPLETED)
+- [x] Closed period enforcement (database triggers)
+- [x] System account integrity fixes
+- [x] Tax-inclusive pricing support
+- [x] Backup/restore hardening
+- [x] Foreign key enforcement consistency
+
+### Phase 5: Advanced Features
 - [ ] Test suite expansion (70+ tests)
 - [ ] Data export and backup functionality
 - [ ] Advanced payment allocation UI (FIFO, heuristic matching)
@@ -410,13 +432,13 @@ All business logic belongs in `src/lib/domain/`:
 - [ ] Custom report builder
 - [ ] Batch operations (bulk payments, invoice generation)
 
-### Phase 3: Banking Integration
-- [ ] Bank statement import (CSV, OFX, QBO)
-- [ ] Automatic transaction matching
-- [ ] Bank reconciliation workflows
-- [ ] Transaction categorization rules
+### Phase 6: Banking Integration
+- [ ] Enhanced bank import features
+- [ ] Additional file format support (OFX, QBO)
+- [ ] Advanced auto-categorization rules
+- [ ] Transaction matching improvements
 
-### Phase 4: Advanced Accounting
+### Phase 7: Polish & Production
 - [ ] Multi-currency support with exchange rates
 - [ ] Inventory tracking and COGS calculation
 - [ ] Payroll processing with tax withholdings
@@ -433,11 +455,11 @@ All business logic belongs in `src/lib/domain/`:
 
 ## 🐛 Known Limitations
 
-1. **Single Currency**: Only CAD supported in MVP (architecture supports multi-currency)
-2. **Report Date Ranges**: Reports show all-time data (period filtering coming in Phase 2)
-3. **Manual Allocation**: Payment allocation is manual (advanced strategies exist but not in UI)
-4. **Default Company Info**: PDF invoices use default company info (settings UI planned)
-5. **Single Entity**: Supports one business entity per database
+1. **Floating-Point Precision**: Uses 1-cent tolerance for balance checking (acceptable for MVP, consider integer-cent storage for V2)
+2. **Report Date Ranges**: Advanced date filtering available in Phase 3 (fiscal year close, period filtering)
+3. **Default Company Info**: PDF invoices use default company info (settings UI planned)
+4. **Single Entity**: Supports one business entity per database
+5. **Invoice Numbering**: Client-side generation (acceptable for single-user, would need ACID counter for multi-user)
 
 ---
 

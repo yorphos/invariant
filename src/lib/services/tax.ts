@@ -54,20 +54,28 @@ export async function getTaxRate(taxCodeId: number, effectiveDate: string): Prom
 export async function calculateTax(
   subtotal: number,
   taxCodeId: number,
-  effectiveDate: string
-): Promise<{ taxAmount: number; taxRate: number; accountId: number | null }> {
+  effectiveDate: string,
+  isTaxInclusive = false
+): Promise<{ taxAmount: number; taxRate: number; accountId: number | null; netSubtotal: number }> {
   const taxRate = await getTaxRate(taxCodeId, effectiveDate);
   
   if (!taxRate) {
     throw new Error(`No tax rate found for tax code ${taxCodeId} on date ${effectiveDate}`);
   }
-  
-  const taxAmount = subtotal * taxRate.rate;
-  
+
+  const normalizedSubtotal = subtotal;
+  const netSubtotal = isTaxInclusive
+    ? normalizedSubtotal / (1 + taxRate.rate)
+    : normalizedSubtotal;
+  const taxAmount = isTaxInclusive
+    ? normalizedSubtotal - netSubtotal
+    : normalizedSubtotal * taxRate.rate;
+
   return {
     taxAmount,
     taxRate: taxRate.rate,
     accountId: taxRate.account_id || null,
+    netSubtotal,
   };
 }
 
