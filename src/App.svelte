@@ -689,12 +689,16 @@
     display: flex;
     flex-direction: column;
     padding: 20px;
+    height: 100vh;
+    flex-shrink: 0;
+    overflow: hidden;
   }
 
   .sidebar h1 {
     font-size: 24px;
     margin: 0 0 30px 0;
     font-weight: 600;
+    flex-shrink: 0;
   }
 
   nav {
@@ -702,6 +706,8 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    overflow-y: auto;
+    min-height: 0;
   }
 
   nav button {
@@ -728,6 +734,8 @@
   .mode-indicator {
     padding: 12px 0;
     border-top: 1px solid #34495e;
+    margin-top: auto;
+    flex-shrink: 0;
   }
 
   .mode-badge {
@@ -748,6 +756,7 @@
     flex: 1;
     overflow-y: auto;
     padding: 40px;
+    min-height: 0;
   }
 
   .view {
