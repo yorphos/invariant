@@ -312,3 +312,45 @@ export interface InventoryBalance {
   average_cost: number;
   fifo_layers: InventoryLayer[];
 }
+
+export type PayrollStatus = 'draft' | 'approved' | 'paid' | 'void';
+
+export interface PayrollRun {
+  id?: number;
+  run_number: string;
+  period_start: string;
+  period_end: string;
+  pay_date: string;
+  status: PayrollStatus;
+  total_gross: number;
+  total_deductions: number;
+  total_net: number;
+  event_id?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PayrollLine {
+  id?: number;
+  payroll_run_id?: number;
+  employee_name: string;
+  employee_id?: string;
+  gross_pay: number;
+  cpp_amount: number;
+  ei_amount: number;
+  income_tax: number;
+  other_deductions: number;
+  net_pay: number;
+}
+
+export interface PayrollCalculation {
+  gross_pay: number;
+  cpp_employee: number;
+  cpp_employer: number;
+  ei_employee: number;
+  ei_employer: number;
+  income_tax: number;
+  other_deductions: number;
+  net_pay: number;
+  total_employer_cost: number;
+}
