@@ -17,6 +17,11 @@ export async function createExpense(
   context: PolicyContext
 ) {
   try {
+    // Validate amount is positive
+    if (expenseData.amount <= 0) {
+      throw new Error('Expense amount must be greater than 0');
+    }
+
     // Validate that accounts exist (fail fast)
     const accounts = await persistenceService.getAccounts();
     const expenseAccount = accounts.find(a => a.id === expenseData.expense_account_id);

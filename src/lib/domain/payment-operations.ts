@@ -17,6 +17,11 @@ export async function createPayment(
   context: PolicyContext
 ) {
   try {
+    // Validate payment amount is positive
+    if (paymentData.amount <= 0) {
+      throw new Error('Payment amount must be greater than 0');
+    }
+
     // Get required accounts first (fail fast if missing)
     const accounts = await persistenceService.getAccounts();
     const cashAccount = accounts.find(a => a.code === '1010'); // Checking Account
@@ -26,10 +31,13 @@ export async function createPayment(
       throw new Error('Required accounts not found. Please ensure accounts 1010 (Cash) and 1100 (A/R) exist.');
     }
 
-    // Validate that all invoice IDs exist
+    // Validate that all invoice IDs exist and allocation amounts are positive
     if (allocations.length > 0) {
       const invoices = await persistenceService.getInvoices();
       for (const allocation of allocations) {
+        if (allocation.amount <= 0) {
+          throw new Error(`Allocation amount must be greater than 0`);
+        }
         const invoiceExists = invoices.find(inv => inv.id === allocation.invoice_id);
         if (!invoiceExists) {
           throw new Error(`Invoice ID ${allocation.invoice_id} not found`);

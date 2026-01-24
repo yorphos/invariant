@@ -23,6 +23,14 @@ export async function createInvoice(
     const taxAmount = subtotal * 0.13; // 13% HST
     const totalAmount = subtotal + taxAmount;
 
+    // Validate amounts are positive
+    if (subtotal <= 0) {
+      throw new Error('Invoice subtotal must be greater than 0');
+    }
+    if (totalAmount <= 0) {
+      throw new Error('Invoice total must be greater than 0');
+    }
+
     // Get required accounts first (fail fast if missing)
     const accounts = await persistenceService.getAccounts();
     const arAccount = accounts.find(a => a.code === '1100'); // Accounts Receivable
@@ -32,8 +40,11 @@ export async function createInvoice(
       throw new Error('Required accounts not found. Please ensure accounts 1100 (A/R) and 2220 (HST Payable) exist.');
     }
 
-    // Validate that all line item accounts exist
+    // Validate that all line item accounts exist and amounts are positive
     for (const line of lines) {
+      if (line.amount <= 0) {
+        throw new Error(`Line item "${line.description}" must have an amount greater than 0`);
+      }
       if (line.account_id) {
         const accountExists = accounts.find(a => a.id === line.account_id);
         if (!accountExists) {
