@@ -6,20 +6,34 @@ export default defineConfig({
   plugins: [svelte({ hot: !process.env.VITEST })],
   test: {
     globals: true,
-    environment: 'happy-dom',
-    include: ['src/**/*.{test,spec}.{js,ts}'],
+    include: [
+      'src/tests/unit/**/*.test.ts',
+      'src/tests/integration/**/*.test.ts',
+    ],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'json', 'html', 'lcov'],
       exclude: [
         'node_modules/',
         'src-tauri/',
         'dist/',
         '**/*.spec.ts',
         '**/*.test.ts',
+        'migrations/',
+        'scripts/',
+      ],
+      include: [
+        'src/lib/**/*.{ts,js}',
       ],
     },
-    setupFiles: ['./src/tests/setup.ts'],
+    setupFiles: [
+      './src/tests/setup.ts',
+      './src/tests/integration/setup.ts',
+    ],
+    testTimeout: 30000,
+    hookTimeout: 30000,
+    pool: 'forks',
+    singleFork: true,
   },
   resolve: {
     alias: {
