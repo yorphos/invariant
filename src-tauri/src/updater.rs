@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use tauri::{ipc::Channel, AppHandle, State};
+use tauri::{AppHandle, State};
 
 #[cfg(desktop)]
 use tauri_plugin_updater::{Update, UpdaterExt};
@@ -156,7 +156,6 @@ pub async fn check_for_update(
 /// # Arguments
 /// * `app` - Application handle
 /// * `pending_update` - State containing the pending update
-/// * `on_event` - Channel to send download progress events
 ///
 /// # Returns
 /// Ok(()) on success, Error on failure
@@ -165,7 +164,6 @@ pub async fn check_for_update(
 pub async fn download_and_install_update(
     app: AppHandle,
     pending_update: State<'_, PendingUpdate>,
-    on_event: Channel<DownloadEvent>,
 ) -> Result<()> {
     log::info!("Starting update download and installation");
 
@@ -181,15 +179,15 @@ pub async fn download_and_install_update(
             |chunk_length, content_length| {
                 if !started {
                     log::info!("Download started, content length: {:?}", content_length);
-                    let _ = on_event.send(DownloadEvent::Started { content_length });
+                    let _ = app.emit("download-and-install-update", DownloadEvent::Started { content_length });
                     started = true;
                 }
 
-                let _ = on_event.send(DownloadEvent::Progress { chunk_length });
+                let _ = app.emit("download-and-install-update", DownloadEvent::Progress { chunk_length });
             },
             || {
                 log::info!("Download finished, installing...");
-                let _ = on_event.send(DownloadEvent::Finished);
+                let _ = app.emit("download-and-install-update", DownloadEvent::Finished);
             },
         )
         .await?;
