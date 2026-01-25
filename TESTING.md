@@ -98,21 +98,22 @@ Test Files  17 passed (17)
      Tests  513 passed (513)
 ```
 
-### Integration Tests (98 tests - 100% passing)
+### Integration Tests (114 tests - 100% passing)
 
 ```
 ✓ src/tests/integration/crud.test.ts (18 tests - all passing)
+✓ src/tests/integration/guardrails.test.ts (18 tests - all passing)
 ✓ src/tests/integration/workflow.test.ts (18 tests - all passing)
 ✓ src/tests/integration/migrations.test.ts (62 tests - all passing)
 
-Test Files  2 passed (2)
-     Tests  98 passed (98)
+Test Files  4 passed (4)
+     Tests  114 passed (114)
 ```
 
 #### Test Summary
 
-- **Total Tests:** 611 tests
-- **Passing:** 611 (100%)
+- **Total Tests:** 627 tests
+- **Passing:** 627 (100%)
 - **Failing:** 0
 
 All tests pass successfully!
