@@ -1,4 +1,5 @@
 import { getDatabase } from './database';
+import { getCurrentVersion as getCurrentVersionTauri } from './updater';
 import type {
   Account,
   JournalEntry,
@@ -66,8 +67,7 @@ export class PersistenceService {
   }
 
   async getCurrentVersion(): Promise<string> {
-    // This will be injected by Tauri
-    return '0.2.0';
+    return await getCurrentVersionTauri();
   }
 
   // Account operations
