@@ -86,7 +86,24 @@
       // Check for updates after initialization (non-blocking)
       checkForUpdatesOnStartup();
     } catch (e) {
-      error = `Failed to initialize database: ${e}`;
+      const errorMessage = String(e);
+      error = `Failed to initialize: ${errorMessage}`;
+      
+      // On ANY initialization error, check for updates - there might be a fix
+      try {
+        console.log('Initialization error detected, checking for updates...');
+        const channel = await persistenceService.getUpdateChannel();
+        const update = await checkForUpdate(channel);
+        
+        if (update) {
+          updateAvailable = update;
+          showUpdateModal = true;
+          error = `${error}\n\nA new version (v${update.version}) is available that may fix this issue.`;
+        }
+      } catch (updateError) {
+        console.error('Failed to check for updates:', updateError);
+      }
+      
       console.error(error);
     }
   });
@@ -419,6 +436,17 @@
     <div class="error">
       <h2>Error</h2>
       <p>{error}</p>
+      <div class="error-actions">
+        <p>This error may be fixed by updating to the latest version.</p>
+        <button onclick={handleManualUpdateCheck}>
+          Check for Updates
+        </button>
+        {#if updateAvailable}
+          <button onclick={() => showUpdateModal = true} class="primary">
+            Install Update v{updateAvailable.version}
+          </button>
+        {/if}
+      </div>
     </div>
   {:else if !dbReady}
     <div class="loading">
@@ -1330,10 +1358,47 @@
     font-size: 24px;
   }
 
-  .loading p, .error p {
+  .loading p,   .error p {
     margin: 0;
     color: #7f8c8d;
-    max-width: 500px;
+    max-width: 600px;
+  }
+
+  .error-actions {
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .error-actions p {
+    color: #555;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .error-actions button {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .error-actions button:hover {
+    background: #2980b9;
+  }
+
+  .error-actions button.primary {
+    background: #27ae60;
+  }
+
+  .error-actions button.primary:hover {
+    background: #219a52;
   }
 
   .fiscal-years-list {
