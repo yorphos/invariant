@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.2]
+
+### Added
+- **Auto-update check on initialization errors**: If the app fails to start due to any error, automatically checks for available updates
+- Error screen now includes \"Check for Updates\" button
+- Shows update modal immediately if a new version is available
+- Prevents users being stuck with a broken app when a fix exists
+
+---
+
 ## [0.4.1]
 
 ### Fixed
