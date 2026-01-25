@@ -14,7 +14,11 @@ import type {
   BillLine,
   VendorPayment,
   BillAllocation,
-  PolicyMode
+  PolicyMode,
+  CreditNote,
+  CreditNoteLine,
+  CreditNoteApplication,
+  CreditNoteRefund,
 } from '../domain/types';
 
 /**
@@ -775,6 +779,90 @@ export class PersistenceService {
       );
     }
     return await db.select<BillAllocation[]>('SELECT * FROM bill_allocation');
+  }
+
+  // Credit Note operations
+  async createCreditNote(
+    creditNote: Omit<CreditNote, 'id' | 'created_at' | 'updated_at'>,
+    lines: Omit<CreditNoteLine, 'id' | 'credit_note_id'>[]
+  ): Promise<number> {
+    const db = await getDatabase();
+
+    const creditNoteResult = await db.execute(
+      `INSERT INTO credit_note (credit_note_number, contact_id, event_id, issue_date, status, subtotal, tax_amount, total_amount, applied_amount, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [creditNote.credit_note_number, creditNote.contact_id, creditNote.event_id, creditNote.issue_date,
+       creditNote.status, creditNote.subtotal, creditNote.tax_amount, creditNote.total_amount,
+       creditNote.applied_amount, creditNote.notes]
+    );
+    const creditNoteId = creditNoteResult.lastInsertId ?? 0;
+
+    for (const line of lines) {
+      await db.execute(
+        `INSERT INTO credit_note_line (credit_note_id, line_number, description, quantity, unit_price, amount, is_tax_inclusive, tax_code_id, account_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          creditNoteId,
+          line.line_number,
+          line.description,
+          line.quantity,
+          line.unit_price,
+          line.amount,
+          line.is_tax_inclusive ? 1 : 0,
+          line.tax_code_id,
+          line.account_id,
+        ]
+      );
+    }
+
+    return creditNoteId;
+  }
+
+  async getCreditNotes(contactId?: number): Promise<CreditNote[]> {
+    const db = await getDatabase();
+    if (contactId) {
+      return await db.select<CreditNote[]>(
+        'SELECT * FROM credit_note WHERE contact_id = ? ORDER BY issue_date DESC',
+        [contactId]
+      );
+    }
+    return await db.select<CreditNote[]>(
+      'SELECT * FROM credit_note ORDER BY issue_date DESC'
+    );
+  }
+
+  async getCreditNoteById(id: number): Promise<CreditNote | null> {
+    const db = await getDatabase();
+    const results = await db.select<CreditNote[]>(
+      'SELECT * FROM credit_note WHERE id = ?',
+      [id]
+    );
+    return results.length > 0 ? results[0] : null;
+  }
+
+  async getCreditNoteLines(creditNoteId: number): Promise<CreditNoteLine[]> {
+    const db = await getDatabase();
+    return await db.select<CreditNoteLine[]>(
+      'SELECT * FROM credit_note_line WHERE credit_note_id = ? ORDER BY line_number',
+      [creditNoteId]
+    );
+  }
+
+  async getCreditNoteApplications(creditNoteId?: number, invoiceId?: number): Promise<CreditNoteApplication[]> {
+    const db = await getDatabase();
+    if (creditNoteId) {
+      return await db.select<CreditNoteApplication[]>(
+        'SELECT * FROM credit_note_application WHERE credit_note_id = ? ORDER BY application_date DESC',
+        [creditNoteId]
+      );
+    }
+    if (invoiceId) {
+      return await db.select<CreditNoteApplication[]>(
+        'SELECT * FROM credit_note_application WHERE invoice_id = ? ORDER BY application_date DESC',
+        [invoiceId]
+      );
+    }
+    return await db.select<CreditNoteApplication[]>('SELECT * FROM credit_note_application ORDER BY application_date DESC');
   }
 }
 

@@ -7,7 +7,7 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 [![Status](https://img.shields.io/badge/Status-Phase%208%20Complete-brightgreen)]()
 [![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
-[![Tests](https://img.shields.io/badge/Tests-501%20Passing-success)]()
+[![Tests](https://img.shields.io/badge/Tests-531%20Passing-success)]()
 [![Migrations](https://img.shields.io/badge/Migrations-17-blue)]()
 
 ---
@@ -24,7 +24,7 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 
 ## ✨ Features
 
-### Current Release (Phase 8 Complete)
+### Current Release (Phase 9 Complete)
 
 #### 🔄 Auto-Update System (Phase 8 - Latest)
 - **Automatic Update Checking** - Check for updates on app startup
@@ -582,18 +582,25 @@ All business logic belongs in `src/lib/domain/`:
 ### 🚧 Future Phases
 
 #### Phase 9: Advanced Features
+- [x] **Credit Notes & Refunds** (NEW)
+  - Credit note creation with proper double-entry accounting (CR A/R, CR Revenue, CR Tax)
+  - Credit note application to outstanding invoices
+  - Cash refunds with reversal journal entries
+  - Credit note voiding with reversal entries
+  - Status tracking (Draft, Issued, Applied, Partial, Void)
+  - Available amount tracking
+- Full audit trail for all operations
+- Database triggers for automatic totals and applied amount updates
+
+#### Phase 10: Extended Functionality
 - [ ] Additional file format support (OFX, QBO)
 - [ ] Advanced auto-categorization rules
 - [ ] Custom report builder
 - [ ] Date range filtering for reports
-
-#### Phase 10: Extended Functionality
 - [ ] Multi-currency support with exchange rates
 - [ ] Inventory tracking and COGS calculation
 - [ ] Payroll processing with tax withholdings
 - [ ] Budgeting and forecasting
-
-#### Phase 11: Collaboration
 - [ ] Multi-user support with permissions
 - [ ] Optional cloud sync (encrypted)
 - [ ] Accountant collaboration mode
