@@ -73,7 +73,7 @@ export async function closeTestDatabase(): Promise<void> {
   }
 }
 
-export async function resetTestDatabase(): Promise<void> {
+export async function resetTestDatabase(): Promise<Database.Database> {
   await closeTestDatabase();
   return await getTestDatabase();
 }
