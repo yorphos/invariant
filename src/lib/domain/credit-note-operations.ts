@@ -63,7 +63,7 @@ async function validateAndRecalculateCreditNote(
 
   const { taxAmount, taxRate, accountId: taxAccountId, netSubtotal } = await calculateTax(
     subtotal,
-    creditNoteData.tax_code_id,
+    creditNoteData.tax_code_id ?? 1,
     creditNoteData.issue_date,
     hasTaxInclusiveLines
   );

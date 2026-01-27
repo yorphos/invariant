@@ -3,16 +3,17 @@
   export let padding = true;
 </script>
 
-<div class="card" class:no-padding={!padding}>
-  {#if title}
-    <div class="card-header">
-      <h3>{title}</h3>
-    </div>
-  {/if}
-  <div class="card-content">
-    <slot />
-  </div>
-</div>
+ <div class="card" class:no-padding={!padding}>
+   {#if title}
+     <div class="card-header">
+       <h3>{title}</h3>
+       <slot name="actions" />
+     </div>
+   {/if}
+   <div class="card-content">
+     <slot />
+   </div>
+ </div>
 
 <style>
   .card {

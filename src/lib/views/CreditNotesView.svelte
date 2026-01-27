@@ -51,6 +51,13 @@
     : subtotal * taxRate;
   $: total = taxInclusivePricing ? subtotal : subtotal + taxAmount;
 
+  $: if (formSelectedCreditNote) {
+    selectedCreditNote = creditNotes.find(cn => cn.id === Number(formSelectedCreditNote)) || null;
+  }
+  $: if (formSelectedInvoice) {
+    selectedInvoice = invoices.find(inv => inv.id === Number(formSelectedInvoice)) || null;
+  }
+
   onMount(async () => {
     await loadData();
   });
@@ -178,22 +185,6 @@
     }
   }
 
-      if (result.ok) {
-        toasts.success('Credit note applied successfully');
-        view = 'list';
-        await loadData();
-        selectedCreditNote = null;
-        selectedInvoice = null;
-        applyAmount = 0;
-      } else {
-        toasts.error(result.warnings[0]?.message || 'Failed to apply credit note');
-      }
-    } catch (e) {
-      console.error('Apply credit note error:', e);
-      toasts.error('Failed to apply credit note');
-    }
-  }
-
   async function handleRefund() {
     if (!selectedCreditNote || !refundNumber || !refundAmount) {
       toasts.error('Please fill in all fields');
@@ -221,23 +212,7 @@
       } else {
         toasts.error(result.warnings[0]?.message || 'Failed to process refund');
       }
-    } catch (e) {
-      console.error('Refund error:', e);
-      toasts.error('Failed to process refund');
-    }
-  }
-
-      if (result.ok) {
-        toasts.success('Refund processed successfully');
-        view = 'list';
-        await loadData();
-        selectedCreditNote = null;
-        refundNumber = '';
-        refundAmount = 0;
-      } else {
-        toasts.error(result.warnings[0]?.message || 'Failed to process refund');
-      }
-    } catch (e) {
+      } catch (e) {
       console.error('Refund error:', e);
       toasts.error('Failed to process refund');
     }
@@ -259,21 +234,6 @@
         selectedCreditNote = null;
         voidReason = '';
         formSelectedCreditNote = '';
-      } else {
-        toasts.error(result.warnings[0]?.message || 'Failed to void credit note');
-      }
-    } catch (e) {
-      console.error('Void credit note error:', e);
-      toasts.error('Failed to void credit note');
-    }
-  }
-
-      if (result.ok) {
-        toasts.success('Credit note voided successfully');
-        view = 'list';
-        await loadData();
-        selectedCreditNote = null;
-        voidReason = '';
       } else {
         toasts.error(result.warnings[0]?.message || 'Failed to void credit note');
       }
@@ -456,7 +416,7 @@
         <div class="space-y-4">
           <Select
             label="Credit Note"
-            bind:value={selectedCreditNote as string | number}
+            bind:value={formSelectedCreditNote}
             options={creditNotes
               .filter(cn => cn.status === 'issued' || cn.status === 'partial')
               .map(cn => ({
@@ -501,7 +461,7 @@
         <div class="space-y-4">
           <Select
             label="Credit Note"
-            bind:value={selectedCreditNote as string | number}
+            bind:value={formSelectedCreditNote}
             options={creditNotes
               .filter(cn => cn.status === 'issued' || cn.status === 'partial')
               .map(cn => ({
@@ -548,10 +508,10 @@
             label="Credit Note"
             bind:value={formSelectedCreditNote}
             options={creditNotes
-              .filter(cn => cn.status !== 'void')
+              .filter(cn => cn.status === 'issued' || cn.status === 'partial')
               .map(cn => ({
                 value: cn.id!.toString(),
-                label: cn.credit_note_number
+                label: `${cn.credit_note_number} - $${(cn.total_amount - cn.applied_amount).toFixed(2)} available`
               }))}
             placeholder="Select credit note"
           />
@@ -580,20 +540,19 @@
   {/if}
 </div>
 
-{#if showModal && selectedCreditNote}
-  <Modal open={showModal} title={selectedCreditNote.credit_note_number} onclose={() => { showModal = false; selectedCreditNote = null; }}>
-    <div class="space-y-4">
-      {@const customer = contacts.find(c => c.id === selectedCreditNote.contact_id)}
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-          <p class="text-gray-900">{customer?.name || '-'}</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
-          <p class="text-gray-900">{selectedCreditNote.issue_date}</p>
-        </div>
-      </div>
+ {#if showModal && selectedCreditNote}
+   <Modal open={showModal} title={selectedCreditNote!.credit_note_number} onclose={() => { showModal = false; selectedCreditNote = null; }}>
+     <div class="space-y-4">
+       <div class="grid grid-cols-2 gap-4">
+         <div>
+           <label class="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+           <p class="text-gray-900">{contacts.find(c => c.id === selectedCreditNote!.contact_id)?.name || '-'}</p>
+         </div>
+         <div>
+           <label class="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
+           <p class="text-gray-900">{selectedCreditNote!.issue_date}</p>
+         </div>
+       </div>
 
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -625,15 +584,15 @@
       {/if}
 
       <div class="flex gap-2 justify-end pt-4 border-t">
-        {#if (selectedCreditNote.status === 'issued' || selectedCreditNote.status === 'partial')}
-          <Button variant="secondary" on:click={() => { showModal = false; view = 'apply'; applyAmount = (selectedCreditNote.total_amount - selectedCreditNote.applied_amount); }}>
+        {#if (selectedCreditNote!.status === 'issued' || selectedCreditNote!.status === 'partial')}
+          <Button variant="secondary" on:click={() => { showModal = false; view = 'apply'; applyAmount = (selectedCreditNote!.total_amount - selectedCreditNote!.applied_amount); }}>
             Apply to Invoice
           </Button>
-          <Button variant="secondary" on:click={() => { showModal = false; view = 'refund'; refundAmount = (selectedCreditNote.total_amount - selectedCreditNote.applied_amount); }}>
+          <Button variant="secondary" on:click={() => { showModal = false; view = 'refund'; refundAmount = (selectedCreditNote!.total_amount - selectedCreditNote!.applied_amount); }}>
             Refund
           </Button>
         {/if}
-        {#if selectedCreditNote.status !== 'void' && selectedCreditNote.applied_amount === 0}
+        {#if selectedCreditNote!.status !== 'void' && selectedCreditNote!.applied_amount === 0}
           <Button variant="danger" on:click={() => { showModal = false; view = 'void'; }}>
             Void
           </Button>
