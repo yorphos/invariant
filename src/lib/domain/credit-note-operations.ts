@@ -185,12 +185,9 @@ export async function createCreditNote(
       warnings: [],
     };
   } catch (error) {
-    console.error('Credit note creation error:', error);
-
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {
       errorMessage = error.message;
-      console.error('Error stack:', error.stack);
 
       if (errorMessage.includes('1811')) {
         errorMessage = 'Database integrity error (1811). This may be caused by database corruption or trigger issues. Please try again.';
@@ -325,8 +322,6 @@ export async function applyCreditNote(
       warnings: [],
     };
   } catch (error) {
-    console.error('Credit note application error:', error);
-
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {
       errorMessage = error.message;
@@ -434,8 +429,6 @@ export async function refundCreditNote(
       warnings: [],
     };
   } catch (error) {
-    console.error('Credit note refund error:', error);
-
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {
       errorMessage = error.message;
@@ -550,8 +543,6 @@ export async function voidCreditNote(
       warnings: [],
     };
   } catch (error) {
-    console.error('Credit note void error:', error);
-
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {
       errorMessage = error.message;
