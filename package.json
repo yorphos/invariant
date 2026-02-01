@@ -20,6 +20,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
+    "test:stats": "vitest run && echo '' && echo 'For detailed statistics, run: npm run test:run'",
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
@@ -28,6 +29,7 @@
     "@tsconfig/svelte": "^5.0.6",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.10.1",
+    "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.18",
     "better-sqlite3": "^12.6.2",
     "happy-dom": "^20.3.7",

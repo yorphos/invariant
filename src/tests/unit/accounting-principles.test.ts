@@ -1,6 +1,20 @@
 /**
  * Accounting Principles Unit Tests
- * Tests for core accounting business logic and validation rules
+ *
+ * IMPORTANT: These tests demonstrate accounting principles through inline calculations.
+ * These are documentation/example tests showing how accounting SHOULD work,
+ * not tests of actual code functions.
+ *
+ * For tests of actual code implementation, see:
+ * - ap-operations.test.ts (bill operations)
+ * - ar-matching.test.ts (payment allocation)
+ * - Other domain operation test files
+ *
+ * Purpose of this file:
+ * - Demonstrate double-entry bookkeeping principles
+ * - Show FIFO allocation logic
+ * - Illustrate validation rules
+ * - Document precision handling (floating-point, rounding)
  */
 
 import { describe, it, expect } from 'vitest';
