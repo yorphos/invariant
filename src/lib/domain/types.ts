@@ -3,6 +3,7 @@
 export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
 export type JournalStatus = 'draft' | 'posted' | 'void';
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'partial' | 'overdue' | 'void';
+export type CreditNoteStatus = 'draft' | 'issued' | 'applied' | 'partial' | 'void';
 export type PaymentStatus = 'pending' | 'allocated' | 'partial' | 'reconciled';
 export type BillStatus = 'draft' | 'pending' | 'paid' | 'partial' | 'overdue' | 'void';
 export type VendorPaymentStatus = 'pending' | 'allocated' | 'partial' | 'cleared';
@@ -97,6 +98,59 @@ export interface InvoiceLine {
   is_tax_inclusive?: boolean;
   tax_code_id?: number;
   account_id?: number;
+}
+
+export interface CreditNote {
+  id?: number;
+  credit_note_number: string;
+  contact_id: number;
+  event_id?: number;
+  issue_date: string;
+  status: CreditNoteStatus;
+  subtotal: number;
+  tax_amount: number;
+  total_amount: number;
+  applied_amount: number;
+  tax_code_id?: number;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreditNoteLine {
+  id?: number;
+  credit_note_id?: number;
+  line_number: number;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  amount: number;
+  is_tax_inclusive?: boolean;
+  tax_code_id?: number;
+  account_id?: number;
+}
+
+export interface CreditNoteApplication {
+  id?: number;
+  credit_note_id: number;
+  invoice_id: number;
+  amount: number;
+  application_date: string;
+  notes?: string;
+  created_at?: string;
+}
+
+export interface CreditNoteRefund {
+  id?: number;
+  credit_note_id: number;
+  refund_number: string;
+  refund_date: string;
+  amount: number;
+  payment_method?: PaymentMethod;
+  reference?: string;
+  notes?: string;
+  event_id?: number;
+  created_at?: string;
 }
 
 export interface Payment {

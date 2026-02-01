@@ -14,6 +14,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.2]
 
 ### Added
+- **Credit Notes & Refunds** - New feature for handling returns and adjustments
+  - **Credit Note Creation** - Full double-entry accounting with CR A/R, CR Revenue, CR Tax
+  - **Credit Note Application** - Apply credit notes to outstanding invoices
+  - **Cash Refunds** - Process cash refunds with proper reversal entries
+  - **Credit Note Voiding** - Create reversal journal entries for voided credit notes
+  - **Status Tracking** - Draft, Issued, Applied, Partial, Void
+  - **Available Amount Tracking** - Prevents over-application
+  - **Database Schema** - New tables: credit_note, credit_note_line, credit_note_application, credit_note_refund
+  - **Database Migration** - Migration 018 with triggers and indexes
+- - **Domain Operations** - New file: credit-note-operations.ts with all CRUD operations
+- - **Persistence Layer** - Extended with credit note CRUD operations
+- - **UI Component** - CreditNotesView.svelte with full workflows
+- - **Navigation** - Added Credit Notes entry to sidebar
+
+### Technical Details
+- New files:
+  - migrations/018_credit_notes.ts (Database schema + triggers)
+  - src/lib/domain/credit-note-operations.ts (Domain logic)
+  - src/lib/views/CreditNotesView.svelte (UI component)
+  - Updated App.svelte (Navigation)
+
+- Database Migration 018:
+  - credit_note table (header, lines, status tracking, applied_amount)
+  - credit_note_line table (line items)
+  - credit_note_application table (applications to invoices)
+  - credit_note_refund table (cash refunds)
+  - Triggers for automatic totals and status updates
+
+- Domain Logic Features:
+  - Server-side validation for all operations
+  - Tax-inclusive pricing support
+  - Proper double-entry journal entries for all workflows
+  - Complete audit trail with transaction events
+
+### Accounting Principles Maintained
+- All journal entries balance (debits = credits)
+- Double-entry enforced via database triggers
+- Credit notes create DR Revenue / CR A/R entries (opposite of invoices)
+- Refunds create CR Cash / DR A/R entries (opposite of credit notes)
+- Applications update A/R balances correctly
+- Void operations create proper reversals
+
+### Added
 - **Auto-update check on initialization errors**: If the app fails to start due to any error, automatically checks for available updates
 - Error screen now includes \"Check for Updates\" button
 - Shows update modal immediately if a new version is available
