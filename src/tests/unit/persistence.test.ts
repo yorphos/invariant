@@ -226,7 +226,7 @@ describe('Persistence Service - Invoice Operations', () => {
       paid_amount: 0,
     };
 
-    await persistenceService.createInvoice(invoice);
+    await persistenceService.createInvoice(invoice, []);
   });
 });
 
@@ -500,7 +500,7 @@ describe('Persistence Service - Data Integrity', () => {
       paid_amount: 0,
     };
 
-    await persistenceService.createInvoice(invoice);
+    await persistenceService.createInvoice(invoice, []);
   });
 
   it('should handle unique constraints', async () => {
