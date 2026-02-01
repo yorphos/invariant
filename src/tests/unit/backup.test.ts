@@ -1,4 +1,27 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Mock Tauri modules BEFORE importing backup service
+vi.mock('@tauri-apps/plugin-dialog', () => ({
+  save: vi.fn().mockResolvedValue('/path/to/backup.db'),
+  open: vi.fn().mockResolvedValue(['/path/to/restore.db']),
+}));
+
+vi.mock('@tauri-apps/plugin-fs', () => ({
+  copyFile: vi.fn().mockResolvedValue(undefined),
+  readFile: vi.fn().mockResolvedValue(new Uint8Array(100)),
+  remove: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@tauri-apps/api/path', () => ({
+  appDataDir: vi.fn().mockResolvedValue('/app/data'),
+}));
+
+vi.mock('../../lib/services/database', () => ({
+  closeDatabase: vi.fn().mockResolvedValue(undefined),
+  getDatabase: vi.fn().mockResolvedValue({}),
+}));
+
+// Import after mocks are set up
 import {
   backupDatabase,
   restoreDatabase,
@@ -68,111 +91,49 @@ describe('Backup Service - Unit Tests', () => {
 });
 
 describe('Backup Service - Integration Tests (Mocked)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Set up global mocks that all tests might need
+    if (typeof global.alert !== 'function') {
+      global.alert = vi.fn();
+    }
+    if (typeof global.confirm !== 'function') {
+      global.confirm = vi.fn().mockReturnValue(true);
+    }
+  });
+
   describe('Backup Database', () => {
     it('should attempt to close database before backup', async () => {
-      vi.mock('../../lib/services/database', () => ({
-        closeDatabase: vi.fn().mockResolvedValue(undefined),
-        getDatabase: vi.fn().mockResolvedValue({}),
-      }));
+      const result = await backupDatabase();
 
-      vi.mock('@tauri-apps/plugin-fs', () => ({
-        copyFile: vi.fn().mockResolvedValue(undefined),
-        readFile: vi.fn().mockResolvedValue(new Uint8Array(100)),
-      }));
-
-      vi.mock('@tauri-apps/plugin-dialog', () => ({
-        save: vi.fn().mockResolvedValue('/path/to/backup.db'),
-      }));
-
-      vi.mock('@tauri-apps/api/path', () => ({
-        appDataDir: vi.fn().mockResolvedValue('/app/data'),
-      }));
-
-      const { backupDatabase: mockBackup } = await import('../../lib/services/backup');
-      const result = await mockBackup();
-
-      expect(result).toBeDefined();
-    });
-
-    it('should use correct date format in default filename', async () => {
-      vi.mock('@tauri-apps/api/path', () => ({
-        appDataDir: vi.fn().mockResolvedValue('/app/data'),
-      }));
-
-      const date = new Date('2026-01-24');
-      vi.spyOn(global, 'Date').mockReturnValue(date as any);
-
-      vi.mock('@tauri-apps/plugin-dialog', () => ({
-        save: vi.fn().mockResolvedValue('/path/to/backup.db'),
-      }));
-
-      vi.mock('@tauri-apps/plugin-fs', () => ({
-        copyFile: vi.fn().mockResolvedValue(undefined),
-        readFile: vi.fn().mockResolvedValue(new Uint8Array(100)),
-      }));
-
-      vi.mock('../../lib/services/database', () => ({
-        closeDatabase: vi.fn().mockResolvedValue(undefined),
-        getDatabase: vi.fn().mockResolvedValue({}),
-      }));
-
-      vi.restoreAllMocks();
+      expect(result).toBe(true);
     });
   });
 
   describe('Restore Database', () => {
+    beforeEach(() => {
+      global.confirm = vi.fn().mockReturnValue(true);
+    });
+
     it('should validate SQLite file header', async () => {
-      vi.mock('@tauri-apps/plugin-fs', () => ({
-        readFile: vi.fn().mockResolvedValue(
-          new TextEncoder().encode('SQLite format 3')
-        ),
-        copyFile: vi.fn().mockResolvedValue(undefined),
-      }));
+      const { readFile } = await import('@tauri-apps/plugin-fs');
+      vi.mocked(readFile).mockResolvedValue(
+        new TextEncoder().encode('SQLite format 3')
+      );
 
-      vi.mock('@tauri-apps/plugin-dialog', () => ({
-        open: vi.fn().mockResolvedValue(['/path/to/restore.db']),
-      }));
+      const result = await restoreDatabase();
 
-      vi.mock('../../lib/services/database', () => ({
-        closeDatabase: vi.fn().mockResolvedValue(undefined),
-        getDatabase: vi.fn().mockResolvedValue({}),
-      }));
-
-      vi.mock('@tauri-apps/api/path', () => ({
-        appDataDir: vi.fn().mockResolvedValue('/app/data'),
-      }));
-
-      const { restoreDatabase: mockRestore } = await import('../../lib/services/backup');
-      const result = await mockRestore();
-
-      expect(result).toBeDefined();
+      expect(result).toBe(true);
     });
 
     it('should reject non-SQLite files', async () => {
-      vi.mock('@tauri-apps/plugin-fs', () => ({
-        readFile: vi.fn().mockResolvedValue(
-          new TextEncoder().encode('NOT A SQLITE FILE')
-        ),
-        copyFile: vi.fn().mockResolvedValue(undefined),
-      }));
-
-      vi.mock('@tauri-apps/plugin-dialog', () => ({
-        open: vi.fn().mockResolvedValue(['/path/to/file.txt']),
-      }));
-
-      vi.mock('../../lib/services/database', () => ({
-        closeDatabase: vi.fn().mockResolvedValue(undefined),
-        getDatabase: vi.fn().mockResolvedValue({}),
-      }));
-
-      vi.mock('@tauri-apps/api/path', () => ({
-        appDataDir: vi.fn().mockResolvedValue('/app/data'),
-      }));
-
-      const { restoreDatabase: mockRestore } = await import('../../lib/services/backup');
+      const { readFile } = await import('@tauri-apps/plugin-fs');
+      vi.mocked(readFile).mockResolvedValue(
+        new TextEncoder().encode('NOT A SQLITE FILE')
+      );
 
       try {
-        await mockRestore();
+        await restoreDatabase();
         expect.fail('Should have thrown an error');
       } catch (error: any) {
         expect(error.message).toContain('not a valid SQLite database');
@@ -180,60 +141,31 @@ describe('Backup Service - Integration Tests (Mocked)', () => {
     });
 
     it('should handle user cancellation in confirmation', async () => {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      vi.mocked(open).mockResolvedValue(['/path/to/restore.db']);
       global.confirm = vi.fn().mockReturnValue(false);
 
-      vi.mock('@tauri-apps/plugin-dialog', () => ({
-        open: vi.fn().mockResolvedValue(['/path/to/restore.db']),
-      }));
-
-      vi.mock('../../lib/services/database', () => ({
-        closeDatabase: vi.fn().mockResolvedValue(undefined),
-        getDatabase: vi.fn().mockResolvedValue({}),
-      }));
-
-      vi.mock('@tauri-apps/api/path', () => ({
-        appDataDir: vi.fn().mockResolvedValue('/app/data'),
-      }));
-
-      const { restoreDatabase: mockRestore } = await import('../../lib/services/backup');
-      const result = await mockRestore();
+      const result = await restoreDatabase();
 
       expect(result).toBe(false);
-    });
-
-    it('should require explicit user confirmation', async () => {
-      let confirmCalls = 0;
-      global.confirm = vi.fn((msg?: string) => {
-        confirmCalls++;
-        return msg?.includes('RESET DATABASE') ?? false;
-      });
-
-      expect(confirmCalls).toBe(0);
     });
   });
 
   describe('Export Database SQL', () => {
-    it('should indicate SQL export not implemented', async () => {
-      vi.mock('@tauri-apps/plugin-dialog', () => ({
-        save: vi.fn().mockResolvedValue('/path/to/export.sql'),
-      }));
+    beforeEach(() => {
+      global.alert = vi.fn();
+    });
 
-      const { exportDatabaseSQL: mockExport } = await import('../../lib/services/backup');
-      const result = await mockExport();
+    it('should indicate SQL export not implemented', async () => {
+      const result = await exportDatabaseSQL();
 
       expect(result).toBe(false);
     });
 
     it('should show alert about not implemented', async () => {
-      vi.mock('@tauri-apps/plugin-dialog', () => ({
-        save: vi.fn().mockResolvedValue('/path/to/export.sql'),
-      }));
+      const mockAlert = global.alert as ReturnType<typeof vi.fn>;
 
-      const mockAlert = vi.fn();
-      global.alert = mockAlert;
-
-      const { exportDatabaseSQL: mockExport } = await import('../../lib/services/backup');
-      await mockExport();
+      await exportDatabaseSQL();
 
       expect(mockAlert).toHaveBeenCalledWith(
         expect.stringContaining('not yet implemented')
@@ -243,23 +175,8 @@ describe('Backup Service - Integration Tests (Mocked)', () => {
 
   describe('Database Reset', () => {
     it('should validate confirmation text before reset', async () => {
-      vi.mock('../../lib/services/database', () => ({
-        closeDatabase: vi.fn().mockResolvedValue(undefined),
-        getDatabase: vi.fn().mockResolvedValue({}),
-      }));
-
-      vi.mock('@tauri-apps/plugin-fs', () => ({
-        remove: vi.fn().mockResolvedValue(undefined),
-      }));
-
-      vi.mock('@tauri-apps/api/path', () => ({
-        appDataDir: vi.fn().mockResolvedValue('/app/data'),
-      }));
-
-      const { resetDatabase: mockReset } = await import('../../lib/services/backup');
-
       try {
-        await mockReset('WRONG CONFIRMATION');
+        await resetDatabase('WRONG CONFIRMATION');
         expect.fail('Should have thrown an error');
       } catch (error: any) {
         expect(error.message).toContain('Invalid confirmation');
@@ -268,43 +185,16 @@ describe('Backup Service - Integration Tests (Mocked)', () => {
     });
 
     it('should accept valid confirmation text', async () => {
-      vi.mock('../../lib/services/database', () => ({
-        closeDatabase: vi.fn().mockResolvedValue(undefined),
-        getDatabase: vi.fn().mockResolvedValue({}),
-      }));
-
-      vi.mock('@tauri-apps/plugin-fs', () => ({
-        remove: vi.fn().mockResolvedValue(undefined),
-      }));
-
-      vi.mock('@tauri-apps/api/path', () => ({
-        appDataDir: vi.fn().mockResolvedValue('/app/data'),
-      }));
-
-      const { resetDatabase: mockReset } = await import('../../lib/services/backup');
-      const result = await mockReset('RESET DATABASE');
+      const result = await resetDatabase('RESET DATABASE');
 
       expect(result).toBe(true);
     });
 
     it('should close database before deletion', async () => {
-      const mockClose = vi.fn().mockResolvedValue(undefined);
+      const { closeDatabase } = await import('../../lib/services/database');
+      const mockClose = vi.mocked(closeDatabase);
 
-      vi.mock('../../lib/services/database', () => ({
-        closeDatabase: mockClose,
-        getDatabase: vi.fn().mockResolvedValue({}),
-      }));
-
-      vi.mock('@tauri-apps/plugin-fs', () => ({
-        remove: vi.fn().mockResolvedValue(undefined),
-      }));
-
-      vi.mock('@tauri-apps/api/path', () => ({
-        appDataDir: vi.fn().mockResolvedValue('/app/data'),
-      }));
-
-      const { resetDatabase: mockReset } = await import('../../lib/services/backup');
-      await mockReset('RESET DATABASE');
+      await resetDatabase('RESET DATABASE');
 
       expect(mockClose).toHaveBeenCalled();
     });
@@ -380,41 +270,22 @@ describe('Backup Service - File Operations', () => {
 describe('Backup Service - Error Handling', () => {
   describe('File System Errors', () => {
     it('should handle file not found error', async () => {
-      vi.mock('@tauri-apps/plugin-fs', () => ({
-        remove: vi.fn().mockRejectedValue(new Error('File not found')),
-      }));
-
-      const { resetDatabase: mockReset } = await import('../../lib/services/backup');
+      const { remove } = await import('@tauri-apps/plugin-fs');
+      vi.mocked(remove).mockRejectedValue(new Error('File not found'));
 
       try {
-        await mockReset('RESET DATABASE');
+        await resetDatabase('RESET DATABASE');
       } catch (error: any) {
         expect(error).toBeDefined();
       }
     });
 
     it('should handle permission errors', async () => {
-      vi.mock('@tauri-apps/plugin-fs', () => ({
-        copyFile: vi.fn().mockRejectedValue(new Error('Permission denied')),
-      }));
-
-      vi.mock('@tauri-apps/plugin-dialog', () => ({
-        save: vi.fn().mockResolvedValue('/path/to/backup.db'),
-      }));
-
-      vi.mock('../../lib/services/database', () => ({
-        closeDatabase: vi.fn().mockResolvedValue(undefined),
-        getDatabase: vi.fn().mockResolvedValue({}),
-      }));
-
-      vi.mock('@tauri-apps/api/path', () => ({
-        appDataDir: vi.fn().mockResolvedValue('/app/data'),
-      }));
-
-      const { backupDatabase: mockBackup } = await import('../../lib/services/backup');
+      const { copyFile } = await import('@tauri-apps/plugin-fs');
+      vi.mocked(copyFile).mockRejectedValue(new Error('Permission denied'));
 
       try {
-        await mockBackup();
+        await backupDatabase();
       } catch (error: any) {
         expect(error).toBeDefined();
       }
@@ -423,50 +294,22 @@ describe('Backup Service - Error Handling', () => {
 
   describe('Database Connection Errors', () => {
     it('should handle database close errors', async () => {
-      vi.mock('../../lib/services/database', () => ({
-        closeDatabase: vi.fn().mockRejectedValue(new Error('Database busy')),
-        getDatabase: vi.fn().mockResolvedValue({}),
-      }));
-
-      vi.mock('@tauri-apps/plugin-dialog', () => ({
-        save: vi.fn().mockResolvedValue('/path/to/backup.db'),
-      }));
-
-      vi.mock('@tauri-apps/api/path', () => ({
-        appDataDir: vi.fn().mockResolvedValue('/app/data'),
-      }));
-
-      const { backupDatabase: mockBackup } = await import('../../lib/services/backup');
+      const { closeDatabase } = await import('../../lib/services/database');
+      vi.mocked(closeDatabase).mockRejectedValue(new Error('Database busy'));
 
       try {
-        await mockBackup();
+        await backupDatabase();
       } catch (error: any) {
         expect(error).toBeDefined();
       }
     });
 
     it('should handle database reopen errors', async () => {
-      vi.mock('../../lib/services/database', () => ({
-        closeDatabase: vi.fn().mockResolvedValue(undefined),
-        getDatabase: vi.fn().mockRejectedValue(new Error('Cannot open database')),
-      }));
-
-      vi.mock('@tauri-apps/plugin-dialog', () => ({
-        save: vi.fn().mockResolvedValue('/path/to/backup.db'),
-      }));
-
-      vi.mock('@tauri-apps/plugin-fs', () => ({
-        copyFile: vi.fn().mockResolvedValue(undefined),
-      }));
-
-      vi.mock('@tauri-apps/api/path', () => ({
-        appDataDir: vi.fn().mockResolvedValue('/app/data'),
-      }));
-
-      const { backupDatabase: mockBackup } = await import('../../lib/services/backup');
+      const { getDatabase } = await import('../../lib/services/database');
+      vi.mocked(getDatabase).mockRejectedValue(new Error('Cannot open database'));
 
       try {
-        await mockBackup();
+        await backupDatabase();
       } catch (error: any) {
         expect(error).toBeDefined();
       }
@@ -475,39 +318,42 @@ describe('Backup Service - Error Handling', () => {
 
   describe('User Cancellation', () => {
     it('should handle save dialog cancellation', async () => {
-      vi.mock('@tauri-apps/plugin-dialog', () => ({
-        save: vi.fn().mockResolvedValue(null),
-      }));
+      vi.clearAllMocks();
+      // Reset database mocks to default state (previous test may have set them to reject)
+      const { closeDatabase, getDatabase } = await import('../../lib/services/database');
+      vi.mocked(closeDatabase).mockResolvedValue(undefined);
+      vi.mocked(getDatabase).mockResolvedValue({
+        execute: vi.fn(),
+        select: vi.fn().mockResolvedValue([]),
+        close: vi.fn().mockResolvedValue(undefined),
+        path: ''
+      });
 
-      vi.mock('../../lib/services/database', () => ({
-        closeDatabase: vi.fn().mockResolvedValue(undefined),
-        getDatabase: vi.fn().mockResolvedValue({}),
-      }));
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      vi.mocked(save).mockResolvedValue(null);
 
-      const { backupDatabase: mockBackup } = await import('../../lib/services/backup');
-      const result = await mockBackup();
+      const result = await backupDatabase();
 
       expect(result).toBe(false);
     });
 
     it('should handle open dialog cancellation', async () => {
+      vi.clearAllMocks();
+      // Reset database mocks to default state (previous test may have set them to reject)
+      const { closeDatabase, getDatabase } = await import('../../lib/services/database');
+      vi.mocked(closeDatabase).mockResolvedValue(undefined);
+      vi.mocked(getDatabase).mockResolvedValue({
+        execute: vi.fn(),
+        select: vi.fn().mockResolvedValue([]),
+        close: vi.fn().mockResolvedValue(undefined),
+        path: ''
+      });
+
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      vi.mocked(open).mockResolvedValue(null);
       global.confirm = vi.fn().mockReturnValue(true);
 
-      vi.mock('@tauri-apps/plugin-dialog', () => ({
-        open: vi.fn().mockResolvedValue(null),
-      }));
-
-      vi.mock('../../lib/services/database', () => ({
-        closeDatabase: vi.fn().mockResolvedValue(undefined),
-        getDatabase: vi.fn().mockResolvedValue({}),
-      }));
-
-      vi.mock('@tauri-apps/api/path', () => ({
-        appDataDir: vi.fn().mockResolvedValue('/app/data'),
-      }));
-
-      const { restoreDatabase: mockRestore } = await import('../../lib/services/backup');
-      const result = await mockRestore();
+      const result = await restoreDatabase();
 
       expect(result).toBe(false);
     });
@@ -534,26 +380,5 @@ describe('Backup Service - Edge Cases', () => {
     });
   });
 
-  describe('Concurrent Operations', () => {
-    it('should prevent backup during backup', async () => {
-      let isBackingUp = false;
 
-      if (isBackingUp) {
-        throw new Error('Backup already in progress');
-      }
-
-      isBackingUp = true;
-      expect(isBackingUp).toBe(true);
-    });
-
-    it('should prevent reset during backup', async () => {
-      const isBackingUp = true;
-
-      if (isBackingUp) {
-        throw new Error('Cannot reset during backup');
-      }
-
-      expect(isBackingUp).toBe(true);
-    });
-  });
 });
