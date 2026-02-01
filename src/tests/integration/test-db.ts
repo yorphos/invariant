@@ -4,7 +4,7 @@ import type { Migration } from '../../lib/services/database';
 
 let testDbInstance: Database.Database | null = null;
 
-export async function getTestDatabase(): Promise<Database.Database> {
+export async function getTestDatabase(): Promise<any> {
   if (testDbInstance) {
     return testDbInstance;
   }
@@ -14,6 +14,18 @@ export async function getTestDatabase(): Promise<Database.Database> {
   await initializeMigrations();
   await runMigrations();
   await seedDefaultData();
+
+  // Add Tauri-like API wrapper methods
+  (testDbInstance as any).select = async <T = any>(sql: string, params?: any[]): Promise<T[]> => {
+    const stmt = testDbInstance!.prepare(sql);
+    return stmt.all(params || []) as T[];
+  };
+
+  (testDbInstance as any).execute = async (sql: string, params?: any[]): Promise<any> => {
+    const stmt = testDbInstance!.prepare(sql);
+    const result = stmt.run(params || []);
+    return { lastInsertId: (result as any).lastInsertRowid, changes: (result as any).changes };
+  };
 
   return testDbInstance;
 }

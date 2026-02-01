@@ -13,7 +13,7 @@ describe('Persistence Service - Settings Operations', () => {
     vi.mock('../../lib/services/database', () => ({
       getDatabase: vi.fn().mockResolvedValue({
         select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue(undefined),
+        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
       }),
     }));
   });
@@ -70,7 +70,7 @@ describe('Persistence Service - Account Operations', () => {
     vi.mock('../../lib/services/database', () => ({
       getDatabase: vi.fn().mockResolvedValue({
         select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue(undefined),
+        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
       }),
     }));
   });
@@ -116,7 +116,7 @@ describe('Persistence Service - Contact Operations', () => {
     vi.mock('../../lib/services/database', () => ({
       getDatabase: vi.fn().mockResolvedValue({
         select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue(undefined),
+        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
       }),
     }));
   });
@@ -182,7 +182,7 @@ describe('Persistence Service - Invoice Operations', () => {
     vi.mock('../../lib/services/database', () => ({
       getDatabase: vi.fn().mockResolvedValue({
         select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue(undefined),
+        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
       }),
     }));
   });
@@ -235,7 +235,7 @@ describe('Persistence Service - Payment Operations', () => {
     vi.mock('../../lib/services/database', () => ({
       getDatabase: vi.fn().mockResolvedValue({
         select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue(undefined),
+        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
       }),
     }));
   });
@@ -291,7 +291,7 @@ describe('Persistence Service - Transaction Operations', () => {
     vi.mock('../../lib/services/database', () => ({
       getDatabase: vi.fn().mockResolvedValue({
         select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue(undefined),
+        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
       }),
     }));
   });
@@ -340,7 +340,7 @@ describe('Persistence Service - Allocation Operations', () => {
     vi.mock('../../lib/services/database', () => ({
       getDatabase: vi.fn().mockResolvedValue({
         select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue(undefined),
+        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
       }),
     }));
   });
@@ -378,7 +378,7 @@ describe('Persistence Service - Error Handling', () => {
     vi.mock('../../lib/services/database', () => ({
       getDatabase: vi.fn().mockResolvedValue({
         select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue(undefined),
+        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
       }),
     }));
   });
@@ -422,7 +422,7 @@ describe('Persistence Service - Edge Cases', () => {
     vi.mock('../../lib/services/database', () => ({
       getDatabase: vi.fn().mockResolvedValue({
         select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue(undefined),
+        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
       }),
     }));
   });
@@ -468,7 +468,7 @@ describe('Persistence Service - Data Integrity', () => {
     vi.mock('../../lib/services/database', () => ({
       getDatabase: vi.fn().mockResolvedValue({
         select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue(undefined),
+        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
       }),
     }));
   });
@@ -524,7 +524,7 @@ describe('Persistence Service - Query Performance', () => {
     vi.mock('../../lib/services/database', () => ({
       getDatabase: vi.fn().mockResolvedValue({
         select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue(undefined),
+        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
       }),
     }));
   });
