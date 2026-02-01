@@ -1,3 +1,41 @@
+// Mock Tauri modules BEFORE importing domain modules
+vi.mock('@tauri-apps/plugin-dialog', () => ({
+  save: vi.fn().mockResolvedValue('/path/to/backup.db'),
+  open: vi.fn().mockResolvedValue(['/path/to/restore.db']),
+}));
+
+vi.mock('@tauri-apps/plugin-fs', () => ({
+  copyFile: vi.fn().mockResolvedValue(undefined),
+  readFile: vi.fn().mockResolvedValue(new Uint8Array(100)),
+  remove: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@tauri-apps/api/path', () => ({
+  appDataDir: vi.fn().mockResolvedValue('/app/data'),
+}));
+
+vi.mock('../../lib/services/database', () => ({
+  closeDatabase: vi.fn().mockResolvedValue(undefined),
+  getDatabase: vi.fn().mockResolvedValue({
+    execute: vi.fn().mockResolvedValue(undefined),
+    select: vi.fn().mockResolvedValue([]),
+    close: vi.fn().mockResolvedValue(undefined),
+    path: ''
+  }),
+}));
+
+vi.mock('../../lib/services/system-accounts', () => ({
+  getSystemAccount: vi.fn().mockResolvedValue({
+    id: 1,
+    code: '1000',
+    name: 'Test Account',
+    type: 'asset',
+    is_active: 1,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }),
+}));
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createPayment, type PaymentInput } from '../../lib/domain/payment-operations';
 import type { PolicyContext } from '../../lib/domain/types';

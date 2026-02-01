@@ -502,12 +502,12 @@ export class PersistenceService {
     const db = await getDatabase();
     if (contactId) {
       return await db.select<Invoice[]>(
-        "SELECT * FROM invoice WHERE contact_id = ? AND status IN ("sent", "partial", "overdue") ORDER BY issue_date",
+        "SELECT * FROM invoice WHERE contact_id = ? AND status IN ('sent', 'partial', 'overdue') ORDER BY issue_date",
         [contactId]
       );
     }
     return await db.select<Invoice[]>(
-      "SELECT * FROM invoice WHERE status IN ("sent", "partial", "overdue") ORDER BY issue_date",
+      "SELECT * FROM invoice WHERE status IN ('sent', 'partial', 'overdue') ORDER BY issue_date",
     );
   }
 
@@ -693,12 +693,12 @@ export class PersistenceService {
     const db = await getDatabase();
     if (vendorId) {
       return await db.select<Bill[]>(
-        "SELECT * FROM bill WHERE vendor_id = ? AND status IN ("pending", "partial", "overdue") ORDER BY bill_date",
+        "SELECT * FROM bill WHERE vendor_id = ? AND status IN ('pending', 'partial', 'overdue') ORDER BY bill_date",
         [vendorId]
       );
     }
     return await db.select<Bill[]>(
-      "SELECT * FROM bill WHERE status IN ("pending", "partial", "overdue") ORDER BY bill_date",
+      "SELECT * FROM bill WHERE status IN ('pending', 'partial', 'overdue') ORDER BY bill_date",
     );
   }
 
