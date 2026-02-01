@@ -28,6 +28,13 @@ export async function createPayment(
     const arAccount = await getSystemAccount('accounts_receivable');
     const customerDepositsAccount = await getSystemAccount('customer_deposits');
 
+    // Validate allocations are not zero or negative (early validation)
+    for (const allocation of allocations) {
+      if (allocation.amount <= 0) {
+        throw new Error(`Allocation amount must be greater than 0`);
+      }
+    }
+
     // Get all open invoices for FIFO allocation
     let allOpenInvoices = await persistenceService.getOpenInvoices();
     

@@ -17,8 +17,86 @@ vi.mock('@tauri-apps/api/path', () => ({
 vi.mock('../../lib/services/database', () => ({
   closeDatabase: vi.fn().mockResolvedValue(undefined),
   getDatabase: vi.fn().mockResolvedValue({
-    execute: vi.fn().mockResolvedValue(undefined),
-    select: vi.fn().mockResolvedValue([]),
+    execute: vi.fn().mockImplementation((query: string, params?: any[]) => {
+      // Mock INSERT operations to return lastInsertId
+      if (query.startsWith('INSERT INTO')) {
+        let insertId = 1;
+        // Increment ID for each INSERT
+        if (query.includes('transaction_event')) {
+          insertId = 100;
+        } else if (query.includes('payment')) {
+          insertId = 200;
+        } else if (query.includes('journal_line')) {
+          insertId = 300;
+        } else if (query.includes('allocation')) {
+          insertId = 400;
+        }
+        return { lastInsertId: insertId };
+      }
+      return { changes: 0 };
+    }),
+    select: vi.fn().mockImplementation((query: string, params?: any[]) => {
+      // Return mock invoices for invoice queries
+      if (query.includes('SELECT * FROM invoice')) {
+        // Check if querying specific invoice by ID
+        if (params && params.length > 0 && query.includes('WHERE id = ?')) {
+          const invoiceId = params[0];
+          const invoice = {
+            id: invoiceId,
+            invoice_number: `INV-${String(invoiceId).padStart(4, '0')}`,
+            contact_id: 1,
+            event_id: 1,
+            issue_date: '2026-01-01',
+            due_date: '2026-01-31',
+            status: 'sent',
+            subtotal: 100.00,
+            tax_amount: 13.00,
+            total_amount: 113.00,
+            paid_amount: 0.00,
+            notes: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          return [invoice];
+        }
+        // Return all invoices
+        return [
+          {
+            id: 1,
+            invoice_number: 'INV-0001',
+            contact_id: 1,
+            event_id: 1,
+            issue_date: '2026-01-01',
+            due_date: '2026-01-31',
+            status: 'sent',
+            subtotal: 100.00,
+            tax_amount: 13.00,
+            total_amount: 113.00,
+            paid_amount: 0.00,
+            notes: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          {
+            id: 2,
+            invoice_number: 'INV-0002',
+            contact_id: 2,
+            event_id: 2,
+            issue_date: '2026-01-15',
+            due_date: '2026-02-14',
+            status: 'sent',
+            subtotal: 200.00,
+            tax_amount: 26.00,
+            total_amount: 226.00,
+            paid_amount: 0.00,
+            notes: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ];
+      }
+      return [];
+    }),
     close: vi.fn().mockResolvedValue(undefined),
     path: ''
   }),
