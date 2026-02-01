@@ -4,9 +4,10 @@
   import { persistenceService } from './lib/services/persistence';
   import type { PolicyMode } from './lib/domain/types';
   
-  import ContactsView from './lib/views/ContactsView.svelte';
-  import InvoicesView from './lib/views/InvoicesView.svelte';
-  import PaymentsView from './lib/views/PaymentsView.svelte';
+   import ContactsView from './lib/views/ContactsView.svelte';
+   import InvoicesView from './lib/views/InvoicesView.svelte';
+   import PaymentsView from './lib/views/PaymentsView.svelte';
+   import CreditNotesView from './lib/views/CreditNotesView.svelte';
   import BillsView from './lib/views/BillsView.svelte';
   import ExpensesView from './lib/views/ExpensesView.svelte';
   import ReportsView from './lib/views/ReportsView.svelte';
@@ -46,7 +47,7 @@
   let mode: PolicyMode = 'beginner';
   let dbReady = false;
   let error = '';
-  let activeView: 'dashboard' | 'accounts' | 'contacts' | 'invoices' | 'payments' | 'bills' | 'expenses' | 'reports' | 'reconciliation' | 'batch' | 'bank-import' | 'inventory' | 'payroll' | 'journal' | 'settings' = 'dashboard';
+   let activeView: 'dashboard' | 'accounts' | 'contacts' | 'invoices' | 'payments' | 'bills' | 'expenses' | 'reports' | 'reconciliation' | 'batch' | 'bank-import' | 'inventory' | 'payroll' | 'journal' | 'credit-notes' | 'settings' = 'dashboard';
   
   // Period close state
   let fiscalYears: FiscalYear[] = [];
@@ -475,18 +476,24 @@
         >
           Contacts
         </button>
-        <button 
-          class:active={activeView === 'invoices'}
-          onclick={() => setView('invoices')}
-        >
-          Invoices
-        </button>
-        <button 
-          class:active={activeView === 'payments'}
-          onclick={() => setView('payments')}
-        >
-          Payments
-        </button>
+         <button
+           class:active={activeView === 'invoices'}
+           onclick={() => setView('invoices')}
+         >
+           Invoices
+         </button>
+         <button
+           class:active={activeView === 'payments'}
+           onclick={() => setView('payments')}
+         >
+           Payments
+         </button>
+         <button
+           class:active={activeView === 'credit-notes'}
+           onclick={() => setView('credit-notes')}
+         >
+           Credit Notes
+         </button>
         <button 
           class:active={activeView === 'bills'}
           onclick={() => setView('bills')}
@@ -582,11 +589,13 @@
         <InventoryView {mode} />
       {:else if activeView === 'payroll'}
         <PayrollView {mode} />
-      {:else if activeView === 'journal'}
-        <JournalEntryView {mode} />
-      {:else if activeView === 'settings'}
-        <div class="view">
-          <h2>Settings</h2>
+       {:else if activeView === 'journal'}
+         <JournalEntryView {mode} />
+       {:else if activeView === 'credit-notes'}
+         <CreditNotesView {mode} />
+       {:else if activeView === 'settings'}
+         <div class="view">
+           <h2>Settings</h2>
           
           <div class="setting-group">
             <h3>Mode</h3>
