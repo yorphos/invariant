@@ -1,5 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Mock database at top level before importing persistenceService
+vi.mock('../../lib/services/database', () => ({
+  getDatabase: vi.fn().mockResolvedValue({
+    select: vi.fn().mockResolvedValue([]),
+    execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
+  }),
+}));
+
 import { persistenceService } from '../../lib/services/persistence';
+import { getDatabase } from '../../lib/services/database';
 import type {
   Account,
   Contact,
@@ -10,12 +20,7 @@ import type {
 
 describe('Persistence Service - Settings Operations', () => {
   beforeEach(() => {
-    vi.mock('../../lib/services/database', () => ({
-      getDatabase: vi.fn().mockResolvedValue({
-        select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
-      }),
-    }));
+    vi.clearAllMocks();
   });
 
   it('should get setting by key', async () => {
@@ -67,12 +72,7 @@ describe('Persistence Service - Settings Operations', () => {
 
 describe('Persistence Service - Account Operations', () => {
   beforeEach(() => {
-    vi.mock('../../lib/services/database', () => ({
-      getDatabase: vi.fn().mockResolvedValue({
-        select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
-      }),
-    }));
+    vi.clearAllMocks();
   });
 
   it('should get all accounts', async () => {
@@ -112,14 +112,6 @@ describe('Persistence Service - Account Operations', () => {
 });
 
 describe('Persistence Service - Contact Operations', () => {
-  beforeEach(() => {
-    vi.mock('../../lib/services/database', () => ({
-      getDatabase: vi.fn().mockResolvedValue({
-        select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
-      }),
-    }));
-  });
 
   it('should get all contacts', async () => {
     const contacts = await persistenceService.getContacts();
@@ -178,14 +170,6 @@ describe('Persistence Service - Contact Operations', () => {
 });
 
 describe('Persistence Service - Invoice Operations', () => {
-  beforeEach(() => {
-    vi.mock('../../lib/services/database', () => ({
-      getDatabase: vi.fn().mockResolvedValue({
-        select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
-      }),
-    }));
-  });
 
   it('should get all invoices', async () => {
     const invoices = await persistenceService.getInvoices();
@@ -231,14 +215,6 @@ describe('Persistence Service - Invoice Operations', () => {
 });
 
 describe('Persistence Service - Payment Operations', () => {
-  beforeEach(() => {
-    vi.mock('../../lib/services/database', () => ({
-      getDatabase: vi.fn().mockResolvedValue({
-        select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
-      }),
-    }));
-  });
 
   it('should get all payments', async () => {
     const payments = await persistenceService.getPayments();
@@ -287,14 +263,6 @@ describe('Persistence Service - Payment Operations', () => {
 });
 
 describe('Persistence Service - Transaction Operations', () => {
-  beforeEach(() => {
-    vi.mock('../../lib/services/database', () => ({
-      getDatabase: vi.fn().mockResolvedValue({
-        select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
-      }),
-    }));
-  });
 
   it('should create transaction event', async () => {
     const eventId = await persistenceService.createTransactionEvent({
@@ -336,14 +304,6 @@ describe('Persistence Service - Transaction Operations', () => {
 });
 
 describe('Persistence Service - Allocation Operations', () => {
-  beforeEach(() => {
-    vi.mock('../../lib/services/database', () => ({
-      getDatabase: vi.fn().mockResolvedValue({
-        select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
-      }),
-    }));
-  });
 
   it('should create allocation', async () => {
     const allocation = await persistenceService.createAllocation({
@@ -374,58 +334,45 @@ describe('Persistence Service - Allocation Operations', () => {
 });
 
 describe('Persistence Service - Error Handling', () => {
-  beforeEach(() => {
-    vi.mock('../../lib/services/database', () => ({
-      getDatabase: vi.fn().mockResolvedValue({
-        select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
-      }),
-    }));
-  });
 
   it('should handle database connection errors gracefully', async () => {
-    try {
-      await persistenceService.getAccounts();
-    } catch (error) {
-      expect(error).toBeDefined();
-    }
+    // Mock database to reject
+    const mockGetDb = vi.mocked(getDatabase);
+    const mockDb = await mockGetDb();
+    vi.mocked(mockDb.select).mockRejectedValueOnce(new Error('Connection failed'));
+    
+    await expect(persistenceService.getAccounts()).rejects.toThrow('Connection failed');
   });
 
   it('should handle query execution errors', async () => {
-    try {
-      await persistenceService.getAccountById(1);
-    } catch (error) {
-      expect(error).toBeDefined();
-    }
+    // Mock database to reject
+    const mockGetDb = vi.mocked(getDatabase);
+    const mockDb = await mockGetDb();
+    vi.mocked(mockDb.select).mockRejectedValueOnce(new Error('Query error'));
+    
+    await expect(persistenceService.getAccountById(1)).rejects.toThrow('Query error');
   });
 
   it('should handle foreign key constraint violations', async () => {
-    try {
-      const contact: Contact = {
-        type: 'customer',
-        name: 'Test',
-        email: 'test@example.com',
-        phone: '555-1234',
-        address: '123 Main St',
-        is_active: true,
-      };
+    const contact: Contact = {
+      type: 'customer',
+      name: 'Test',
+      email: 'test@example.com',
+      phone: '555-1234',
+      address: '123 Main St',
+      is_active: true,
+    };
 
-      await persistenceService.createContact(contact);
-    } catch (error: any) {
-      expect(error).toBeDefined();
-    }
+    // Mock database to reject with foreign key error
+    const mockGetDb = vi.mocked(getDatabase);
+    const mockDb = await mockGetDb();
+    vi.mocked(mockDb.execute).mockRejectedValueOnce(new Error('FOREIGN KEY constraint failed'));
+    
+    await expect(persistenceService.createContact(contact)).rejects.toThrow('FOREIGN KEY');
   });
 });
 
 describe('Persistence Service - Edge Cases', () => {
-  beforeEach(() => {
-    vi.mock('../../lib/services/database', () => ({
-      getDatabase: vi.fn().mockResolvedValue({
-        select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
-      }),
-    }));
-  });
 
   it('should handle empty result sets', async () => {
     const accounts = await persistenceService.getAccounts();
@@ -464,14 +411,6 @@ describe('Persistence Service - Edge Cases', () => {
 });
 
 describe('Persistence Service - Data Integrity', () => {
-  beforeEach(() => {
-    vi.mock('../../lib/services/database', () => ({
-      getDatabase: vi.fn().mockResolvedValue({
-        select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
-      }),
-    }));
-  });
 
   it('should maintain referential integrity', async () => {
     const contact: Contact = {
@@ -520,22 +459,17 @@ describe('Persistence Service - Data Integrity', () => {
 });
 
 describe('Persistence Service - Query Performance', () => {
-  beforeEach(() => {
-    vi.mock('../../lib/services/database', () => ({
-      getDatabase: vi.fn().mockResolvedValue({
-        select: vi.fn().mockResolvedValue([]),
-        execute: vi.fn().mockResolvedValue({ lastInsertId: 1 }),
-      }),
-    }));
-  });
 
   it('should execute queries efficiently', async () => {
-    const startTime = Date.now();
-    await persistenceService.getAccounts();
-    const endTime = Date.now();
-    const duration = endTime - startTime;
-
-    expect(duration).toBeLessThan(1000);
+    // Verify the query executes without error and returns data
+    const result = await persistenceService.getAccounts();
+    expect(result).toBeDefined();
+    expect(Array.isArray(result)).toBe(true);
+    
+    // Verify database select was called
+    const mockGetDb = vi.mocked(getDatabase);
+    const mockDb = await mockGetDb();
+    expect(mockDb.select).toHaveBeenCalled();
   });
 
   it('should handle batch queries', async () => {

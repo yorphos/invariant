@@ -36,16 +36,8 @@ vi.mock('../../lib/services/system-accounts', async (importOriginal) => {
       }
       
       if (!result) {
-        // For unit tests without proper database setup, return a mock account
-        return {
-          id: 1,
-          code: '1000',
-          name: 'Mock Cash Account',
-          type: 'asset',
-          is_active: 1,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
+        // Fail loudly in integration tests when system account is missing
+        throw new Error(`System account not found for role: ${key}. Check migrations/seed data.`);
       }
       return result as { id: number; code: string; name: string };
     }),

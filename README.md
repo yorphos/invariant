@@ -341,7 +341,7 @@ On first run, Invariant will:
 1. **Create Database**: SQLite database in OS-specific app data directory
    - Windows: `%APPDATA%\invariant`
    - macOS: `~/Library/Application Support/invariant`
-    - Linux: `~/.local/share/invariant`
+   - Linux: `~/.local/share/invariant`
 
 2. **Run Migrations**: Apply all schema migrations automatically
 

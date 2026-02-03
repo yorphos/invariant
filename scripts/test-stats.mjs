@@ -10,10 +10,11 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-
-const TEST_RESULTS_FILE = '.test-results.json';
+import os from 'os';
 
 function runTests() {
+  const testResultsFile = path.join(os.tmpdir(), `.test-results-${Date.now()}.json`);
+  
   try {
     console.log('Running test suite...\n');
 
@@ -24,8 +25,8 @@ function runTests() {
 
     const results = JSON.parse(output);
 
-    // Save results for later use
-    fs.writeFileSync(TEST_RESULTS_FILE, JSON.stringify(results, null, 2));
+    // Save results to temp directory
+    fs.writeFileSync(testResultsFile, JSON.stringify(results, null, 2));
 
     printSummary(results);
     printDetailedStats(results);
@@ -42,6 +43,15 @@ function runTests() {
   } catch (error) {
     console.error('Error running tests:', error.message);
     process.exit(1);
+  } finally {
+    // Clean up temp file
+    try {
+      if (fs.existsSync(testResultsFile)) {
+        fs.unlinkSync(testResultsFile);
+      }
+    } catch (cleanupError) {
+      // Ignore cleanup errors
+    }
   }
 }
 
