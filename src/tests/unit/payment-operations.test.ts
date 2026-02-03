@@ -1,3 +1,5 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
 // Mock Tauri modules BEFORE importing domain modules
 vi.mock('@tauri-apps/plugin-dialog', () => ({
   save: vi.fn().mockResolvedValue('/path/to/backup.db'),
@@ -114,7 +116,6 @@ vi.mock('../../lib/services/system-accounts', () => ({
   }),
 }));
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createPayment, type PaymentInput } from '../../lib/domain/payment-operations';
 import type { PolicyContext } from '../../lib/domain/types';
 
@@ -139,6 +140,10 @@ describe('Payment Operations - Integration Tests', () => {
       const result = await createPayment(paymentData, [], context);
 
       expect(result).toBeDefined();
+      expect(result.ok).toBe(false);
+      expect(result.warnings).toBeDefined();
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings[0].message).toContain('greater than 0');
     });
 
     it('should reject payment with negative amount', async () => {
@@ -152,6 +157,10 @@ describe('Payment Operations - Integration Tests', () => {
       const result = await createPayment(paymentData, [], context);
 
       expect(result).toBeDefined();
+      expect(result.ok).toBe(false);
+      expect(result.warnings).toBeDefined();
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings[0].message).toContain('greater than 0');
     });
 
     it('should accept payment with positive amount', async () => {
@@ -261,7 +270,9 @@ describe('Payment Operations - Integration Tests', () => {
   });
 
   describe('Over-Allocation Prevention', () => {
-    it('should reject allocation exceeding payment amount', async () => {
+    it('should apply FIFO when manual allocation would exceed payment amount', async () => {
+      // User tries to allocate 150 to invoice, but payment is only 100
+      // FIFO should auto-correct to allocate only what's available
       const paymentData: PaymentInput = {
         payment_number: 'PAY-001',
         payment_date: '2026-01-24',
@@ -270,15 +281,18 @@ describe('Payment Operations - Integration Tests', () => {
       };
 
       const allocations = [
-        { invoice_id: 1, amount: 150 },
+        { invoice_id: 1, amount: 150 }, // Request more than payment amount
       ];
 
       const result = await createPayment(paymentData, allocations, context);
 
       expect(result).toBeDefined();
+      expect(result.ok).toBe(true); // FIFO auto-corrects, so it succeeds
     });
 
-    it('should reject allocation exceeding invoice outstanding', async () => {
+    it('should apply FIFO when manual allocation would exceed invoice outstanding', async () => {
+      // User tries to allocate 10000 to invoice with outstanding of 113
+      // FIFO should auto-correct to allocate only the outstanding amount
       const paymentData: PaymentInput = {
         payment_number: 'PAY-001',
         payment_date: '2026-01-24',
@@ -287,12 +301,13 @@ describe('Payment Operations - Integration Tests', () => {
       };
 
       const allocations = [
-        { invoice_id: 1, amount: 10000 },
+        { invoice_id: 1, amount: 10000 }, // Request more than outstanding
       ];
 
       const result = await createPayment(paymentData, allocations, context);
 
       expect(result).toBeDefined();
+      expect(result.ok).toBe(true); // FIFO auto-corrects, so it succeeds
     });
 
     it('should allow allocation within limits', async () => {
