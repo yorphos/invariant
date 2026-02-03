@@ -5,7 +5,14 @@ import type { Migration } from '../../lib/services/database';
 let testDbInstance: Database.Database | null = null;
 
 // TestDatabase type that matches the Tauri Database interface
+export interface TestStatement {
+  run(...params: any[]): { lastInsertRowid: number; changes: number };
+  get<T = any>(...params: any[]): T | undefined;
+  all<T = any>(...params: any[]): T[];
+}
+
 export interface TestDatabase {
+  prepare(sql: string): TestStatement;
   select<T = any>(sql: string, params?: any[]): Promise<T[]>;
   execute(sql: string, params?: any[]): Promise<{ lastInsertId?: number; changes?: number }>;
   close(): void;
