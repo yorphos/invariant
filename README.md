@@ -7,8 +7,6 @@ Invariant Accounting is a desktop application that brings enterprise-grade doubl
 [![Status](https://img.shields.io/badge/Status-Phase%208%20Complete-brightgreen)]()
 [![License](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
-[![Tests](https://img.shields.io/badge/Tests-531%20Passing-success)]()
-[![Migrations](https://img.shields.io/badge/Migrations-17-blue)]()
 
 ---
 
@@ -262,7 +260,7 @@ invariant/
 │   ├── capabilities/            # Permission system
 │   │   └── default.json
 │   └── tauri.conf.json          # Application configuration
-├── migrations/                  # Database versioning (17 migrations)
+├── migrations/                  # Database versioning
 │   ├── 001_core_ledger.ts       # Accounts, journal, audit
 │   ├── 002_contacts_ar_ap.ts    # Contacts, invoices, payments
 │   ├── 003-016                  # Additional feature migrations
@@ -345,7 +343,7 @@ On first run, Invariant will:
    - macOS: `~/Library/Application Support/invariant`
    - Linux: `~/.local/share/invariant`
 
-2. **Run Migrations**: Apply all 17 schema migrations automatically
+2. **Run Migrations**: Apply all schema migrations automatically
 
 3. **Seed Data**: Insert default chart of accounts (50+ accounts)
 
@@ -569,7 +567,7 @@ All business logic belongs in `src/lib/domain/`:
 - [x] Expanded system account roles (18 configurable roles)
 - [x] System account badges in UI
 - [x] Database reset functionality (Pro Mode)
-- [x] Comprehensive test suite (501 tests)
+- [x] Comprehensive test suite (see TESTING.md for details)
 
 #### Phase 8: Auto-Update System
 - [x] Automatic update checking on startup

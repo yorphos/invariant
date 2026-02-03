@@ -159,7 +159,7 @@ export const RESET_CONFIRMATION_TEXT = 'RESET DATABASE';
  * Validate the user's reset confirmation input
  */
 export function isResetConfirmationValid(userInput: string): boolean {
-  return userInput.trim() === RESET_CONFIRMATION_TEXT;
+  return userInput === RESET_CONFIRMATION_TEXT;
 }
 
 /**

@@ -74,49 +74,29 @@ npm run test:coverage
 
 ## Test Results
 
-### Unit Tests (513 tests - 100% passing)
+To view current test results, run:
 
-```
-✓ src/tests/unit/accounting-principles.test.ts (37 tests)
-✓ src/tests/unit/ap-operations.test.ts (32 tests)
-✓ src/tests/unit/ar-matching.test.ts (19 tests)
-✓ src/tests/unit/bank-import.test.ts (21 tests)
-✓ src/tests/unit/bank-reconciliation.test.ts (22 tests)
-✓ src/tests/unit/batch-operations.test.ts (32 tests)
-✓ src/tests/unit/chart-of-accounts.test.ts (27 tests)
-✓ src/tests/unit/csv-export.test.ts (21 tests)
-✓ src/tests/unit/currency-operations.test.ts (36 tests)
-✓ src/tests/unit/expense-operations.test.ts (19 tests)
-✓ src/tests/unit/inventory-operations.test.ts (39 tests)
-✓ src/tests/unit/payroll-operations.test.ts (35 tests)
-✓ src/tests/unit/period-close.test.ts (9 tests)
-✓ src/tests/unit/policy-engine.test.ts (23 tests)
-✓ src/tests/unit/system-accounts.test.ts (73 tests)
-✓ src/tests/unit/ux-features.test.ts (56 tests)
-
-Test Files  17 passed (17)
-     Tests  513 passed (513)
+```bash
+npm run test:run
 ```
 
-### Integration Tests (114 tests - 100% passing)
+This will display:
+- Test file count
+- Test count per file
+- Pass/fail status
+- Execution time
 
-```
-✓ src/tests/integration/crud.test.ts (18 tests - all passing)
-✓ src/tests/integration/guardrails.test.ts (18 tests - all passing)
-✓ src/tests/integration/workflow.test.ts (18 tests - all passing)
-✓ src/tests/integration/migrations.test.ts (62 tests - all passing)
+### Unit Tests
 
-Test Files  4 passed (4)
-     Tests  114 passed (114)
-```
+Unit tests focus on **pure functions** and **business logic** without database dependencies. Test files are located in `src/tests/unit/`.
 
-#### Test Summary
+### Integration Tests
 
-- **Total Tests:** 627 tests
-- **Passing:** 627 (100%)
-- **Failing:** 0
+Integration tests verify **database operations** and **end-to-end workflows** using in-memory SQLite. Test files are located in `src/tests/integration/`.
 
-All tests pass successfully!
+### Test Summary
+
+Run `npm run test:run` to see current test statistics. All tests should pass before committing changes.
 
 ## Test Architecture
 
@@ -388,35 +368,45 @@ $1,000 × 13% = $130
 
 ## Test Statistics
 
-**Total Tests:** 604 tests
-**Success Rate:** 98.6% (596/604 passing)
-**Execution Time:** Fast (all tests run in ~3.5 seconds)
-**Test Files:** 20 files
+To view current test statistics:
 
-### Coverage by Category
+```bash
+# Run tests with detailed output
+npm run test:run
 
-#### Unit Tests (513 tests - 100% passing)
-- Accounting Principles: 37 tests
-- Accounts Payable: 32 tests
-- A/R Matching: 19 tests
-- Bank Import: 21 tests
-- Bank Reconciliation: 22 tests
-- Batch Operations: 32 tests
-- Chart of Accounts: 27 tests
-- CSV Export: 21 tests
-- Currency Operations: 36 tests
-- Expense Operations: 19 tests
-- Inventory Operations: 39 tests
-- Payroll Operations: 35 tests
-- Period Close: 9 tests
-- Policy Engine: 23 tests
-- System Accounts: 73 tests
-- UX Features: 56 tests (Phase 6)
+# Run tests with coverage report
+npm run test:coverage
 
-#### Integration Tests (91 tests - 91.2% passing)
-- Database CRUD: 13 tests (11 passing, 2 failing)
-- Full Workflow: 18 tests (18 passing)
-- Migration Testing: 58 tests (52 passing, 6 failing)
+# Run tests in interactive UI
+npm run test:ui
+```
+
+### Test Categories
+
+#### Unit Tests
+Located in `src/tests/unit/`, these tests focus on pure business logic:
+- Accounting Principles
+- Accounts Payable
+- A/R Matching
+- Bank Import
+- Bank Reconciliation
+- Batch Operations
+- Chart of Accounts
+- CSV Export
+- Currency Operations
+- Expense Operations
+- Inventory Operations
+- Payroll Operations
+- Period Close
+- Policy Engine
+- System Accounts
+- UX Features
+
+#### Integration Tests
+Located in `src/tests/integration/`, these tests verify database operations:
+- Database CRUD operations
+- Full Workflow tests
+- Migration testing
 
 ---
 
@@ -509,4 +499,4 @@ jobs:
 
 For questions about the test infrastructure, create an issue in the repository.
 
-**Test Status:** 596/604 tests passing (98.6%)
+To check current test status, run: `npm run test:run`

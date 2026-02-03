@@ -4,9 +4,23 @@ import type { Migration } from '../../lib/services/database';
 
 let testDbInstance: Database.Database | null = null;
 
-export async function getTestDatabase(): Promise<Database.Database> {
+// TestDatabase type that matches the Tauri Database interface
+export interface TestStatement {
+  run(...params: any[]): { lastInsertRowid: number; changes: number };
+  get<T = any>(...params: any[]): T | undefined;
+  all<T = any>(...params: any[]): T[];
+}
+
+export interface TestDatabase {
+  prepare(sql: string): TestStatement;
+  select<T = any>(sql: string, params?: any[]): Promise<T[]>;
+  execute(sql: string, params?: any[]): Promise<{ lastInsertId?: number; changes?: number }>;
+  close(): void;
+}
+
+export async function getTestDatabase(): Promise<TestDatabase> {
   if (testDbInstance) {
-    return testDbInstance;
+    return testDbInstance as any as TestDatabase;
   }
 
   testDbInstance = new Database(':memory:');
@@ -15,7 +29,19 @@ export async function getTestDatabase(): Promise<Database.Database> {
   await runMigrations();
   await seedDefaultData();
 
-  return testDbInstance;
+  // Add Tauri-like API wrapper methods
+  (testDbInstance as any).select = async <T = any>(sql: string, params?: any[]): Promise<T[]> => {
+    const stmt = testDbInstance!.prepare(sql);
+    return stmt.all(params || []) as T[];
+  };
+
+  (testDbInstance as any).execute = async (sql: string, params?: any[]): Promise<any> => {
+    const stmt = testDbInstance!.prepare(sql);
+    const result = stmt.run(params || []);
+    return { lastInsertId: (result as any).lastInsertRowid, changes: (result as any).changes };
+  };
+
+  return testDbInstance as any as TestDatabase;
 }
 
 async function initializeMigrations(): Promise<void> {
@@ -73,7 +99,7 @@ export async function closeTestDatabase(): Promise<void> {
   }
 }
 
-export async function resetTestDatabase(): Promise<Database.Database> {
+export async function resetTestDatabase(): Promise<TestDatabase> {
   await closeTestDatabase();
   return await getTestDatabase();
 }
