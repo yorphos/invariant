@@ -94,11 +94,11 @@ describe('Backup Service - Integration Tests (Mocked)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Set up global mocks that all tests might need
-    if (typeof global.alert !== 'function') {
-      global.alert = vi.fn();
+    if (typeof globalThis.alert !== 'function') {
+      globalThis.alert = vi.fn() as any;
     }
-    if (typeof global.confirm !== 'function') {
-      global.confirm = vi.fn().mockReturnValue(true);
+    if (typeof globalThis.confirm !== 'function') {
+      globalThis.confirm = vi.fn().mockReturnValue(true) as any;
     }
   });
 

@@ -4,9 +4,16 @@ import type { Migration } from '../../lib/services/database';
 
 let testDbInstance: Database.Database | null = null;
 
-export async function getTestDatabase(): Promise<any> {
+// TestDatabase type that matches the Tauri Database interface
+export interface TestDatabase {
+  select<T = any>(sql: string, params?: any[]): Promise<T[]>;
+  execute(sql: string, params?: any[]): Promise<{ lastInsertId?: number; changes?: number }>;
+  close(): void;
+}
+
+export async function getTestDatabase(): Promise<TestDatabase> {
   if (testDbInstance) {
-    return testDbInstance;
+    return testDbInstance as any as TestDatabase;
   }
 
   testDbInstance = new Database(':memory:');
@@ -27,7 +34,7 @@ export async function getTestDatabase(): Promise<any> {
     return { lastInsertId: (result as any).lastInsertRowid, changes: (result as any).changes };
   };
 
-  return testDbInstance;
+  return testDbInstance as any as TestDatabase;
 }
 
 async function initializeMigrations(): Promise<void> {
@@ -85,7 +92,7 @@ export async function closeTestDatabase(): Promise<void> {
   }
 }
 
-export async function resetTestDatabase(): Promise<Database.Database> {
+export async function resetTestDatabase(): Promise<TestDatabase> {
   await closeTestDatabase();
   return await getTestDatabase();
 }

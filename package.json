@@ -20,7 +20,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
-    "test:stats": "vitest run && echo '' && echo 'For detailed statistics, run: npm run test:run'",
+    "test:stats": "node scripts/test-stats.mjs",
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
