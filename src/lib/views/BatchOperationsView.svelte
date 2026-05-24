@@ -4,6 +4,9 @@
   import { batchOperationsService } from '../services/batch-operations';
   import type { BatchOperationResult, PaymentImportRow } from '../services/batch-operations';
   import type { Contact, Invoice, InvoiceLine, PolicyMode } from '../domain/types';
+  import { confirmAction } from '../utils/confirm-action';
+  import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
   import Button from '../ui/Button.svelte';
   import Input from '../ui/Input.svelte';
   import Select from '../ui/Select.svelte';
@@ -57,8 +60,8 @@
         persistenceService.getInvoices()
       ]);
     } catch (e) {
-      console.error('Failed to load data:', e);
-      alert('Failed to load data: ' + e);
+      logger.error('Failed to load data:', e);
+      toasts.error('Failed to load data: ' + e);
     }
     loading = false;
   }
@@ -66,12 +69,12 @@
   // Batch Invoice Creation
   async function handleBatchInvoices() {
     if (selectedCustomers.length === 0) {
-      alert('Please select at least one customer');
+      toasts.warning('Please select at least one customer');
       return;
     }
 
     if (!batchInvoiceLineDescription || batchInvoiceLineAmount <= 0) {
-      alert('Please provide a valid line item description and amount');
+      toasts.warning('Please provide a valid line item description and amount');
       return;
     }
 
@@ -110,7 +113,7 @@
         selectedCustomers = [];
       }
     } catch (e) {
-      alert('Batch operation failed: ' + e);
+      toasts.error('Batch operation failed: ' + e);
     }
     loading = false;
   }
@@ -128,7 +131,7 @@
 
   async function handleImportPayments() {
     if (parsedPayments.length === 0) {
-      alert('No payments to import. Please parse CSV first.');
+      toasts.warning('No payments to import. Please parse CSV first.');
       return;
     }
 
@@ -143,7 +146,7 @@
         parsedPayments = [];
       }
     } catch (e) {
-      alert('Import failed: ' + e);
+      toasts.error('Import failed: ' + e);
     }
     loading = false;
   }
@@ -167,15 +170,17 @@
 
   async function handleBulkStatusChange() {
     if (selectedInvoiceIds.length === 0) {
-      alert('Please select at least one invoice');
+      toasts.warning('Please select at least one invoice');
       return;
     }
 
+    const title = bulkNewStatus === 'void' ? 'Void Invoices' : 'Change Invoice Status';
     const confirmMsg = bulkNewStatus === 'void'
       ? `Are you sure you want to VOID ${selectedInvoiceIds.length} invoices? This creates reversal entries.`
       : `Are you sure you want to change ${selectedInvoiceIds.length} invoices to "${bulkNewStatus}" status?`;
 
-    if (!confirm(confirmMsg)) {
+    const confirmed = await confirmAction(title, confirmMsg);
+    if (!confirmed) {
       return;
     }
 
@@ -193,7 +198,7 @@
         selectedInvoiceIds = [];
       }
     } catch (e) {
-      alert('Bulk status change failed: ' + e);
+      toasts.error('Bulk status change failed: ' + e);
     }
     loading = false;
   }

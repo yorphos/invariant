@@ -11,6 +11,9 @@
   import Table from '../ui/Table.svelte';
   import FileUpload from '../ui/FileUpload.svelte';
   import InvoiceDetailModal from '../ui/InvoiceDetailModal.svelte';
+  import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
+  import { confirmAction } from '../utils/confirm-action';
   import { storeDocument, attachDocument, getEntityDocuments, deleteDocument } from '../services/document-storage';
   import type { DocumentWithAttachment } from '../domain/types';
 
@@ -84,7 +87,8 @@
       formDueDate = dueDate.toISOString().split('T')[0];
 
     } catch (e) {
-      console.error('Failed to load data:', e);
+      logger.error('Failed to load data:', e);
+      toasts.error('Failed to load invoices');
     }
     loading = false;
   }
@@ -102,14 +106,14 @@
   async function handleSubmit() {
     try {
       if (!formContactId || typeof formContactId !== 'number') {
-        alert('Please select a customer');
+        toasts.warning('Please select a customer');
         return;
       }
 
       // Validate lines
       for (const line of formLines) {
         if (!line.description || typeof line.account_id !== 'number') {
-          alert('Please fill in all line items');
+          toasts.warning('Please fill in all line items');
           return;
         }
       }
@@ -157,13 +161,13 @@
       }
 
       if (!result.ok) {
-        alert(`Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice:\n` + result.warnings.map((w: ValidationWarning) => w.message).join('\n'));
+        toasts.error(`Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice:\n` + result.warnings.map((w: ValidationWarning) => w.message).join('\n'));
         return;
       }
 
       // Show warnings if any (e.g., "invoice was voided and recreated")
       if (result.warnings.length > 0) {
-        alert(result.warnings.map((w: ValidationWarning) => w.message).join('\n'));
+        toasts.warning(result.warnings.map((w: ValidationWarning) => w.message).join('\n'));
       }
 
       // Handle file uploads if there are any
@@ -191,8 +195,8 @@
             );
           }
         } catch (e) {
-          console.error('Failed to upload attachments:', e);
-          alert('Invoice created but failed to upload some attachments: ' + e);
+          logger.error('Failed to upload attachments:', e);
+          toasts.warning('Invoice created but failed to upload some attachments: ' + e);
         }
       }
 
@@ -200,8 +204,8 @@
       view = 'list';
       resetForm();
     } catch (e) {
-      console.error(`Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice:`, e);
-      alert(`Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice: ` + e);
+      logger.error(`Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice:`, e);
+      toasts.error(`Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice: ` + e);
     }
   }
 
@@ -225,12 +229,14 @@
     try {
       existingDocuments = await getEntityDocuments('invoice', invoiceId);
     } catch (e) {
-      console.error('Failed to load documents:', e);
+      logger.error('Failed to load documents:', e);
+      toasts.error('Failed to load invoice documents');
     }
   }
 
   async function handleDeleteDocument(documentId: number) {
-    if (!confirm('Are you sure you want to delete this document?')) return;
+    const confirmed = await confirmAction('Delete Document', 'Are you sure you want to delete this document?');
+    if (!confirmed) return;
     
     try {
       await deleteDocument(documentId);
@@ -239,7 +245,7 @@
         await loadExistingDocuments(editingInvoiceId);
       }
     } catch (e) {
-      alert('Failed to delete document: ' + e);
+      toasts.error('Failed to delete document: ' + e);
     }
   }
 

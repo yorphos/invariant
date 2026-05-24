@@ -9,6 +9,8 @@
     getInventoryBalance 
   } from '../domain/inventory-operations';
   import type { Item, Account, PolicyMode, InventoryMovement } from '../domain/types';
+  import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
   import Button from '../ui/Button.svelte';
   import Input from '../ui/Input.svelte';
   import Select from '../ui/Select.svelte';
@@ -93,8 +95,8 @@
       await loadItemBalances();
 
     } catch (e) {
-      console.error('Failed to load data:', e);
-      alert(`Error loading data: ${e instanceof Error ? e.message : String(e)}`);
+      logger.error('Failed to load data:', e);
+      toasts.error(`Error loading data: ${e instanceof Error ? e.message : String(e)}`);
     }
     loading = false;
   }
@@ -112,7 +114,7 @@
           value: balance.total_cost
         });
       } catch (e) {
-        console.error(`Failed to load balance for item ${item.id}:`, e);
+        logger.error(`Failed to load balance for item ${item.id}:`, e);
       }
     }
     
@@ -123,7 +125,7 @@
   async function handleCreateItem() {
     try {
       if (!formSku || !formName) {
-        alert('SKU and Name are required');
+        toasts.warning('SKU and Name are required');
         return;
       }
 
@@ -140,7 +142,7 @@
         cogs_account_id: typeof formCogsAccountId === 'number' ? formCogsAccountId : undefined
       });
 
-      alert('Item created successfully');
+      toasts.success('Item created successfully');
       
       // Reset form
       formSku = '';
@@ -158,8 +160,8 @@
       await loadData();
 
     } catch (e) {
-      console.error('Failed to create item:', e);
-      alert(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      logger.error('Failed to create item:', e);
+      toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -167,7 +169,7 @@
     try {
       if (typeof purchaseItemId !== 'number' || typeof purchaseQuantity !== 'number' || 
           typeof purchaseUnitCost !== 'number' || typeof purchaseCashAccountId !== 'number') {
-        alert('Please fill in all required fields');
+        toasts.warning('Please fill in all required fields');
         return;
       }
 
@@ -182,7 +184,7 @@
       }, { mode });
 
       if (result.ok) {
-        alert(`Purchase recorded successfully. Journal Entry #${result.journal_entry_id}`);
+        toasts.success(`Purchase recorded successfully. Journal Entry #${result.journal_entry_id}`);
         
         // Reset form
         purchaseItemId = '';
@@ -197,15 +199,15 @@
       }
 
     } catch (e) {
-      console.error('Failed to record purchase:', e);
-      alert(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      logger.error('Failed to record purchase:', e);
+      toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
   async function handleRecordSale() {
     try {
       if (typeof saleItemId !== 'number' || typeof saleQuantity !== 'number') {
-        alert('Please fill in all required fields');
+        toasts.warning('Please fill in all required fields');
         return;
       }
 
@@ -221,7 +223,7 @@
         const warningMsg = result.warnings.length > 0 
           ? '\n\nWarnings:\n' + result.warnings.map(w => `- ${w.message}`).join('\n')
           : '';
-        alert(`Sale recorded successfully. COGS: $${result.cogs_amount?.toFixed(2)}\nJournal Entry #${result.journal_entry_id}${warningMsg}`);
+        toasts.success(`Sale recorded successfully. COGS: $${result.cogs_amount?.toFixed(2)} Journal Entry #${result.journal_entry_id}${warningMsg}`);
         
         // Reset form
         saleItemId = '';
@@ -235,8 +237,8 @@
       }
 
     } catch (e) {
-      console.error('Failed to record sale:', e);
-      alert(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      logger.error('Failed to record sale:', e);
+      toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -244,7 +246,7 @@
     try {
       if (typeof adjustmentItemId !== 'number' || typeof adjustmentQuantity !== 'number' ||
           typeof adjustmentAccountId !== 'number') {
-        alert('Please fill in all required fields');
+        toasts.warning('Please fill in all required fields');
         return;
       }
 
@@ -259,7 +261,7 @@
       }, { mode });
 
       if (result.ok) {
-        alert(`Adjustment recorded successfully. Journal Entry #${result.journal_entry_id}`);
+        toasts.success(`Adjustment recorded successfully. Journal Entry #${result.journal_entry_id}`);
         
         // Reset form
         adjustmentItemId = '';
@@ -274,8 +276,8 @@
       }
 
     } catch (e) {
-      console.error('Failed to record adjustment:', e);
-      alert(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      logger.error('Failed to record adjustment:', e);
+      toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -294,7 +296,8 @@
         [item.id]
       );
     } catch (e) {
-      console.error('Failed to load movements:', e);
+      logger.error('Failed to load movements:', e);
+      toasts.error('Failed to load item movements');
     }
   }
 

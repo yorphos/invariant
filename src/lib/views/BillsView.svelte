@@ -3,6 +3,9 @@
   import { persistenceService } from '../services/persistence';
   import { createBill, voidBill } from '../domain/bill-operations';
   import type { Bill, BillLine, Contact, Account, PolicyMode } from '../domain/types';
+  import { confirmAction } from '../utils/confirm-action';
+  import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
   import Button from '../ui/Button.svelte';
   import Input from '../ui/Input.svelte';
   import Select from '../ui/Select.svelte';
@@ -68,7 +71,8 @@
       formDueDate = dueDate.toISOString().split('T')[0];
 
     } catch (e) {
-      console.error('Failed to load data:', e);
+      logger.error('Failed to load data:', e);
+      toasts.error('Failed to load bills');
     }
     loading = false;
   }
@@ -86,14 +90,14 @@
   async function handleSubmit() {
     try {
       if (!formVendorId || typeof formVendorId !== 'number') {
-        alert('Please select a vendor');
+        toasts.warning('Please select a vendor');
         return;
       }
 
       // Validate lines
       for (const line of formLines) {
         if (!line.description || typeof line.account_id !== 'number') {
-          alert('Please fill in all line items');
+          toasts.warning('Please fill in all line items');
           return;
         }
       }
@@ -122,21 +126,22 @@
       );
 
       if (!result.ok) {
-        alert('Failed to create bill:\n' + result.warnings.map(w => w.message).join('\n'));
+        toasts.error('Failed to create bill:\n' + result.warnings.map(w => w.message).join('\n'));
         return;
       }
 
       // Show warnings if any
       if (result.warnings.length > 0) {
-        alert(result.warnings.map(w => w.message).join('\n'));
+        toasts.warning(result.warnings.map(w => w.message).join('\n'));
       }
 
       await loadData();
       view = 'list';
       resetForm();
     } catch (e) {
-      console.error('Failed to create bill:', e);
-      alert('Failed to create bill: ' + e);
+      logger.error('Failed to create bill:', e);
+      toasts.error('Failed to create bill: ' + e);
+      toasts.error('Failed to create bill: ' + e);
     }
   }
 
@@ -158,7 +163,8 @@
   }
 
   async function handleVoid(billId: number) {
-    if (!confirm('Are you sure you want to void this bill? This action creates a reversal entry and cannot be undone.')) {
+    const confirmed = await confirmAction('Void Bill', 'Are you sure you want to void this bill? This action creates a reversal entry and cannot be undone.');
+    if (!confirmed) {
       return;
     }
 
@@ -166,19 +172,20 @@
       const result = await voidBill(billId, 'User requested void', { mode });
 
       if (!result.ok) {
-        alert('Failed to void bill:\n' + result.warnings.map(w => w.message).join('\n'));
+        toasts.error('Failed to void bill:\n' + result.warnings.map(w => w.message).join('\n'));
         return;
       }
 
       if (result.warnings.length > 0) {
-        alert(result.warnings.map(w => w.message).join('\n'));
+        toasts.warning(result.warnings.map(w => w.message).join('\n'));
       }
 
       await loadData();
       closeDetailModal();
     } catch (e) {
-      console.error('Failed to void bill:', e);
-      alert('Failed to void bill: ' + e);
+      logger.error('Failed to void bill:', e);
+      toasts.error('Failed to void bill: ' + e);
+      toasts.error('Failed to void bill: ' + e);
     }
   }
 

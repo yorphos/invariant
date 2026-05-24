@@ -20,6 +20,8 @@
     PolicyMode
   } from '../domain/types';
   import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
+  import { confirmAction } from '../utils/confirm-action';
   import Button from '../ui/Button.svelte';
   import Input from '../ui/Input.svelte';
   import Select from '../ui/Select.svelte';
@@ -86,7 +88,8 @@
       accounts = await persistenceService.getAccounts();
       statementDate = new Date().toISOString().split('T')[0];
     } catch (e) {
-      console.error('Failed to load accounts:', e);
+      logger.error('Failed to load accounts:', e);
+      toasts.error('Failed to load accounts for reconciliation');
     }
     loading = false;
   }
@@ -104,7 +107,8 @@
     try {
       reconciliations = await getReconciliations(selectedAccountId);
     } catch (e) {
-      console.error('Failed to load reconciliations:', e);
+      logger.error('Failed to load reconciliations:', e);
+      toasts.error('Failed to load reconciliations');
     }
   }
 
@@ -114,7 +118,8 @@
     try {
       reconSummary = await getReconciliationSummary(selectedAccountId);
     } catch (e) {
-      console.error('Failed to load summary:', e);
+      logger.error('Failed to load summary:', e);
+      toasts.error('Failed to load reconciliation summary');
     }
   }
 
@@ -137,7 +142,7 @@
       clearedTransactionIds.clear();
       view = 'create';
     } catch (e) {
-      console.error('Failed to start reconciliation:', e);
+      logger.error('Failed to start reconciliation:', e);
       toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   }
@@ -186,7 +191,7 @@
       // Calculate difference
       await updateReconciliationDifference();
     } catch (e) {
-      console.error('Failed to save reconciliation:', e);
+      logger.error('Failed to save reconciliation:', e);
       toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   }
@@ -197,7 +202,8 @@
     try {
       reconDifference = await calculateReconciliationDifference(currentReconciliationId);
     } catch (e) {
-      console.error('Failed to calculate difference:', e);
+      logger.error('Failed to calculate difference:', e);
+      toasts.error('Failed to calculate reconciliation difference');
     }
   }
 
@@ -205,11 +211,12 @@
     if (!currentReconciliationId) return;
     
     if (!reconDifference?.isBalanced) {
-      const confirm = window.confirm(
+      const confirmed = await confirmAction(
+        'Reconciliation Not Balanced',
         `This reconciliation does not balance (difference: $${Math.abs(reconDifference?.difference || 0).toFixed(2)}). ` +
         `Are you sure you want to complete it?`
       );
-      if (!confirm) return;
+      if (!confirmed) return;
     }
     
     try {
@@ -224,7 +231,7 @@
       await loadReconciliations();
       await loadSummary();
     } catch (e) {
-      console.error('Failed to complete reconciliation:', e);
+      logger.error('Failed to complete reconciliation:', e);
       toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   }
@@ -233,8 +240,9 @@
     if (currentReconciliationId) {
       try {
         await cancelReconciliation(currentReconciliationId, { mode });
-      } catch (e) {
-        console.error('Failed to cancel reconciliation:', e);
+} catch (e) {
+      logger.error('Failed to cancel reconciliation:', e);
+      toasts.error('Failed to cancel reconciliation');
       }
     }
     
@@ -339,7 +347,7 @@
       adjustmentAccountId = '';
       adjustmentDescription = 'Bank reconciliation adjustment';
     } catch (e) {
-      console.error('Failed to create adjustment entry:', e);
+      logger.error('Failed to create adjustment entry:', e);
       toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
     } finally {
       creatingAdjustment = false;

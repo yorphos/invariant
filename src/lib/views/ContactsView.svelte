@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import { persistenceService } from '../services/persistence';
   import type { Contact } from '../domain/types';
+  import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
   import Button from '../ui/Button.svelte';
   import Input from '../ui/Input.svelte';
   import Select from '../ui/Select.svelte';
@@ -38,7 +40,8 @@
     try {
       contacts = await persistenceService.getContacts();
     } catch (e) {
-      console.error('Failed to load contacts:', e);
+      logger.error('Failed to load contacts:', e);
+      toasts.error('Failed to load contacts');
     }
     loading = false;
   }
@@ -83,7 +86,8 @@
           formType = 'both'; // Default to 'both' which is always available
         }
       } catch (e) {
-        console.error('Failed to load available contact types:', e);
+        logger.error('Failed to load available contact types:', e);
+      toasts.error('Failed to load contact type options');
         // Fallback to all options
         availableTypeOptions = [
           { value: 'customer', label: 'Customer' },
@@ -124,8 +128,9 @@
       await loadContacts();
       closeModal();
     } catch (e) {
-      console.error('Failed to save contact:', e);
-      alert('Failed to save contact: ' + e);
+      logger.error('Failed to save contact:', e);
+      toasts.error('Failed to save contact: ' + e);
+      toasts.error('Failed to save contact: ' + e);
     }
   }
 </script>
