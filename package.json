@@ -47,6 +47,7 @@
     "@tauri-apps/plugin-fs": "^2.4.5",
     "@tauri-apps/plugin-sql": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.9.0",
-    "jspdf": "^4.0.0"
+    "jspdf": "^4.0.0",
+    "zod": "^4.4.3"
   }
 }

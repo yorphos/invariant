@@ -21,6 +21,33 @@ import type {
   CreditNoteRefund,
 } from '../domain/types';
 
+// In-memory cache for chart of accounts (rarely changes)
+let accountsCache: Account[] | null = null;
+let accountsCacheTimestamp = 0;
+const CACHE_TTL_MS = 60000;
+
+function normalizeIds(ids: number[]): number[] {
+  return [...new Set(ids.filter((id) => Number.isInteger(id)))];
+}
+
+function invalidateAccountsCache(): void {
+  accountsCache = null;
+  accountsCacheTimestamp = 0;
+}
+
+async function getCachedAccounts(): Promise<Map<number, Account>> {
+  const now = Date.now();
+  if (!accountsCache || now - accountsCacheTimestamp > CACHE_TTL_MS) {
+    const db = await getDatabase();
+    accountsCache = await db.select<Account[]>(
+      'SELECT * FROM account ORDER BY code'
+    );
+    accountsCacheTimestamp = now;
+  }
+
+  return new Map(accountsCache.map((account) => [account.id, account]));
+}
+
 /**
  * Persistence service - handles all database operations
  * High-level API for domain operations
@@ -88,12 +115,23 @@ export class PersistenceService {
   }
 
   async getAccountById(id: number): Promise<Account | null> {
+    const accountsById = await getCachedAccounts();
+    return accountsById.get(id) ?? null;
+  }
+
+  async getAccountsByIds(ids: number[]): Promise<Account[]> {
+    const normalizedIds = normalizeIds(ids);
+
+    if (normalizedIds.length === 0) {
+      return [];
+    }
+
     const db = await getDatabase();
-    const results = await db.select<Account[]>(
-      'SELECT * FROM account WHERE id = ?',
-      [id]
+    const placeholders = normalizedIds.map(() => '?').join(', ');
+    return await db.select<Account[]>(
+      `SELECT * FROM account WHERE id IN (${placeholders}) ORDER BY code`,
+      normalizedIds
     );
-    return results.length > 0 ? results[0] : null;
   }
 
   async getAccountsByType(type: string): Promise<Account[]> {
@@ -111,6 +149,7 @@ export class PersistenceService {
        VALUES (?, ?, ?, ?, ?)`,
       [account.code, account.name, account.type, account.parent_id, account.is_active ? 1 : 0]
     );
+    invalidateAccountsCache();
     return result.lastInsertId ?? 0;
   }
 
@@ -146,6 +185,7 @@ export class PersistenceService {
         `UPDATE account SET ${fields.join(', ')} WHERE id = ?`,
         [...values, id]
       );
+      invalidateAccountsCache();
     }
   }
 
@@ -300,6 +340,21 @@ export class PersistenceService {
     }
     return await db.select<Contact[]>(
       'SELECT * FROM contact WHERE is_active = 1 ORDER BY name'
+    );
+  }
+
+  async getContactsByIds(ids: number[]): Promise<Contact[]> {
+    const normalizedIds = normalizeIds(ids);
+
+    if (normalizedIds.length === 0) {
+      return [];
+    }
+
+    const db = await getDatabase();
+    const placeholders = normalizedIds.map(() => '?').join(', ');
+    return await db.select<Contact[]>(
+      `SELECT * FROM contact WHERE id IN (${placeholders}) ORDER BY name`,
+      normalizedIds
     );
   }
 
@@ -518,6 +573,21 @@ export class PersistenceService {
       [id]
     );
     return results.length > 0 ? results[0] : null;
+  }
+
+  async getInvoicesByIds(ids: number[]): Promise<Invoice[]> {
+    const normalizedIds = normalizeIds(ids);
+
+    if (normalizedIds.length === 0) {
+      return [];
+    }
+
+    const db = await getDatabase();
+    const placeholders = normalizedIds.map(() => '?').join(', ');
+    return await db.select<Invoice[]>(
+      `SELECT * FROM invoice WHERE id IN (${placeholders}) ORDER BY issue_date DESC, id DESC`,
+      normalizedIds
+    );
   }
 
   async getInvoiceLines(invoiceId: number): Promise<InvoiceLine[]> {
