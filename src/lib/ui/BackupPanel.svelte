@@ -1,78 +1,78 @@
 <script lang="ts">
-  import Modal from './Modal.svelte';
-  import { toasts } from '../stores/toast';
-  import {
-    backupDatabase,
-    restoreDatabase,
-    resetDatabase,
-    RESET_CONFIRMATION_TEXT,
-    isResetConfirmationValid
-  } from '../services/backup';
-  import type { PolicyMode } from '../domain/types';
+import Modal from './Modal.svelte';
+import { toasts } from '../stores/toast';
+import {
+  backupDatabase,
+  restoreDatabase,
+  resetDatabase,
+  RESET_CONFIRMATION_TEXT,
+  isResetConfirmationValid,
+} from '../services/backup';
+import type { PolicyMode } from '../domain/types';
 
-  interface Props {
-    open: boolean;
-    mode: PolicyMode;
-    onclose?: () => void;
-  }
+interface Props {
+  open: boolean;
+  mode: PolicyMode;
+  onclose?: () => void;
+}
 
-  let { open, mode, onclose = () => {} }: Props = $props();
+let { open, mode, onclose = () => {} }: Props = $props();
 
-  // Reset state
-  let showResetModal = $state(false);
-  let resetConfirmationInput = $state('');
-  let resetInProgress = $state(false);
+// Reset state
+let showResetModal = $state(false);
+let resetConfirmationInput = $state('');
+let resetInProgress = $state(false);
 
-  async function handleBackup() {
-    try {
-      const success = await backupDatabase();
-      if (success) {
-        toasts.success('Database backed up successfully!');
-      }
-    } catch (e) {
-      toasts.error(`Backup failed: ${e}`);
+async function handleBackup() {
+  try {
+    const success = await backupDatabase();
+    if (success) {
+      toasts.success('Database backed up successfully!');
     }
+  } catch (e) {
+    toasts.error(`Backup failed: ${e}`);
   }
+}
 
-  async function handleRestore() {
-    try {
-      const success = await restoreDatabase();
-      if (success) {
-        location.reload();
-      }
-    } catch (e) {
-      toasts.error(`Restore failed: ${e}`);
+async function handleRestore() {
+  try {
+    const success = await restoreDatabase();
+    if (success) {
+      location.reload();
     }
+  } catch (e) {
+    toasts.error(`Restore failed: ${e}`);
+  }
+}
+
+function openResetModal() {
+  resetConfirmationInput = '';
+  showResetModal = true;
+}
+
+function closeResetModal() {
+  showResetModal = false;
+  resetConfirmationInput = '';
+}
+
+async function handleDatabaseReset() {
+  if (!isResetConfirmationValid(resetConfirmationInput)) {
+    toasts.error(`Please type "${RESET_CONFIRMATION_TEXT}" exactly to confirm.`);
+    return;
   }
 
-  function openResetModal() {
-    resetConfirmationInput = '';
-    showResetModal = true;
+  try {
+    resetInProgress = true;
+    await resetDatabase(resetConfirmationInput);
+    toasts.success('Database reset to factory state. The application will now reload.');
+    closeResetModal();
+    setTimeout(() => location.reload(), 1500);
+  } catch (e) {
+    toasts.error(`Reset failed: ${e}`);
+  } finally {
+    resetInProgress = false;
   }
-
-  function closeResetModal() {
-    showResetModal = false;
-    resetConfirmationInput = '';
-  }
-
-  async function handleDatabaseReset() {
-    if (!isResetConfirmationValid(resetConfirmationInput)) {
-      toasts.error(`Please type "${RESET_CONFIRMATION_TEXT}" exactly to confirm.`);
-      return;
-    }
-
-    try {
-      resetInProgress = true;
-      await resetDatabase(resetConfirmationInput);
-      toasts.success('Database reset to factory state. The application will now reload.');
-      closeResetModal();
-      setTimeout(() => location.reload(), 1500);
-    } catch (e) {
-      toasts.error(`Reset failed: ${e}`);
-    } finally {
-      resetInProgress = false;
-    }
-  }
+}
 </script>
 
 <Modal {open} title="Backup & Restore" size="medium" {onclose}>

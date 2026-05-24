@@ -9,10 +9,12 @@ describe('Integration - Database Guardrails and Constraints', () => {
   });
 
   function getTriggerNames(): string[] {
-    const results = db.prepare(`
+    const results = db
+      .prepare(`
       SELECT name FROM sqlite_master WHERE type='trigger' ORDER BY name
-    `).all() as Array<{ name: string }>;
-    return results.map(r => r.name);
+    `)
+      .all() as Array<{ name: string }>;
+    return results.map((r) => r.name);
   }
 
   describe('Trigger Existence Verification', () => {
@@ -45,27 +47,33 @@ describe('Integration - Database Guardrails and Constraints', () => {
 
   describe('Journal Entry Integrity Triggers', () => {
     it('should prevent modifying posted journal entry', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
 
-      const beforeUpdate = db.prepare('SELECT * FROM journal_entry WHERE id = ?').get(entryId) as any;
-
-      db.prepare(`
-        INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
-        VALUES (?, ?, ?, ?)
-      `).run(entryId, 1, 1000.00, 0.00);
+      const beforeUpdate = db
+        .prepare('SELECT * FROM journal_entry WHERE id = ?')
+        .get(entryId) as any;
 
       db.prepare(`
         INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
         VALUES (?, ?, ?, ?)
-      `).run(entryId, 2, 0.00, 1000.00);
+      `).run(entryId, 1, 1000.0, 0.0);
+
+      db.prepare(`
+        INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
+        VALUES (?, ?, ?, ?)
+      `).run(entryId, 2, 0.0, 1000.0);
 
       db.prepare(`
         UPDATE journal_entry
@@ -85,31 +93,37 @@ describe('Integration - Database Guardrails and Constraints', () => {
         `).run(entryId);
       }).toThrow('Cannot modify posted journal entry');
 
-      const afterFailedUpdate = db.prepare('SELECT * FROM journal_entry WHERE id = ?').get(entryId) as any;
+      const afterFailedUpdate = db
+        .prepare('SELECT * FROM journal_entry WHERE id = ?')
+        .get(entryId) as any;
       expect(afterFailedUpdate.description).toBe(beforeUpdate.description);
       expect(afterFailedUpdate.status).toBe('posted');
     });
 
     it('should prevent modifying lines in posted journal entry', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
 
       db.prepare(`
         INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
         VALUES (?, ?, ?, ?)
-      `).run(entryId, 1, 1000.00, 0.00);
+      `).run(entryId, 1, 1000.0, 0.0);
 
       db.prepare(`
         INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
         VALUES (?, ?, ?, ?)
-      `).run(entryId, 2, 0.00, 1000.00);
+      `).run(entryId, 2, 0.0, 1000.0);
 
       db.prepare(`
         UPDATE journal_entry
@@ -117,9 +131,11 @@ describe('Integration - Database Guardrails and Constraints', () => {
         WHERE id = ?
       `).run('test_user', entryId);
 
-      const line = db.prepare(`
+      const line = db
+        .prepare(`
         SELECT id, debit_amount FROM journal_line WHERE journal_entry_id = ? LIMIT 1
-      `).get(entryId) as any;
+      `)
+        .get(entryId) as any;
 
       const beforeDebit = line.debit_amount;
 
@@ -131,32 +147,38 @@ describe('Integration - Database Guardrails and Constraints', () => {
         `).run(line.id);
       }).toThrow('Cannot modify lines in posted journal entry');
 
-      const afterFailedUpdate = db.prepare(`
+      const afterFailedUpdate = db
+        .prepare(`
         SELECT debit_amount FROM journal_line WHERE id = ?
-      `).get(line.id) as any;
+      `)
+        .get(line.id) as any;
       expect(afterFailedUpdate.debit_amount).toBe(beforeDebit);
     });
 
     it('should prevent deleting lines from posted journal entry', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
 
       db.prepare(`
         INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
         VALUES (?, ?, ?, ?)
-      `).run(entryId, 1, 1000.00, 0.00);
+      `).run(entryId, 1, 1000.0, 0.0);
 
       db.prepare(`
         INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
         VALUES (?, ?, ?, ?)
-      `).run(entryId, 2, 0.00, 1000.00);
+      `).run(entryId, 2, 0.0, 1000.0);
 
       db.prepare(`
         UPDATE journal_entry
@@ -164,40 +186,50 @@ describe('Integration - Database Guardrails and Constraints', () => {
         WHERE id = ?
       `).run('test_user', entryId);
 
-      const beforeCount = db.prepare(`
+      const beforeCount = db
+        .prepare(`
         SELECT COUNT(*) as count FROM journal_line WHERE journal_entry_id = ?
-      `).get(entryId) as any;
+      `)
+        .get(entryId) as any;
       expect(beforeCount.count).toBe(2);
 
-      const line = db.prepare(`
+      const line = db
+        .prepare(`
         SELECT id FROM journal_line WHERE journal_entry_id = ? LIMIT 1
-      `).get(entryId) as any;
+      `)
+        .get(entryId) as any;
 
       expect(() => {
         db.prepare('DELETE FROM journal_line WHERE id = ?').run(line.id);
       }).toThrow('Cannot delete lines from posted journal entry');
 
-      const afterFailedDelete = db.prepare(`
+      const afterFailedDelete = db
+        .prepare(`
         SELECT COUNT(*) as count FROM journal_line WHERE journal_entry_id = ?
-      `).get(entryId) as any;
+      `)
+        .get(entryId) as any;
       expect(afterFailedDelete.count).toBe(2);
     });
 
     it('should prevent posting unbalanced journal entry', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
 
       db.prepare(`
         INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
         VALUES (?, ?, ?, ?)
-      `).run(entryId, 1, 1000.00, 0.00);
+      `).run(entryId, 1, 1000.0, 0.0);
 
       const beforePost = db.prepare('SELECT * FROM journal_entry WHERE id = ?').get(entryId) as any;
       expect(beforePost.status).toBe('draft');
@@ -211,7 +243,9 @@ describe('Integration - Database Guardrails and Constraints', () => {
         `).run('test_user', entryId);
       }).toThrow('Cannot post unbalanced journal entry');
 
-      const afterFailedPost = db.prepare('SELECT * FROM journal_entry WHERE id = ?').get(entryId) as any;
+      const afterFailedPost = db
+        .prepare('SELECT * FROM journal_entry WHERE id = ?')
+        .get(entryId) as any;
       expect(afterFailedPost.status).toBe('draft');
       expect(afterFailedPost.posted_at).toBeNull();
     });
@@ -219,213 +253,329 @@ describe('Integration - Database Guardrails and Constraints', () => {
 
   describe('Allocation Constraint Triggers', () => {
     it('should successfully allocate within payment limit', async () => {
-      const contactId = db.prepare(`
+      const contactId = db
+        .prepare(`
         INSERT INTO contact (name, type)
         VALUES (?, ?)
-      `).run('Test Customer', 'customer').lastInsertRowid as number;
+      `)
+        .run('Test Customer', 'customer').lastInsertRowid as number;
 
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('payment_received', 'Test Payment', 'PMT-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('payment_received', 'Test Payment', 'PMT-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Payment Entry', 'PMT-001', 'posted').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Payment Entry', 'PMT-001', 'posted').lastInsertRowid as number;
 
-      const invoiceEventId = db.prepare(`
+      const invoiceEventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const invoiceEntryId = db.prepare(`
+      const invoiceEntryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(invoiceEventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted').lastInsertRowid as number;
+      `)
+        .run(invoiceEventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted')
+        .lastInsertRowid as number;
 
-      const invoiceId = db.prepare(`
+      const invoiceId = db
+        .prepare(`
         INSERT INTO invoice (event_id, invoice_number, contact_id, issue_date, due_date, subtotal, tax_amount, total_amount, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(invoiceEventId, 'INV-001', contactId, '2026-01-25', '2026-02-25', 1000.00, 130.00, 1130.00, 'sent').lastInsertRowid as number;
+      `)
+        .run(
+          invoiceEventId,
+          'INV-001',
+          contactId,
+          '2026-01-25',
+          '2026-02-25',
+          1000.0,
+          130.0,
+          1130.0,
+          'sent',
+        ).lastInsertRowid as number;
 
-      const paymentId = db.prepare(`
+      const paymentId = db
+        .prepare(`
         INSERT INTO payment (event_id, payment_number, contact_id, payment_date, amount, status)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(eventId, 'PMT-001', contactId, '2026-01-25', 500.00, 'pending').lastInsertRowid as number;
+      `)
+        .run(eventId, 'PMT-001', contactId, '2026-01-25', 500.0, 'pending')
+        .lastInsertRowid as number;
 
-      const beforeAllocations = db.prepare(`
+      const beforeAllocations = db
+        .prepare(`
         SELECT COUNT(*) as count FROM allocation WHERE payment_id = ?
-      `).get(paymentId) as any;
+      `)
+        .get(paymentId) as any;
       expect(beforeAllocations.count).toBe(0);
 
       db.prepare(`
         INSERT INTO allocation (payment_id, invoice_id, amount, allocation_method, created_at)
         VALUES (?, ?, ?, 'manual', datetime('now'))
-      `).run(paymentId, invoiceId, 300.00);
+      `).run(paymentId, invoiceId, 300.0);
 
-      const afterAllocations = db.prepare(`
+      const afterAllocations = db
+        .prepare(`
         SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM allocation WHERE payment_id = ?
-      `).get(paymentId) as any;
+      `)
+        .get(paymentId) as any;
       expect(afterAllocations.count).toBe(1);
-      expect(afterAllocations.total).toBe(300.00);
+      expect(afterAllocations.total).toBe(300.0);
     });
     it('should prevent payment over-allocation', async () => {
-      const contactId = db.prepare(`
+      const contactId = db
+        .prepare(`
         INSERT INTO contact (name, type)
         VALUES (?, ?)
-      `).run('Test Customer', 'customer').lastInsertRowid as number;
+      `)
+        .run('Test Customer', 'customer').lastInsertRowid as number;
 
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('payment_received', 'Test Payment', 'PMT-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('payment_received', 'Test Payment', 'PMT-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Payment Entry', 'PMT-001', 'posted').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Payment Entry', 'PMT-001', 'posted').lastInsertRowid as number;
 
-      const invoiceEventId = db.prepare(`
+      const invoiceEventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const invoiceEntryId = db.prepare(`
+      const invoiceEntryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(invoiceEventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted').lastInsertRowid as number;
+      `)
+        .run(invoiceEventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted')
+        .lastInsertRowid as number;
 
-      const invoiceId = db.prepare(`
+      const invoiceId = db
+        .prepare(`
         INSERT INTO invoice (event_id, invoice_number, contact_id, issue_date, due_date, subtotal, tax_amount, total_amount, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(invoiceEventId, 'INV-001', contactId, '2026-01-25', '2026-02-25', 1000.00, 130.00, 1130.00, 'sent').lastInsertRowid as number;
+      `)
+        .run(
+          invoiceEventId,
+          'INV-001',
+          contactId,
+          '2026-01-25',
+          '2026-02-25',
+          1000.0,
+          130.0,
+          1130.0,
+          'sent',
+        ).lastInsertRowid as number;
 
-      const paymentId = db.prepare(`
+      const paymentId = db
+        .prepare(`
         INSERT INTO payment (event_id, payment_number, contact_id, payment_date, amount, status)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(eventId, 'PMT-001', contactId, '2026-01-25', 500.00, 'pending').lastInsertRowid as number;
+      `)
+        .run(eventId, 'PMT-001', contactId, '2026-01-25', 500.0, 'pending')
+        .lastInsertRowid as number;
 
       const payment = db.prepare('SELECT * FROM payment WHERE id = ?').get(paymentId) as any;
-      expect(payment.amount).toBe(500.00);
+      expect(payment.amount).toBe(500.0);
 
-      const beforeAllocations = db.prepare(`
+      const beforeAllocations = db
+        .prepare(`
         SELECT COUNT(*) as count FROM allocation WHERE payment_id = ?
-      `).get(paymentId) as any;
+      `)
+        .get(paymentId) as any;
       expect(beforeAllocations.count).toBe(0);
 
       expect(() => {
         db.prepare(`
           INSERT INTO allocation (payment_id, invoice_id, amount, allocation_method, created_at)
           VALUES (?, ?, ?, 'manual', datetime('now'))
-        `).run(paymentId, invoiceId, 600.00);
+        `).run(paymentId, invoiceId, 600.0);
       }).toThrow('Allocation would exceed payment amount');
 
-      const afterFailedAllocation = db.prepare(`
+      const afterFailedAllocation = db
+        .prepare(`
         SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM allocation WHERE payment_id = ?
-      `).get(paymentId) as any;
+      `)
+        .get(paymentId) as any;
       expect(afterFailedAllocation.count).toBe(0);
       expect(afterFailedAllocation.total).toBe(0);
     });
 
     it('should prevent invoice over-allocation', async () => {
-      const contactId = db.prepare(`
+      const contactId = db
+        .prepare(`
         INSERT INTO contact (name, type)
         VALUES (?, ?)
-      `).run('Test Customer', 'customer').lastInsertRowid as number;
+      `)
+        .run('Test Customer', 'customer').lastInsertRowid as number;
 
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('payment_received', 'Test Payment', 'PMT-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('payment_received', 'Test Payment', 'PMT-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Payment Entry', 'PMT-001', 'posted').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Payment Entry', 'PMT-001', 'posted').lastInsertRowid as number;
 
-      const invoiceEventId = db.prepare(`
+      const invoiceEventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const invoiceEntryId = db.prepare(`
+      const invoiceEntryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(invoiceEventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted').lastInsertRowid as number;
+      `)
+        .run(invoiceEventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted')
+        .lastInsertRowid as number;
 
-      const invoiceId = db.prepare(`
+      const invoiceId = db
+        .prepare(`
         INSERT INTO invoice (event_id, invoice_number, contact_id, issue_date, due_date, subtotal, tax_amount, total_amount, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(invoiceEventId, 'INV-001', contactId, '2026-01-25', '2026-02-25', 1000.00, 130.00, 1130.00, 'sent').lastInsertRowid as number;
+      `)
+        .run(
+          invoiceEventId,
+          'INV-001',
+          contactId,
+          '2026-01-25',
+          '2026-02-25',
+          1000.0,
+          130.0,
+          1130.0,
+          'sent',
+        ).lastInsertRowid as number;
 
       const invoice = db.prepare('SELECT * FROM invoice WHERE id = ?').get(invoiceId) as any;
-      expect(invoice.total_amount).toBe(1130.00);
+      expect(invoice.total_amount).toBe(1130.0);
 
-      const paymentId = db.prepare(`
+      const paymentId = db
+        .prepare(`
         INSERT INTO payment (event_id, payment_number, contact_id, payment_date, amount, status)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(eventId, 'PMT-001', contactId, '2026-01-25', 2000.00, 'pending').lastInsertRowid as number;
+      `)
+        .run(eventId, 'PMT-001', contactId, '2026-01-25', 2000.0, 'pending')
+        .lastInsertRowid as number;
 
-      const beforeAllocations = db.prepare(`
+      const beforeAllocations = db
+        .prepare(`
         SELECT COUNT(*) as count FROM allocation WHERE invoice_id = ?
-      `).get(invoiceId) as any;
+      `)
+        .get(invoiceId) as any;
       expect(beforeAllocations.count).toBe(0);
 
       expect(() => {
         db.prepare(`
           INSERT INTO allocation (payment_id, invoice_id, amount, allocation_method, created_at)
           VALUES (?, ?, ?, 'manual', datetime('now'))
-        `).run(paymentId, invoiceId, 1200.00);
+        `).run(paymentId, invoiceId, 1200.0);
       }).toThrow('Allocation would exceed invoice total');
 
-      const afterFailedAllocation = db.prepare(`
+      const afterFailedAllocation = db
+        .prepare(`
         SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM allocation WHERE invoice_id = ?
-      `).get(invoiceId) as any;
+      `)
+        .get(invoiceId) as any;
       expect(afterFailedAllocation.count).toBe(0);
       expect(afterFailedAllocation.total).toBe(0);
     });
 
     it('should prevent reducing invoice total below allocated', async () => {
-      const contactId = db.prepare(`
+      const contactId = db
+        .prepare(`
         INSERT INTO contact (name, type)
         VALUES (?, ?)
-      `).run('Test Customer', 'customer').lastInsertRowid as number;
+      `)
+        .run('Test Customer', 'customer').lastInsertRowid as number;
 
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('payment_received', 'Test Payment', 'PMT-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('payment_received', 'Test Payment', 'PMT-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Payment Entry', 'PMT-001', 'posted').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Payment Entry', 'PMT-001', 'posted').lastInsertRowid as number;
 
-      const invoiceEventId = db.prepare(`
+      const invoiceEventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const invoiceEntryId = db.prepare(`
+      const invoiceEntryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(invoiceEventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted').lastInsertRowid as number;
+      `)
+        .run(invoiceEventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted')
+        .lastInsertRowid as number;
 
-      const invoiceId = db.prepare(`
+      const invoiceId = db
+        .prepare(`
         INSERT INTO invoice (event_id, invoice_number, contact_id, issue_date, due_date, subtotal, tax_amount, total_amount, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(invoiceEventId, 'INV-001', contactId, '2026-01-25', '2026-02-25', 1000.00, 130.00, 1130.00, 'sent').lastInsertRowid as number;
+      `)
+        .run(
+          invoiceEventId,
+          'INV-001',
+          contactId,
+          '2026-01-25',
+          '2026-02-25',
+          1000.0,
+          130.0,
+          1130.0,
+          'sent',
+        ).lastInsertRowid as number;
 
-      const paymentId = db.prepare(`
+      const paymentId = db
+        .prepare(`
         INSERT INTO payment (event_id, payment_number, contact_id, payment_date, amount, status)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(eventId, 'PMT-001', contactId, '2026-01-25', 2000.00, 'pending').lastInsertRowid as number;
+      `)
+        .run(eventId, 'PMT-001', contactId, '2026-01-25', 2000.0, 'pending')
+        .lastInsertRowid as number;
 
       db.prepare(`
         INSERT INTO allocation (payment_id, invoice_id, amount, allocation_method, created_at)
         VALUES (?, ?, ?, 'manual', datetime('now'))
-      `).run(paymentId, invoiceId, 1000.00);
+      `).run(paymentId, invoiceId, 1000.0);
 
       expect(() => {
         db.prepare(`
@@ -437,68 +587,100 @@ describe('Integration - Database Guardrails and Constraints', () => {
     });
 
     it('should successfully allocate within invoice total', async () => {
-      const contactId = db.prepare(`
+      const contactId = db
+        .prepare(`
         INSERT INTO contact (name, type)
         VALUES (?, ?)
-      `).run('Test Customer', 'customer').lastInsertRowid as number;
+      `)
+        .run('Test Customer', 'customer').lastInsertRowid as number;
 
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('payment_received', 'Test Payment', 'PMT-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('payment_received', 'Test Payment', 'PMT-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Payment Entry', 'PMT-001', 'posted').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Payment Entry', 'PMT-001', 'posted').lastInsertRowid as number;
 
-      const invoiceEventId = db.prepare(`
+      const invoiceEventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const invoiceEntryId = db.prepare(`
+      const invoiceEntryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(invoiceEventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted').lastInsertRowid as number;
+      `)
+        .run(invoiceEventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted')
+        .lastInsertRowid as number;
 
-      const invoiceId = db.prepare(`
+      const invoiceId = db
+        .prepare(`
         INSERT INTO invoice (event_id, invoice_number, contact_id, issue_date, due_date, subtotal, tax_amount, total_amount, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(invoiceEventId, 'INV-001', contactId, '2026-01-25', '2026-02-25', 1000.00, 130.00, 1130.00, 'sent').lastInsertRowid as number;
+      `)
+        .run(
+          invoiceEventId,
+          'INV-001',
+          contactId,
+          '2026-01-25',
+          '2026-02-25',
+          1000.0,
+          130.0,
+          1130.0,
+          'sent',
+        ).lastInsertRowid as number;
 
       const invoice = db.prepare('SELECT * FROM invoice WHERE id = ?').get(invoiceId) as any;
-      expect(invoice.total_amount).toBe(1130.00);
+      expect(invoice.total_amount).toBe(1130.0);
 
-      const paymentId = db.prepare(`
+      const paymentId = db
+        .prepare(`
         INSERT INTO payment (event_id, payment_number, contact_id, payment_date, amount, status)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(eventId, 'PMT-001', contactId, '2026-01-25', 1500.00, 'pending').lastInsertRowid as number;
+      `)
+        .run(eventId, 'PMT-001', contactId, '2026-01-25', 1500.0, 'pending')
+        .lastInsertRowid as number;
 
-      const beforeAllocations = db.prepare(`
+      const beforeAllocations = db
+        .prepare(`
         SELECT COUNT(*) as count FROM allocation WHERE invoice_id = ?
-      `).get(invoiceId) as any;
+      `)
+        .get(invoiceId) as any;
       expect(beforeAllocations.count).toBe(0);
 
       db.prepare(`
         INSERT INTO allocation (payment_id, invoice_id, amount, allocation_method, created_at)
         VALUES (?, ?, ?, 'manual', datetime('now'))
-      `).run(paymentId, invoiceId, 1000.00);
+      `).run(paymentId, invoiceId, 1000.0);
 
-      const afterAllocations = db.prepare(`
+      const afterAllocations = db
+        .prepare(`
         SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total FROM allocation WHERE invoice_id = ?
-      `).get(invoiceId) as any;
+      `)
+        .get(invoiceId) as any;
       expect(afterAllocations.count).toBe(1);
-      expect(afterAllocations.total).toBe(1000.00);
+      expect(afterAllocations.total).toBe(1000.0);
     });
   });
 
   describe('Closed Fiscal Period Constraints', () => {
     it('should prevent posting entry in closed fiscal year', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
       db.prepare(`
         UPDATE fiscal_year
@@ -515,15 +697,19 @@ describe('Integration - Database Guardrails and Constraints', () => {
     });
 
     it('should prevent moving entry into closed fiscal year', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
 
       db.prepare(`
         UPDATE fiscal_year
@@ -541,10 +727,12 @@ describe('Integration - Database Guardrails and Constraints', () => {
     });
 
     it('should allow posting in open fiscal year', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
       expect(() => {
         db.prepare(`
@@ -557,48 +745,60 @@ describe('Integration - Database Guardrails and Constraints', () => {
 
   describe('Data Validation Constraints', () => {
     it('should enforce decimal constraints on amounts', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
 
-      const validLineCount = db.prepare(`
+      const validLineCount = db
+        .prepare(`
         SELECT COUNT(*) as count FROM journal_line WHERE journal_entry_id = ?
-      `).get(entryId) as any;
+      `)
+        .get(entryId) as any;
       expect(validLineCount.count).toBe(0);
 
       db.prepare(`
         INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
         VALUES (?, ?, ?, ?)
-      `).run(entryId, 1, 1000.00, 0.00);
+      `).run(entryId, 1, 1000.0, 0.0);
 
-      const afterValidLine = db.prepare(`
+      const afterValidLine = db
+        .prepare(`
         SELECT debit_amount FROM journal_line WHERE journal_entry_id = ?
-      `).get(entryId) as any;
-      expect(afterValidLine.debit_amount).toBe(1000.00);
+      `)
+        .get(entryId) as any;
+      expect(afterValidLine.debit_amount).toBe(1000.0);
     });
 
     it('should reject negative amounts in journal lines', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted').lastInsertRowid as number;
 
       expect(() => {
         db.prepare(`
           INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
           VALUES (?, ?, ?, ?)
-        `).run(entryId, 1, -100.00, 0.00);
+        `).run(entryId, 1, -100.0, 0.0);
       }).toThrow();
     });
 
@@ -612,59 +812,99 @@ describe('Integration - Database Guardrails and Constraints', () => {
     });
 
     it('should reject invalid invoice status', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
       expect(() => {
         db.prepare(`
           INSERT INTO invoice (event_id, invoice_number, contact_id, issue_date, due_date, subtotal, tax_amount, total_amount, status)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(eventId, 'INV-001', 1, '2026-01-25', '2026-02-25', 1000.00, 130.00, 1130.00, 'invalid_status');
+        `).run(
+          eventId,
+          'INV-001',
+          1,
+          '2026-01-25',
+          '2026-02-25',
+          1000.0,
+          130.0,
+          1130.0,
+          'invalid_status',
+        );
       }).toThrow();
     });
 
     it('should reject invalid payment status', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('payment_received', 'Test Payment', 'PMT-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('payment_received', 'Test Payment', 'PMT-001', 'test_user').lastInsertRowid as number;
 
       expect(() => {
         db.prepare(`
         INSERT INTO payment (event_id, payment_number, contact_id, payment_date, amount, status)
           VALUES (?, ?, ?, ?, ?, ?)
-        `).run(eventId, 'PMT-001', 1, '2026-01-25', 1000.00, 'invalid_status');
+        `).run(eventId, 'PMT-001', 1, '2026-01-25', 1000.0, 'invalid_status');
       }).toThrow();
     });
 
     it('should reject duplicate invoice numbers', async () => {
-      const contactId = db.prepare(`
+      const contactId = db
+        .prepare(`
         INSERT INTO contact (name, type)
         VALUES (?, ?)
-      `).run('Test Customer', 'customer').lastInsertRowid as number;
+      `)
+        .run('Test Customer', 'customer').lastInsertRowid as number;
 
-      const eventId1 = db.prepare(`
+      const eventId1 = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice 1', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice 1', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const eventId2 = db.prepare(`
+      const eventId2 = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice 2', 'INV-002', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice 2', 'INV-002', 'test_user').lastInsertRowid as number;
 
       db.prepare(`
         INSERT INTO invoice (event_id, invoice_number, contact_id, issue_date, due_date, subtotal, tax_amount, total_amount, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(eventId1, 'INV-001', contactId, '2026-01-25', '2026-02-25', 1000.00, 130.00, 1130.00, 'sent');
+      `).run(
+        eventId1,
+        'INV-001',
+        contactId,
+        '2026-01-25',
+        '2026-02-25',
+        1000.0,
+        130.0,
+        1130.0,
+        'sent',
+      );
 
       expect(() => {
         db.prepare(`
           INSERT INTO invoice (event_id, invoice_number, contact_id, issue_date, due_date, subtotal, tax_amount, total_amount, status)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(eventId2, 'INV-001', contactId, '2026-01-26', '2026-02-26', 500.00, 65.00, 565.00, 'sent');
+        `).run(
+          eventId2,
+          'INV-001',
+          contactId,
+          '2026-01-26',
+          '2026-02-26',
+          500.0,
+          65.0,
+          565.0,
+          'sent',
+        );
       }).toThrow();
     });
 

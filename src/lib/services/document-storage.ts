@@ -1,6 +1,6 @@
 /**
  * Document Storage Service
- * 
+ *
  * Handles receipt and document attachments for transactions.
  * Stores files locally with content-hash deduplication.
  */
@@ -12,11 +12,19 @@ import type {
   DocumentWithAttachment,
   DocumentType,
   EntityType,
-  AttachmentType
+  AttachmentType,
 } from '../domain/types';
 
 // Use Tauri's filesystem API for file operations
-import { BaseDirectory, writeFile, readFile, exists, mkdir, remove, readDir } from '@tauri-apps/plugin-fs';
+import {
+  BaseDirectory,
+  writeFile,
+  readFile,
+  exists,
+  mkdir,
+  remove,
+  readDir,
+} from '@tauri-apps/plugin-fs';
 import { appDataDir } from '@tauri-apps/api/path';
 import { logger } from '../utils/logger';
 import type { SqlParams } from '../utils/sql-types';
@@ -30,14 +38,14 @@ async function ensureDocumentDir(): Promise<string> {
   try {
     const appDir = await appDataDir();
     const docsPath = `${appDir}/${DOCUMENTS_DIR}`;
-    
+
     // Check if directory exists, create if not
     const dirExists = await exists(DOCUMENTS_DIR, { baseDir: BaseDirectory.AppData });
-    
+
     if (!dirExists) {
       await mkdir(DOCUMENTS_DIR, { baseDir: BaseDirectory.AppData, recursive: true });
     }
-    
+
     return docsPath;
   } catch (error) {
     throw new Error(`Failed to initialize document directory: ${error}`);
@@ -50,7 +58,7 @@ async function ensureDocumentDir(): Promise<string> {
 async function calculateHash(content: Uint8Array): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-256', content.buffer as ArrayBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
   return hashHex;
 }
 
@@ -65,39 +73,39 @@ export async function storeDocument(
   documentType?: DocumentType,
   description?: string,
   tags?: string,
-  uploadedBy?: string
+  uploadedBy?: string,
 ): Promise<number> {
   const db = await getDatabase();
-  
+
   // Calculate content hash for deduplication
   const contentHash = await calculateHash(fileContent);
-  
+
   // Check if document with this hash already exists
   const existing = await db.select<Document[]>(
     'SELECT * FROM document WHERE content_hash = ? LIMIT 1',
-    [contentHash]
+    [contentHash],
   );
-  
+
   if (existing[0]) {
     // Document already exists, return existing ID
     return existing[0].id!;
   }
-  
+
   // Ensure document directory exists
   await ensureDocumentDir();
-  
+
   // Generate unique file name (hash + original extension)
   const ext = originalFileName.split('.').pop() || 'bin';
   const storedFileName = `${contentHash}.${ext}`;
   const filePath = `${DOCUMENTS_DIR}/${storedFileName}`;
-  
+
   // Write file to disk
   try {
     await writeFile(filePath, fileContent, { baseDir: BaseDirectory.AppData });
   } catch (error) {
     throw new Error(`Failed to write document file: ${error}`);
   }
-  
+
   // Create document record
   const result = await db.execute(
     `INSERT INTO document 
@@ -114,14 +122,14 @@ export async function storeDocument(
       documentType || null,
       description || null,
       tags || null,
-      uploadedBy || null
-    ]
+      uploadedBy || null,
+    ],
   );
-  
+
   if (!result.lastInsertId) {
     throw new Error('Failed to create document record');
   }
-  
+
   return result.lastInsertId;
 }
 
@@ -134,28 +142,28 @@ export async function attachDocument(
   entityId: number,
   attachmentType: AttachmentType = 'supporting',
   notes?: string,
-  attachedBy?: string
+  attachedBy?: string,
 ): Promise<number> {
   const db = await getDatabase();
-  
+
   // Verify document exists
   const doc = await getDocument(documentId);
   if (!doc) {
     throw new Error(`Document ID ${documentId} does not exist`);
   }
-  
+
   // Create attachment
   const result = await db.execute(
     `INSERT INTO document_attachment 
      (document_id, entity_type, entity_id, attachment_type, notes, attached_by)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [documentId, entityType, entityId, attachmentType, notes || null, attachedBy || null]
+    [documentId, entityType, entityId, attachmentType, notes || null, attachedBy || null],
   );
-  
+
   if (!result.lastInsertId) {
     throw new Error('Failed to create document attachment');
   }
-  
+
   return result.lastInsertId;
 }
 
@@ -165,14 +173,14 @@ export async function attachDocument(
 export async function detachDocument(
   documentId: number,
   entityType: EntityType,
-  entityId: number
+  entityId: number,
 ): Promise<void> {
   const db = await getDatabase();
-  
+
   await db.execute(
     `DELETE FROM document_attachment 
      WHERE document_id = ? AND entity_type = ? AND entity_id = ?`,
-    [documentId, entityType, entityId]
+    [documentId, entityType, entityId],
   );
 }
 
@@ -181,12 +189,11 @@ export async function detachDocument(
  */
 export async function getDocument(documentId: number): Promise<Document | null> {
   const db = await getDatabase();
-  
-  const results = await db.select<Document[]>(
-    'SELECT * FROM document WHERE id = ? LIMIT 1',
-    [documentId]
-  );
-  
+
+  const results = await db.select<Document[]>('SELECT * FROM document WHERE id = ? LIMIT 1', [
+    documentId,
+  ]);
+
   return results[0] || null;
 }
 
@@ -195,11 +202,11 @@ export async function getDocument(documentId: number): Promise<Document | null> 
  */
 export async function getDocumentContent(documentId: number): Promise<Uint8Array> {
   const doc = await getDocument(documentId);
-  
+
   if (!doc) {
     throw new Error(`Document ID ${documentId} does not exist`);
   }
-  
+
   try {
     const content = await readFile(doc.file_path, { baseDir: BaseDirectory.AppData });
     return content;
@@ -213,17 +220,21 @@ export async function getDocumentContent(documentId: number): Promise<Uint8Array
  */
 export async function getEntityDocuments(
   entityType: EntityType,
-  entityId: number
+  entityId: number,
 ): Promise<DocumentWithAttachment[]> {
   const db = await getDatabase();
-  
-  const results = await db.select<Array<Document & {
-    attachment_id: number;
-    attachment_type: AttachmentType;
-    attachment_notes: string;
-    attached_by: string;
-    attached_at: string;
-  }>>(
+
+  const results = await db.select<
+    Array<
+      Document & {
+        attachment_id: number;
+        attachment_type: AttachmentType;
+        attachment_notes: string;
+        attached_by: string;
+        attached_at: string;
+      }
+    >
+  >(
     `SELECT 
        d.*,
        da.id as attachment_id,
@@ -235,13 +246,13 @@ export async function getEntityDocuments(
      JOIN document_attachment da ON d.id = da.document_id
      WHERE da.entity_type = ? AND da.entity_id = ?
      ORDER BY da.attached_at DESC`,
-    [entityType, entityId]
+    [entityType, entityId],
   );
-  
-  return results.map(r => ({
+
+  return results.map((r) => ({
     ...r,
     entity_type: entityType,
-    entity_id: entityId
+    entity_id: entityId,
   }));
 }
 
@@ -250,14 +261,14 @@ export async function getEntityDocuments(
  */
 export async function getDocumentsByType(documentType: DocumentType): Promise<Document[]> {
   const db = await getDatabase();
-  
+
   const results = await db.select<Document[]>(
     `SELECT * FROM document 
      WHERE document_type = ?
      ORDER BY uploaded_at DESC`,
-    [documentType]
+    [documentType],
   );
-  
+
   return results;
 }
 
@@ -266,16 +277,16 @@ export async function getDocumentsByType(documentType: DocumentType): Promise<Do
  */
 export async function searchDocuments(query: string): Promise<Document[]> {
   const db = await getDatabase();
-  
+
   const results = await db.select<Document[]>(
     `SELECT * FROM document 
      WHERE original_file_name LIKE ? 
         OR description LIKE ?
         OR tags LIKE ?
      ORDER BY uploaded_at DESC`,
-    [`%${query}%`, `%${query}%`, `%${query}%`]
+    [`%${query}%`, `%${query}%`, `%${query}%`],
   );
-  
+
   return results;
 }
 
@@ -284,27 +295,24 @@ export async function searchDocuments(query: string): Promise<Document[]> {
  */
 export async function deleteDocument(documentId: number): Promise<void> {
   const db = await getDatabase();
-  
+
   // Get document to find file path
   const doc = await getDocument(documentId);
-  
+
   if (!doc) {
     throw new Error(`Document ID ${documentId} does not exist`);
   }
-  
+
   // Check if any other document references the same file
   // (content-hash deduplication means multiple docs can share a file)
   const otherDocsWithSameFile = await db.select<Array<{ count: number }>>(
     'SELECT COUNT(*) as count FROM document WHERE file_path = ? AND id != ?',
-    [doc.file_path, documentId]
+    [doc.file_path, documentId],
   );
-  
+
   // Delete document record first (attachments cascade via FK)
-  await db.execute(
-    'DELETE FROM document WHERE id = ?',
-    [documentId]
-  );
-  
+  await db.execute('DELETE FROM document WHERE id = ?', [documentId]);
+
   // Only delete the physical file if no other document references it
   if (otherDocsWithSameFile[0]?.count === 0) {
     try {
@@ -321,17 +329,17 @@ export async function deleteDocument(documentId: number): Promise<void> {
  */
 export async function getEntityAttachmentCount(
   entityType: EntityType,
-  entityId: number
+  entityId: number,
 ): Promise<number> {
   const db = await getDatabase();
-  
+
   const results = await db.select<Array<{ count: number }>>(
     `SELECT COUNT(*) as count
      FROM document_attachment
      WHERE entity_type = ? AND entity_id = ?`,
-    [entityType, entityId]
+    [entityType, entityId],
   );
-  
+
   return results[0]?.count || 0;
 }
 
@@ -340,17 +348,17 @@ export async function getEntityAttachmentCount(
  */
 export async function getEntityAttachments(
   entityType: EntityType,
-  entityId: number
+  entityId: number,
 ): Promise<DocumentAttachment[]> {
   const db = await getDatabase();
-  
+
   const results = await db.select<DocumentAttachment[]>(
     `SELECT * FROM document_attachment
      WHERE entity_type = ? AND entity_id = ?
      ORDER BY attached_at DESC`,
-    [entityType, entityId]
+    [entityType, entityId],
   );
-  
+
   return results;
 }
 
@@ -363,38 +371,35 @@ export async function updateDocument(
     document_type?: DocumentType;
     description?: string;
     tags?: string;
-  }
+  },
 ): Promise<void> {
   const db = await getDatabase();
-  
+
   const fields: string[] = [];
   const values: SqlParams = [];
-  
+
   if (updates.document_type !== undefined) {
     fields.push('document_type = ?');
     values.push(updates.document_type || null);
   }
-  
+
   if (updates.description !== undefined) {
     fields.push('description = ?');
     values.push(updates.description || null);
   }
-  
+
   if (updates.tags !== undefined) {
     fields.push('tags = ?');
     values.push(updates.tags || null);
   }
-  
+
   if (fields.length === 0) {
     return; // Nothing to update
   }
-  
+
   values.push(documentId);
-  
-  await db.execute(
-    `UPDATE document SET ${fields.join(', ')} WHERE id = ?`,
-    values
-  );
+
+  await db.execute(`UPDATE document SET ${fields.join(', ')} WHERE id = ?`, values);
 }
 
 /**
@@ -408,10 +413,10 @@ export async function bulkAttachDocument(
     attachmentType?: AttachmentType;
     notes?: string;
   }>,
-  attachedBy?: string
+  attachedBy?: string,
 ): Promise<number[]> {
   const attachmentIds: number[] = [];
-  
+
   for (const att of attachments) {
     const id = await attachDocument(
       documentId,
@@ -419,11 +424,11 @@ export async function bulkAttachDocument(
       att.entityId,
       att.attachmentType || 'supporting',
       att.notes,
-      attachedBy
+      attachedBy,
     );
     attachmentIds.push(id);
   }
-  
+
   return attachmentIds;
 }
 
@@ -432,29 +437,32 @@ export async function bulkAttachDocument(
  * Removes files from disk that have no matching database record
  * Returns the number of files cleaned up
  */
-export async function garbageCollectDocuments(): Promise<{ filesRemoved: number; filesScanned: number }> {
+export async function garbageCollectDocuments(): Promise<{
+  filesRemoved: number;
+  filesScanned: number;
+}> {
   const db = await getDatabase();
-  
+
   // Ensure directory exists
   await ensureDocumentDir();
-  
+
   let filesRemoved = 0;
   let filesScanned = 0;
-  
+
   try {
     const entries = await readDir(DOCUMENTS_DIR, { baseDir: BaseDirectory.AppData });
-    
+
     for (const entry of entries) {
       if (entry.name && entry.isFile) {
         filesScanned++;
         const filePath = `${DOCUMENTS_DIR}/${entry.name}`;
-        
+
         // Check if any document record references this file
         const matches = await db.select<Array<{ count: number }>>(
           'SELECT COUNT(*) as count FROM document WHERE file_path = ?',
-          [filePath]
+          [filePath],
         );
-        
+
         if (matches[0]?.count === 0) {
           // Orphaned file - remove it
           try {
@@ -469,6 +477,6 @@ export async function garbageCollectDocuments(): Promise<{ filesRemoved: number;
   } catch (error) {
     logger.error('Failed to read documents directory:', error);
   }
-  
+
   return { filesRemoved, filesScanned };
 }

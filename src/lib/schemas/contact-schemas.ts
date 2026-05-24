@@ -1,10 +1,6 @@
 import { z } from 'zod';
 
-import {
-  NonEmptyStringSchema,
-  OptionalStringSchema,
-  PhoneSchema,
-} from './common';
+import { NonEmptyStringSchema, OptionalStringSchema, PhoneSchema } from './common';
 
 export const ContactTypeSchema = z.enum(['customer', 'vendor', 'both']);
 

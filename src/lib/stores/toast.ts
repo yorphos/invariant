@@ -1,6 +1,6 @@
 /**
  * Toast Notification Store
- * 
+ *
  * Provides a global toast notification system for user feedback.
  * Replaces alert() dialogs with non-blocking notifications.
  */
@@ -23,7 +23,7 @@ function createToastStore() {
   function addToast(
     message: string,
     type: ToastType = 'info',
-    options: { duration?: number; dismissible?: boolean } = {}
+    options: { duration?: number; dismissible?: boolean } = {},
   ): string {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const duration = options.duration ?? (type === 'error' ? 8000 : 5000);
@@ -31,7 +31,7 @@ function createToastStore() {
 
     const toast: Toast = { id, type, message, duration, dismissible };
 
-    update(toasts => [...toasts, toast]);
+    update((toasts) => [...toasts, toast]);
 
     // Auto-dismiss after duration
     if (duration > 0) {
@@ -44,7 +44,7 @@ function createToastStore() {
   }
 
   function dismiss(id: string) {
-    update(toasts => toasts.filter(t => t.id !== id));
+    update((toasts) => toasts.filter((t) => t.id !== id));
   }
 
   function clear() {
@@ -62,7 +62,7 @@ function createToastStore() {
     info: (message: string, options?: { duration?: number; dismissible?: boolean }) =>
       addToast(message, 'info', options),
     dismiss,
-    clear
+    clear,
   };
 }
 

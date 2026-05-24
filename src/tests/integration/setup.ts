@@ -13,11 +13,8 @@ vi.mock('../../lib/services/database', async (importOriginal) => {
 // Mock getSystemAccount to use test database
 vi.mock('../../lib/services/system-accounts', () => ({
   getSystemAccount: vi.fn(async (key: string) => {
-    const db = await getTestDatabase() as unknown;
-    const result = await (db as any).get(
-      'SELECT a.* FROM system_account WHERE key = ?',
-      [key]
-    );
+    const db = (await getTestDatabase()) as unknown;
+    const result = await (db as any).get('SELECT a.* FROM system_account WHERE key = ?', [key]);
     if (!result) {
       throw new Error(`System account '${key}' not found`);
     }

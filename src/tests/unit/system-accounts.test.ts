@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 /**
  * System Accounts Tests (Phase 7)
- * 
+ *
  * Comprehensive tests for dynamic system account management:
  * - System account role types and validation
  * - Account type constraints for each role
@@ -47,31 +47,41 @@ describe('System Account Role Types', () => {
   });
 
   it('should have 5 core accounting roles', () => {
-    const coreRoles = ALL_ROLES.filter(r => 
-      ['accounts_receivable', 'accounts_payable', 'sales_tax_payable', 
-       'retained_earnings', 'current_year_earnings'].includes(r)
+    const coreRoles = ALL_ROLES.filter((r) =>
+      [
+        'accounts_receivable',
+        'accounts_payable',
+        'sales_tax_payable',
+        'retained_earnings',
+        'current_year_earnings',
+      ].includes(r),
     );
     expect(coreRoles.length).toBe(5);
   });
 
   it('should have 3 cash/banking roles', () => {
-    const cashRoles = ALL_ROLES.filter(r => 
-      ['cash_default', 'checking_account', 'customer_deposits'].includes(r)
+    const cashRoles = ALL_ROLES.filter((r) =>
+      ['cash_default', 'checking_account', 'customer_deposits'].includes(r),
     );
     expect(cashRoles.length).toBe(3);
   });
 
   it('should have 4 payroll roles', () => {
-    const payrollRoles = ALL_ROLES.filter(r => 
-      ['salary_expense', 'cpp_payable', 'ei_payable', 'tax_withholding_payable'].includes(r)
+    const payrollRoles = ALL_ROLES.filter((r) =>
+      ['salary_expense', 'cpp_payable', 'ei_payable', 'tax_withholding_payable'].includes(r),
     );
     expect(payrollRoles.length).toBe(4);
   });
 
   it('should have 5 future expansion roles', () => {
-    const futureRoles = ALL_ROLES.filter(r => 
-      ['inventory_asset', 'cogs_expense', 'fx_gain_loss', 
-       'default_revenue', 'default_expense'].includes(r)
+    const futureRoles = ALL_ROLES.filter((r) =>
+      [
+        'inventory_asset',
+        'cogs_expense',
+        'fx_gain_loss',
+        'default_revenue',
+        'default_expense',
+      ].includes(r),
     );
     expect(futureRoles.length).toBe(5);
   });
@@ -219,10 +229,10 @@ describe('Account Code Uniqueness Validation', () => {
   function isCodeUnique(
     newCode: string,
     existingAccounts: Account[],
-    editingAccountId?: number
+    editingAccountId?: number,
   ): boolean {
     const conflicting = existingAccounts.find(
-      a => a.code === newCode && a.id !== editingAccountId
+      (a) => a.code === newCode && a.id !== editingAccountId,
     );
     return !conflicting;
   }
@@ -261,9 +271,7 @@ describe('Account Code Uniqueness Validation', () => {
   });
 
   it('should handle whitespace in codes', () => {
-    const accountsWithSpaces: Account[] = [
-      { id: 1, code: '1000', name: 'Cash', type: 'asset' },
-    ];
+    const accountsWithSpaces: Account[] = [{ id: 1, code: '1000', name: 'Cash', type: 'asset' }];
     // Code with space is different
     expect(isCodeUnique(' 1000', accountsWithSpaces)).toBe(true);
     expect(isCodeUnique('1000 ', accountsWithSpaces)).toBe(true);
@@ -286,7 +294,7 @@ describe('System Account Warning Logic', () => {
     accountId: number,
     oldCode: string,
     newCode: string,
-    systemAccountRoles: SystemAccountRolesMap
+    systemAccountRoles: SystemAccountRolesMap,
   ): boolean {
     if (oldCode === newCode) return false;
     return systemAccountRoles.has(accountId);
@@ -295,7 +303,7 @@ describe('System Account Warning Logic', () => {
   function formatRoleName(role: string): string {
     return role
       .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
   }
 
@@ -338,7 +346,12 @@ describe('System Account Warning Logic', () => {
 describe('System Account Badge Display', () => {
   function getSystemBadgeTooltip(roles: string[]): string {
     return roles
-      .map(r => r.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '))
+      .map((r) =>
+        r
+          .split('_')
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' '),
+      )
       .join(', ');
   }
 
@@ -364,8 +377,9 @@ describe('System Account Badge Display', () => {
   });
 
   it('should generate tooltip with multiple roles', () => {
-    expect(getSystemBadgeTooltip(['cash_default', 'checking_account']))
-      .toBe('Cash Default, Checking Account');
+    expect(getSystemBadgeTooltip(['cash_default', 'checking_account'])).toBe(
+      'Cash Default, Checking Account',
+    );
   });
 
   it('should handle empty roles array', () => {
@@ -537,18 +551,18 @@ describe('System Account Helper Functions', () => {
   function tryGetSystemAccount(
     role: string,
     mappings: Map<string, number>,
-    accounts: Account[]
+    accounts: Account[],
   ): Account | null {
     const accountId = mappings.get(role);
     if (accountId === undefined) return null;
-    return accounts.find(a => a.id === accountId) || null;
+    return accounts.find((a) => a.id === accountId) || null;
   }
 
   // Simulate getSystemAccount behavior (throws if not found)
   function getSystemAccount(
     role: string,
     mappings: Map<string, number>,
-    accounts: Account[]
+    accounts: Account[],
   ): Account {
     const account = tryGetSystemAccount(role, mappings, accounts);
     if (!account) {
@@ -664,7 +678,7 @@ describe('Account Filtering for System Roles', () => {
 
   function getAccountsForRole(role: string, accounts: Account[]): Account[] {
     const types = expectedTypes[role] || [];
-    return accounts.filter(a => a.is_active && types.includes(a.type));
+    return accounts.filter((a) => a.is_active && types.includes(a.type));
   }
 
   const testAccounts: Account[] = [
@@ -679,7 +693,7 @@ describe('Account Filtering for System Roles', () => {
   it('should filter asset accounts for accounts_receivable', () => {
     const accounts = getAccountsForRole('accounts_receivable', testAccounts);
     expect(accounts.length).toBe(2);
-    expect(accounts.every(a => a.type === 'asset')).toBe(true);
+    expect(accounts.every((a) => a.type === 'asset')).toBe(true);
   });
 
   it('should filter liability accounts for accounts_payable', () => {
@@ -697,14 +711,14 @@ describe('Account Filtering for System Roles', () => {
   it('should filter both revenue and expense for fx_gain_loss', () => {
     const accounts = getAccountsForRole('fx_gain_loss', testAccounts);
     expect(accounts.length).toBe(2);
-    expect(accounts.some(a => a.type === 'revenue')).toBe(true);
-    expect(accounts.some(a => a.type === 'expense')).toBe(true);
+    expect(accounts.some((a) => a.type === 'revenue')).toBe(true);
+    expect(accounts.some((a) => a.type === 'expense')).toBe(true);
   });
 
   it('should exclude inactive accounts', () => {
     const accounts = getAccountsForRole('cash_default', testAccounts);
-    expect(accounts.every(a => a.is_active)).toBe(true);
-    expect(accounts.find(a => a.id === 6)).toBeUndefined();
+    expect(accounts.every((a) => a.is_active)).toBe(true);
+    expect(accounts.find((a) => a.id === 6)).toBeUndefined();
   });
 
   it('should return empty array for unknown role', () => {

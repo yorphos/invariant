@@ -1,164 +1,186 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { getDatabase } from './lib/services/database';
-  import { persistenceService } from './lib/services/persistence';
-  import { themeStore } from './lib/stores/theme';
-  import { toasts } from './lib/stores/toast';
-  import { logger } from './lib/utils/logger';
-  import { checkForUpdate, downloadAndInstallUpdate, type UpdateMetadata, type DownloadProgress } from './lib/services/updater';
-  import type { PolicyMode } from './lib/domain/types';
+import { onMount } from 'svelte';
+import { getDatabase } from './lib/services/database';
+import { persistenceService } from './lib/services/persistence';
+import { themeStore } from './lib/stores/theme';
+import { toasts } from './lib/stores/toast';
+import { logger } from './lib/utils/logger';
+import {
+  checkForUpdate,
+  downloadAndInstallUpdate,
+  type UpdateMetadata,
+  type DownloadProgress,
+} from './lib/services/updater';
+import type { PolicyMode } from './lib/domain/types';
 
-  // View imports
-  import DashboardView from './lib/views/DashboardView.svelte';
-  import AccountsView from './lib/views/AccountsView.svelte';
-  import ContactsView from './lib/views/ContactsView.svelte';
-  import InvoicesView from './lib/views/InvoicesView.svelte';
-  import PaymentsView from './lib/views/PaymentsView.svelte';
-  import BillsView from './lib/views/BillsView.svelte';
-  import ExpensesView from './lib/views/ExpensesView.svelte';
-  import ReportsView from './lib/views/ReportsView.svelte';
-  import ReconciliationView from './lib/views/ReconciliationView.svelte';
-  import BatchOperationsView from './lib/views/BatchOperationsView.svelte';
-  import BankImportView from './lib/views/BankImportView.svelte';
-  import InventoryView from './lib/views/InventoryView.svelte';
-  import PayrollView from './lib/views/PayrollView.svelte';
-  import JournalEntryView from './lib/views/JournalEntryView.svelte';
-  import CreditNotesView from './lib/views/CreditNotesView.svelte';
-  import BudgetView from './lib/views/BudgetView.svelte';
+// View imports
+import DashboardView from './lib/views/DashboardView.svelte';
+import AccountsView from './lib/views/AccountsView.svelte';
+import ContactsView from './lib/views/ContactsView.svelte';
+import InvoicesView from './lib/views/InvoicesView.svelte';
+import PaymentsView from './lib/views/PaymentsView.svelte';
+import BillsView from './lib/views/BillsView.svelte';
+import ExpensesView from './lib/views/ExpensesView.svelte';
+import ReportsView from './lib/views/ReportsView.svelte';
+import ReconciliationView from './lib/views/ReconciliationView.svelte';
+import BatchOperationsView from './lib/views/BatchOperationsView.svelte';
+import BankImportView from './lib/views/BankImportView.svelte';
+import InventoryView from './lib/views/InventoryView.svelte';
+import PayrollView from './lib/views/PayrollView.svelte';
+import JournalEntryView from './lib/views/JournalEntryView.svelte';
+import CreditNotesView from './lib/views/CreditNotesView.svelte';
+import BudgetView from './lib/views/BudgetView.svelte';
 
-  // Extracted UI components
-  import Sidebar from './lib/ui/Sidebar.svelte';
-  import SettingsPanel from './lib/ui/SettingsPanel.svelte';
-  import BackupPanel from './lib/ui/BackupPanel.svelte';
-  import PeriodClosePanel from './lib/ui/PeriodClosePanel.svelte';
-  import UpdateModal from './lib/ui/UpdateModal.svelte';
-  import ToastContainer from './lib/ui/ToastContainer.svelte';
+// Extracted UI components
+import Sidebar from './lib/ui/Sidebar.svelte';
+import SettingsPanel from './lib/ui/SettingsPanel.svelte';
+import BackupPanel from './lib/ui/BackupPanel.svelte';
+import PeriodClosePanel from './lib/ui/PeriodClosePanel.svelte';
+import UpdateModal from './lib/ui/UpdateModal.svelte';
+import ToastContainer from './lib/ui/ToastContainer.svelte';
 
-  let mode: PolicyMode = 'beginner';
-  let dbReady = false;
-  let error = '';
-  let activeView: 'dashboard' | 'accounts' | 'contacts' | 'invoices' | 'payments' | 'bills' | 'expenses' | 'reports' | 'reconciliation' | 'batch' | 'bank-import' | 'inventory' | 'payroll' | 'journal' | 'credit-notes' | 'budget' | 'settings' = 'dashboard';
+let mode: PolicyMode = 'beginner';
+let dbReady = false;
+let error = '';
+let activeView:
+  | 'dashboard'
+  | 'accounts'
+  | 'contacts'
+  | 'invoices'
+  | 'payments'
+  | 'bills'
+  | 'expenses'
+  | 'reports'
+  | 'reconciliation'
+  | 'batch'
+  | 'bank-import'
+  | 'inventory'
+  | 'payroll'
+  | 'journal'
+  | 'credit-notes'
+  | 'budget'
+  | 'settings' = 'dashboard';
 
-  // Modal visibility
-  let showSettings = false;
-  let showBackup = false;
-  let showPeriodClose = false;
-  let showUpdateModal = false;
+// Modal visibility
+let showSettings = false;
+let showBackup = false;
+let showPeriodClose = false;
+let showUpdateModal = false;
 
-  // Update state (needed for startup check and error view)
-  let updateAvailable: UpdateMetadata | null = null;
-  let downloadProgress: DownloadProgress | null = null;
-  let skippedVersion: string | null = null;
+// Update state (needed for startup check and error view)
+let updateAvailable: UpdateMetadata | null = null;
+let downloadProgress: DownloadProgress | null = null;
+let skippedVersion: string | null = null;
 
-  onMount(async () => {
-    themeStore.init();
+onMount(async () => {
+  themeStore.init();
+
+  try {
+    await getDatabase();
+    mode = await persistenceService.getMode();
+    dbReady = true;
+
+    checkForUpdatesOnStartup();
+  } catch (e) {
+    const errorMessage = String(e);
+    error = `Failed to initialize: ${errorMessage}`;
 
     try {
-      await getDatabase();
-      mode = await persistenceService.getMode();
-      dbReady = true;
-
-      checkForUpdatesOnStartup();
-    } catch (e) {
-      const errorMessage = String(e);
-      error = `Failed to initialize: ${errorMessage}`;
-
-      try {
-        logger.info('Initialization error detected, checking for updates...');
-        const channel = await persistenceService.getUpdateChannel();
-        const update = await checkForUpdate(channel);
-
-        if (update) {
-          updateAvailable = update;
-          showUpdateModal = true;
-          error = `${error}\n\nA new version (v${update.version}) is available that may fix this issue.`;
-        }
-      } catch (updateError) {
-        logger.error('Failed to check for updates:', updateError);
-      }
-
-      logger.error(error);
-    }
-  });
-
-  async function checkForUpdatesOnStartup() {
-    try {
-      const channel = await persistenceService.getUpdateChannel();
-      const update = await checkForUpdate(channel);
-
-      if (update) {
-        if (skippedVersion === update.version) {
-          logger.debug(`Update ${update.version} was skipped this session`);
-          return;
-        }
-
-        updateAvailable = update;
-        showUpdateModal = true;
-        await persistenceService.setLastUpdateCheck(new Date().toISOString());
-      }
-    } catch (e) {
-      logger.error('Update check failed:', e);
-    }
-  }
-
-  async function handleManualUpdateCheck() {
-    try {
-      toasts.info('Checking for updates...');
+      logger.info('Initialization error detected, checking for updates...');
       const channel = await persistenceService.getUpdateChannel();
       const update = await checkForUpdate(channel);
 
       if (update) {
         updateAvailable = update;
         showUpdateModal = true;
-        skippedVersion = null;
-        await persistenceService.setLastUpdateCheck(new Date().toISOString());
-      } else {
-        toasts.success('You are running the latest version!');
+        error = `${error}\n\nA new version (v${update.version}) is available that may fix this issue.`;
       }
-    } catch (e) {
-      toasts.error(`Update check failed: ${e}`);
+    } catch (updateError) {
+      logger.error('Failed to check for updates:', updateError);
     }
+
+    logger.error(error);
   }
+});
 
-  async function handleInstallUpdate() {
-    if (!updateAvailable) return;
+async function checkForUpdatesOnStartup() {
+  try {
+    const channel = await persistenceService.getUpdateChannel();
+    const update = await checkForUpdate(channel);
 
-    try {
-      downloadProgress = { downloaded: 0, contentLength: null };
+    if (update) {
+      if (skippedVersion === update.version) {
+        logger.debug(`Update ${update.version} was skipped this session`);
+        return;
+      }
 
-      await downloadAndInstallUpdate((progress) => {
-        downloadProgress = progress;
-      });
-
-      toasts.success('Update installed! The app will restart now.');
-    } catch (e) {
-      toasts.error(`Update installation failed: ${e}`);
-      downloadProgress = null;
+      updateAvailable = update;
+      showUpdateModal = true;
+      await persistenceService.setLastUpdateCheck(new Date().toISOString());
     }
+  } catch (e) {
+    logger.error('Update check failed:', e);
   }
+}
 
-  function handleSkipUpdate() {
-    if (updateAvailable) {
-      skippedVersion = updateAvailable.version;
-      toasts.info(`Skipped version ${updateAvailable.version} for this session`);
+async function handleManualUpdateCheck() {
+  try {
+    toasts.info('Checking for updates...');
+    const channel = await persistenceService.getUpdateChannel();
+    const update = await checkForUpdate(channel);
+
+    if (update) {
+      updateAvailable = update;
+      showUpdateModal = true;
+      skippedVersion = null;
+      await persistenceService.setLastUpdateCheck(new Date().toISOString());
+    } else {
+      toasts.success('You are running the latest version!');
     }
-    showUpdateModal = false;
-    updateAvailable = null;
+  } catch (e) {
+    toasts.error(`Update check failed: ${e}`);
+  }
+}
+
+async function handleInstallUpdate() {
+  if (!updateAvailable) return;
+
+  try {
+    downloadProgress = { downloaded: 0, contentLength: null };
+
+    await downloadAndInstallUpdate((progress) => {
+      downloadProgress = progress;
+    });
+
+    toasts.success('Update installed! The app will restart now.');
+  } catch (e) {
+    toasts.error(`Update installation failed: ${e}`);
     downloadProgress = null;
   }
+}
 
-  function handleRemindLater() {
-    showUpdateModal = false;
+function handleSkipUpdate() {
+  if (updateAvailable) {
+    skippedVersion = updateAvailable.version;
+    toasts.info(`Skipped version ${updateAvailable.version} for this session`);
   }
+  showUpdateModal = false;
+  updateAvailable = null;
+  downloadProgress = null;
+}
 
-  function handleModeChange(newMode: PolicyMode) {
-    mode = newMode;
-    toasts.success(`Switched to ${mode === 'pro' ? 'Pro' : 'Beginner'} Mode`);
-  }
+function handleRemindLater() {
+  showUpdateModal = false;
+}
 
-  function setView(view: typeof activeView) {
-    activeView = view;
-  }
+function handleModeChange(newMode: PolicyMode) {
+  mode = newMode;
+  toasts.success(`Switched to ${mode === 'pro' ? 'Pro' : 'Beginner'} Mode`);
+}
+
+function setView(view: typeof activeView) {
+  activeView = view;
+}
 </script>
 
 <div class="app">

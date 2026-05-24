@@ -22,9 +22,9 @@ export interface CreditNoteInput {
 
 async function validateAndRecalculateCreditNote(
   creditNoteData: CreditNoteInput,
-  lines: CreditNoteLine[]
+  lines: CreditNoteLine[],
 ) {
-  const recalculatedLines = lines.map(line => {
+  const recalculatedLines = lines.map((line) => {
     if (!line.description || line.description.trim() === '') {
       throw new Error('Line item description is required');
     }
@@ -43,8 +43,8 @@ async function validateAndRecalculateCreditNote(
     if (line.amount && Math.abs(calculatedAmount - line.amount) > 0.01) {
       throw new Error(
         `Amount mismatch for "${line.description}": ` +
-        `${line.quantity} × $${line.unit_price} = $${calculatedAmount.toFixed(2)}, ` +
-        `but received $${line.amount.toFixed(2)}`
+          `${line.quantity} × $${line.unit_price} = $${calculatedAmount.toFixed(2)}, ` +
+          `but received $${line.amount.toFixed(2)}`,
       );
     }
 
@@ -57,16 +57,21 @@ async function validateAndRecalculateCreditNote(
 
   const subtotal = recalculatedLines.reduce((sum, line) => sum + line.amount, 0);
 
-  const hasTaxInclusiveLines = recalculatedLines.some(line => line.is_tax_inclusive);
-  if (hasTaxInclusiveLines && recalculatedLines.some(line => !line.is_tax_inclusive)) {
+  const hasTaxInclusiveLines = recalculatedLines.some((line) => line.is_tax_inclusive);
+  if (hasTaxInclusiveLines && recalculatedLines.some((line) => !line.is_tax_inclusive)) {
     throw new Error('All credit note lines must use same tax inclusive setting');
   }
 
-  const { taxAmount, taxRate, accountId: taxAccountId, netSubtotal } = await calculateTax(
+  const {
+    taxAmount,
+    taxRate,
+    accountId: taxAccountId,
+    netSubtotal,
+  } = await calculateTax(
     subtotal,
     creditNoteData.tax_code_id ?? 1,
     creditNoteData.issue_date,
-    hasTaxInclusiveLines
+    hasTaxInclusiveLines,
   );
 
   const effectiveSubtotal = netSubtotal;
@@ -93,27 +98,38 @@ async function validateAndRecalculateCreditNote(
 export async function createCreditNote(
   creditNoteData: CreditNoteInput,
   lines: CreditNoteLine[],
-  context: PolicyContext
+  context: PolicyContext,
 ): Promise<PostingResult> {
   try {
-    const { recalculatedLines, subtotal, taxAmount, totalAmount, taxAccountId, taxRate, isTaxInclusive } =
-      await validateAndRecalculateCreditNote(creditNoteData, lines);
+    const {
+      recalculatedLines,
+      subtotal,
+      taxAmount,
+      totalAmount,
+      taxAccountId,
+      taxRate,
+      isTaxInclusive,
+    } = await validateAndRecalculateCreditNote(creditNoteData, lines);
 
     const accounts = await persistenceService.getAccounts();
     const arAccount = await getSystemAccount('accounts_receivable');
-    const taxAccount = taxAccountId ? accounts.find(a => a.id === taxAccountId) : null;
+    const taxAccount = taxAccountId ? accounts.find((a) => a.id === taxAccountId) : null;
 
     if (taxAmount > 0 && !taxAccount) {
       throw new Error('Tax account not found for selected tax code.');
     }
 
     for (const line of recalculatedLines) {
-      const account = accounts.find(a => a.id === line.account_id);
+      const account = accounts.find((a) => a.id === line.account_id);
       if (!account) {
-        throw new Error(`Account ID ${line.account_id} not found for line item: ${line.description}`);
+        throw new Error(
+          `Account ID ${line.account_id} not found for line item: ${line.description}`,
+        );
       }
       if (account.type !== 'revenue') {
-        throw new Error(`Account "${account.name}" must be a revenue account for credit note line items`);
+        throw new Error(
+          `Account "${account.name}" must be a revenue account for credit note line items`,
+        );
       }
     }
 
@@ -137,7 +153,7 @@ export async function createCreditNote(
         applied_amount: 0,
         tax_code_id: creditNoteData.tax_code_id,
       },
-      recalculatedLines
+      recalculatedLines,
     );
 
     const journalLines = [
@@ -150,9 +166,8 @@ export async function createCreditNote(
     ];
 
     for (const line of recalculatedLines) {
-      const revenueAmount = isTaxInclusive && taxRate > 0
-        ? line.amount / (1 + taxRate)
-        : line.amount;
+      const revenueAmount =
+        isTaxInclusive && taxRate > 0 ? line.amount / (1 + taxRate) : line.amount;
       journalLines.push({
         account_id: line.account_id!,
         debit_amount: revenueAmount,
@@ -178,7 +193,7 @@ export async function createCreditNote(
         reference: creditNoteData.credit_note_number,
         status: 'posted',
       },
-      journalLines
+      journalLines,
     );
 
     return {
@@ -193,13 +208,15 @@ export async function createCreditNote(
       errorMessage = error.message;
 
       if (errorMessage.includes('1811')) {
-        errorMessage = 'Database integrity error (1811). This may be caused by database corruption or trigger issues. Please try again.';
+        errorMessage =
+          'Database integrity error (1811). This may be caused by database corruption or trigger issues. Please try again.';
       } else if (errorMessage.includes('FOREIGN KEY')) {
         errorMessage = 'Foreign key constraint error. Please ensure all referenced data exists.';
       } else if (errorMessage.includes('UNIQUE')) {
         errorMessage = 'This credit note number already exists. Please use a different number.';
       } else if (errorMessage.includes('balanced')) {
-        errorMessage = 'Journal entry is not balanced. This is an internal error - please report it.';
+        errorMessage =
+          'Journal entry is not balanced. This is an internal error - please report it.';
       }
     }
 
@@ -220,18 +237,18 @@ export async function applyCreditNote(
   creditNoteId: number,
   invoiceId: number,
   amount: number,
-  notes?: string
+  notes?: string,
 ): Promise<PostingResult> {
   try {
     const creditNotes = await persistenceService.getCreditNotes();
-    const creditNote = creditNotes.find(cn => cn.id === creditNoteId);
+    const creditNote = creditNotes.find((cn) => cn.id === creditNoteId);
 
     if (!creditNote) {
       throw new Error('Credit note not found');
     }
 
     const invoices = await persistenceService.getInvoices();
-    const invoice = invoices.find(inv => inv.id === invoiceId);
+    const invoice = invoices.find((inv) => inv.id === invoiceId);
 
     if (!invoice) {
       throw new Error('Invoice not found');
@@ -248,14 +265,14 @@ export async function applyCreditNote(
     const availableAmount = creditNote.total_amount - creditNote.applied_amount;
     if (amount > availableAmount) {
       throw new Error(
-        `Cannot apply $${amount.toFixed(2)}. Only $${availableAmount.toFixed(2)} available on credit note.`
+        `Cannot apply $${amount.toFixed(2)}. Only $${availableAmount.toFixed(2)} available on credit note.`,
       );
     }
 
     const outstandingInvoice = invoice.total_amount - invoice.paid_amount;
     if (amount > outstandingInvoice) {
       throw new Error(
-        `Cannot apply $${amount.toFixed(2)}. Only $${outstandingInvoice.toFixed(2)} outstanding on invoice.`
+        `Cannot apply $${amount.toFixed(2)}. Only $${outstandingInvoice.toFixed(2)} outstanding on invoice.`,
       );
     }
 
@@ -269,7 +286,7 @@ export async function applyCreditNote(
     await db.execute(
       `INSERT INTO credit_note_application (credit_note_id, invoice_id, amount, notes, application_date)
        VALUES (?, ?, ?, ?, date('now'))`,
-      [creditNoteId, invoiceId, amount, notes]
+      [creditNoteId, invoiceId, amount, notes],
     );
 
     const eventId = await persistenceService.createTransactionEvent({
@@ -303,12 +320,12 @@ export async function applyCreditNote(
         reference: `${creditNote.credit_note_number} -> ${invoice.invoice_number}`,
         status: 'posted',
       },
-      journalLines
+      journalLines,
     );
 
     await db.execute(
       `UPDATE invoice SET paid_amount = paid_amount + ?, updated_at = datetime('now') WHERE id = ?`,
-      [amount, invoiceId]
+      [amount, invoiceId],
     );
 
     const newAppliedAmount = creditNote.applied_amount + amount;
@@ -321,7 +338,7 @@ export async function applyCreditNote(
 
     await db.execute(
       `UPDATE credit_note SET status = ?, updated_at = datetime('now') WHERE id = ?`,
-      [newStatus, creditNoteId]
+      [newStatus, creditNoteId],
     );
 
     return {
@@ -353,11 +370,11 @@ export async function refundCreditNote(
   refundDate: string,
   paymentMethod: string,
   amount: number,
-  notes?: string
+  notes?: string,
 ): Promise<PostingResult> {
   try {
     const creditNotes = await persistenceService.getCreditNotes();
-    const creditNote = creditNotes.find(cn => cn.id === creditNoteId);
+    const creditNote = creditNotes.find((cn) => cn.id === creditNoteId);
 
     if (!creditNote) {
       throw new Error('Credit note not found');
@@ -370,7 +387,7 @@ export async function refundCreditNote(
     const availableAmount = creditNote.total_amount - creditNote.applied_amount;
     if (amount > availableAmount) {
       throw new Error(
-        `Cannot refund $${amount.toFixed(2)}. Only $${availableAmount.toFixed(2)} available on credit note.`
+        `Cannot refund $${amount.toFixed(2)}. Only $${availableAmount.toFixed(2)} available on credit note.`,
       );
     }
 
@@ -391,7 +408,7 @@ export async function refundCreditNote(
     await db.execute(
       `INSERT INTO credit_note_refund (credit_note_id, refund_number, refund_date, amount, payment_method, notes, event_id)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [creditNoteId, refundNumber, refundDate, amount, paymentMethod, notes, eventId]
+      [creditNoteId, refundNumber, refundDate, amount, paymentMethod, notes, eventId],
     );
 
     const journalLines = [
@@ -417,7 +434,7 @@ export async function refundCreditNote(
         reference: refundNumber,
         status: 'posted',
       },
-      journalLines
+      journalLines,
     );
 
     const newAppliedAmount = creditNote.applied_amount + amount;
@@ -430,7 +447,7 @@ export async function refundCreditNote(
 
     await db.execute(
       `UPDATE credit_note SET applied_amount = ?, status = ?, updated_at = datetime('now') WHERE id = ?`,
-      [newAppliedAmount, newStatus, creditNoteId]
+      [newAppliedAmount, newStatus, creditNoteId],
     );
 
     return {
@@ -456,13 +473,10 @@ export async function refundCreditNote(
   }
 }
 
-export async function voidCreditNote(
-  creditNoteId: number,
-  reason: string
-): Promise<PostingResult> {
+export async function voidCreditNote(creditNoteId: number, reason: string): Promise<PostingResult> {
   try {
     const creditNotes = await persistenceService.getCreditNotes();
-    const creditNote = creditNotes.find(cn => cn.id === creditNoteId);
+    const creditNote = creditNotes.find((cn) => cn.id === creditNoteId);
 
     if (!creditNote) {
       throw new Error('Credit note not found');
@@ -473,7 +487,9 @@ export async function voidCreditNote(
     }
 
     if (creditNote.applied_amount > 0) {
-      throw new Error('Cannot void a credit note that has been applied. You must reverse the applications first.');
+      throw new Error(
+        'Cannot void a credit note that has been applied. You must reverse the applications first.',
+      );
     }
 
     const voidDate = new Date().toISOString().split('T')[0];
@@ -481,7 +497,7 @@ export async function voidCreditNote(
     const db = await getDatabase();
     const creditNoteLines = await db.select<CreditNoteLine[]>(
       'SELECT * FROM credit_note_line WHERE credit_note_id = ? ORDER BY line_number',
-      [creditNoteId]
+      [creditNoteId],
     );
 
     const eventId = await persistenceService.createTransactionEvent({
@@ -499,7 +515,7 @@ export async function voidCreditNote(
     if (creditNote.tax_code_id && creditNote.tax_amount > 0) {
       const taxRate = await getTaxRate(creditNote.tax_code_id!, creditNote.issue_date);
       if (taxRate && taxRate.account_id) {
-        taxAccount = accounts.find(a => a.id === taxRate.account_id);
+        taxAccount = accounts.find((a) => a.id === taxRate.account_id);
       }
     }
 
@@ -542,12 +558,12 @@ export async function voidCreditNote(
         reference: creditNote.credit_note_number,
         status: 'posted',
       },
-      journalLines
+      journalLines,
     );
 
     await db.execute(
       'UPDATE credit_note SET status = ?, updated_at = datetime("now") WHERE id = ?',
-      ['void', creditNoteId]
+      ['void', creditNoteId],
     );
 
     return {

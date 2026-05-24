@@ -1,19 +1,19 @@
 /**
  * Currency Operations
- * 
+ *
  * Business logic for multi-currency accounting:
  * - Currency management
  * - Exchange rate management
  * - Foreign exchange gain/loss calculations
  * - Multi-currency transaction processing
- * 
+ *
  * Accounting Principles:
  * - All amounts stored in home currency (CAD) in the general ledger
  * - Foreign amounts tracked separately for reference and reconciliation
  * - Realized gains/losses: When foreign currency is settled (DR/CR FX Gain/Loss)
  * - Unrealized gains/losses: Period-end revaluation of open balances
  * - Exchange rates locked at transaction time
- * 
+ *
  * Formula:
  * Home Amount = Foreign Amount × Exchange Rate
  * FX Gain/Loss = (Settled Rate - Original Rate) × Foreign Amount
@@ -52,7 +52,7 @@ export interface FXCalculationResult {
 export async function getActiveCurrencies(): Promise<Currency[]> {
   const db = await getDatabase();
   const currencies = await db.select<Currency[]>(
-    `SELECT * FROM currency WHERE is_active = 1 ORDER BY code`
+    `SELECT * FROM currency WHERE is_active = 1 ORDER BY code`,
   );
   return currencies;
 }
@@ -62,10 +62,7 @@ export async function getActiveCurrencies(): Promise<Currency[]> {
  */
 export async function getCurrencyByCode(code: string): Promise<Currency | undefined> {
   const db = await getDatabase();
-  const currencies = await db.select<Currency[]>(
-    `SELECT * FROM currency WHERE code = ?`,
-    [code]
-  );
+  const currencies = await db.select<Currency[]>(`SELECT * FROM currency WHERE code = ?`, [code]);
   return currencies[0];
 }
 
@@ -85,7 +82,7 @@ export async function getHomeCurrency(): Promise<Currency> {
  */
 export async function addCurrency(input: CurrencyInput): Promise<number> {
   const db = await getDatabase();
-  
+
   // Validation
   if (!input.code || input.code.length !== 3) {
     throw new Error('Currency code must be 3 characters (ISO 4217)');
@@ -111,8 +108,8 @@ export async function addCurrency(input: CurrencyInput): Promise<number> {
       input.name,
       input.symbol,
       input.decimal_places ?? 2,
-      input.is_active ?? true ? 1 : 0,
-    ]
+      (input.is_active ?? true) ? 1 : 0,
+    ],
   );
 
   return result.lastInsertId ?? 0;
@@ -125,7 +122,7 @@ export async function addCurrency(input: CurrencyInput): Promise<number> {
 export async function getExchangeRate(
   fromCurrencyCode: string,
   toCurrencyCode: string,
-  date: string
+  date: string,
 ): Promise<number | undefined> {
   const db = await getDatabase();
 
@@ -147,7 +144,7 @@ export async function getExchangeRate(
        AND rate_date <= ?
      ORDER BY rate_date DESC
      LIMIT 1`,
-    [fromCurrency.id, toCurrency.id, date]
+    [fromCurrency.id, toCurrency.id, date],
   );
 
   return rates[0]?.rate;
@@ -181,15 +178,16 @@ export async function addExchangeRate(input: ExchangeRateInput): Promise<number>
   const existing = await db.select<ExchangeRate[]>(
     `SELECT * FROM exchange_rate
      WHERE from_currency_id = ? AND to_currency_id = ? AND rate_date = ?`,
-    [fromCurrency.id, toCurrency.id, input.rate_date]
+    [fromCurrency.id, toCurrency.id, input.rate_date],
   );
 
   if (existing.length > 0) {
     // Update existing rate
-    await db.execute(
-      `UPDATE exchange_rate SET rate = ?, source = ? WHERE id = ?`,
-      [input.rate, input.source, existing[0].id]
-    );
+    await db.execute(`UPDATE exchange_rate SET rate = ?, source = ? WHERE id = ?`, [
+      input.rate,
+      input.source,
+      existing[0].id,
+    ]);
     return existing[0].id!;
   }
 
@@ -197,7 +195,7 @@ export async function addExchangeRate(input: ExchangeRateInput): Promise<number>
   const result = await db.execute(
     `INSERT INTO exchange_rate (from_currency_id, to_currency_id, rate_date, rate, source)
      VALUES (?, ?, ?, ?, ?)`,
-    [fromCurrency.id, toCurrency.id, input.rate_date, input.rate, input.source]
+    [fromCurrency.id, toCurrency.id, input.rate_date, input.rate, input.source],
   );
 
   return result.lastInsertId ?? 0;
@@ -206,20 +204,14 @@ export async function addExchangeRate(input: ExchangeRateInput): Promise<number>
 /**
  * Convert foreign amount to home currency
  */
-export function convertToHomeCurrency(
-  foreignAmount: number,
-  exchangeRate: number
-): number {
+export function convertToHomeCurrency(foreignAmount: number, exchangeRate: number): number {
   return Math.round(foreignAmount * exchangeRate * 100) / 100;
 }
 
 /**
  * Convert home amount to foreign currency
  */
-export function convertToForeignCurrency(
-  homeAmount: number,
-  exchangeRate: number
-): number {
+export function convertToForeignCurrency(homeAmount: number, exchangeRate: number): number {
   if (exchangeRate === 0) {
     throw new Error('Exchange rate cannot be zero');
   }
@@ -229,14 +221,14 @@ export function convertToForeignCurrency(
 /**
  * Calculate realized FX gain/loss
  * Occurs when a foreign currency transaction is settled
- * 
+ *
  * Gain/Loss = (Settled Rate - Original Rate) × Foreign Amount
  * Positive = Gain (CR FX Gain), Negative = Loss (DR FX Loss)
  */
 export function calculateRealizedFXGainLoss(
   foreignAmount: number,
   originalRate: number,
-  settledRate: number
+  settledRate: number,
 ): number {
   const originalHome = foreignAmount * originalRate;
   const settledHome = foreignAmount * settledRate;
@@ -247,13 +239,13 @@ export function calculateRealizedFXGainLoss(
 /**
  * Calculate unrealized FX gain/loss
  * Period-end revaluation of open foreign currency balances
- * 
+ *
  * Unrealized Gain/Loss = (Current Rate - Original Rate) × Foreign Balance
  */
 export function calculateUnrealizedFXGainLoss(
   foreignBalance: number,
   originalRate: number,
-  currentRate: number
+  currentRate: number,
 ): number {
   const originalHome = foreignBalance * originalRate;
   const currentHome = foreignBalance * currentRate;
@@ -273,7 +265,7 @@ export async function recordRealizedFXGainLoss(
   transactionDate: string,
   journalEntryId?: number,
   reference?: string,
-  notes?: string
+  notes?: string,
 ): Promise<number> {
   const db = await getDatabase();
 
@@ -304,7 +296,7 @@ export async function recordRealizedFXGainLoss(
       journalEntryId,
       reference,
       notes,
-    ]
+    ],
   );
 
   return result.lastInsertId ?? 0;
@@ -316,7 +308,7 @@ export async function recordRealizedFXGainLoss(
 export async function getFXGainLossHistory(
   accountId?: number,
   currencyId?: number,
-  type?: 'realized' | 'unrealized'
+  type?: 'realized' | 'unrealized',
 ): Promise<FXGainLoss[]> {
   const db = await getDatabase();
 
@@ -351,7 +343,7 @@ export async function getFXGainLossHistory(
 export function validateExchangeRate(
   fromCurrency: string,
   toCurrency: string,
-  rate: number
+  rate: number,
 ): { valid: boolean; warning?: string } {
   // Basic validation
   if (rate <= 0) {
@@ -368,12 +360,12 @@ export function validateExchangeRate(
 
   // Currency-specific checks (approximate ranges as of 2026)
   const commonRates: { [key: string]: { min: number; max: number } } = {
-    'CAD-USD': { min: 0.60, max: 0.85 },
+    'CAD-USD': { min: 0.6, max: 0.85 },
     'USD-CAD': { min: 1.15, max: 1.65 },
     'CAD-EUR': { min: 0.55, max: 0.75 },
-    'EUR-CAD': { min: 1.30, max: 1.80 },
+    'EUR-CAD': { min: 1.3, max: 1.8 },
     'CAD-GBP': { min: 0.45, max: 0.65 },
-    'GBP-CAD': { min: 1.50, max: 2.20 },
+    'GBP-CAD': { min: 1.5, max: 2.2 },
   };
 
   const pair = `${fromCurrency}-${toCurrency}`;

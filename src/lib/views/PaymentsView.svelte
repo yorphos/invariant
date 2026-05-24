@@ -1,230 +1,236 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { persistenceService } from '../services/persistence';
-  import { createPayment } from '../domain/payment-operations';
-  import { arMatchingEngine } from '../domain/ar-matching';
-  import type { Payment, Invoice, Contact, PolicyMode } from '../domain/types';
-  import type { AllocationSuggestion } from '../domain/ar-matching';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import Button from '../ui/Button.svelte';
-  import Input from '../ui/Input.svelte';
-  import Select from '../ui/Select.svelte';
-  import Card from '../ui/Card.svelte';
-  import Table from '../ui/Table.svelte';
-  import PaymentDetailModal from '../ui/PaymentDetailModal.svelte';
+import { onMount } from 'svelte';
+import { persistenceService } from '../services/persistence';
+import { createPayment } from '../domain/payment-operations';
+import { arMatchingEngine } from '../domain/ar-matching';
+import type { Payment, Invoice, Contact, PolicyMode } from '../domain/types';
+import type { AllocationSuggestion } from '../domain/ar-matching';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import Button from '../ui/Button.svelte';
+import Input from '../ui/Input.svelte';
+import Select from '../ui/Select.svelte';
+import Card from '../ui/Card.svelte';
+import Table from '../ui/Table.svelte';
+import PaymentDetailModal from '../ui/PaymentDetailModal.svelte';
 
-  export let mode: PolicyMode;
+export let mode: PolicyMode;
 
-  let payments: Payment[] = [];
-  let openInvoices: Invoice[] = [];
-  let contacts: Contact[] = [];
-  let loading = true;
-  let view: 'list' | 'create' = 'list';
-  let selectedPayment: Payment | null = null;
-  let showDetailModal = false;
+let payments: Payment[] = [];
+let openInvoices: Invoice[] = [];
+let contacts: Contact[] = [];
+let loading = true;
+let view: 'list' | 'create' = 'list';
+let selectedPayment: Payment | null = null;
+let showDetailModal = false;
 
-  // Form fields
-  let formPaymentNumber = '';
-  let formContactId: number | '' = '';
-  let formPaymentDate = '';
-  let formAmount = 0;
-  let formMethod: 'cash' | 'check' | 'transfer' | 'card' | 'other' = 'transfer';
-  let formReference = '';
-  let formNotes = '';
-  let selectedInvoices: Array<{ invoice_id: number; amount: number }> = [];
-  
-  // Smart allocation
-  let allocationSuggestion: AllocationSuggestion | null = null;
-  let showSuggestions = false;
+// Form fields
+let formPaymentNumber = '';
+let formContactId: number | '' = '';
+let formPaymentDate = '';
+let formAmount = 0;
+let formMethod: 'cash' | 'check' | 'transfer' | 'card' | 'other' = 'transfer';
+let formReference = '';
+let formNotes = '';
+let selectedInvoices: Array<{ invoice_id: number; amount: number }> = [];
 
-  $: contactOpenInvoices = formContactId && typeof formContactId === 'number'
-    ? openInvoices.filter(inv => inv.contact_id === formContactId)
+// Smart allocation
+let allocationSuggestion: AllocationSuggestion | null = null;
+let showSuggestions = false;
+
+$: contactOpenInvoices =
+  formContactId && typeof formContactId === 'number'
+    ? openInvoices.filter((inv) => inv.contact_id === formContactId)
     : [];
-  
-  $: totalAllocated = selectedInvoices.reduce((sum, si) => sum + si.amount, 0);
-  $: remainingAmount = formAmount - totalAllocated;
-  $: isOverAllocated = remainingAmount < -0.01;
-  $: isUnderAllocated = remainingAmount > 0.01 && selectedInvoices.length > 0;
-  $: isFullyAllocated = Math.abs(remainingAmount) <= 0.01;
 
-  onMount(async () => {
-    await loadData();
-  });
+$: totalAllocated = selectedInvoices.reduce((sum, si) => sum + si.amount, 0);
+$: remainingAmount = formAmount - totalAllocated;
+$: isOverAllocated = remainingAmount < -0.01;
+$: isUnderAllocated = remainingAmount > 0.01 && selectedInvoices.length > 0;
+$: isFullyAllocated = Math.abs(remainingAmount) <= 0.01;
 
-  async function loadData() {
-    loading = true;
-    try {
-      [payments, openInvoices, contacts] = await Promise.all([
-        persistenceService.getPayments(),
-        persistenceService.getOpenInvoices(),
-        persistenceService.getContacts()
-      ]);
+onMount(async () => {
+  await loadData();
+});
 
-      // Generate next payment number
-      if (payments.length === 0) {
-        formPaymentNumber = 'PAY-0001';
-      } else {
-        const lastNum = Math.max(...payments.map(pay => {
+async function loadData() {
+  loading = true;
+  try {
+    [payments, openInvoices, contacts] = await Promise.all([
+      persistenceService.getPayments(),
+      persistenceService.getOpenInvoices(),
+      persistenceService.getContacts(),
+    ]);
+
+    // Generate next payment number
+    if (payments.length === 0) {
+      formPaymentNumber = 'PAY-0001';
+    } else {
+      const lastNum = Math.max(
+        ...payments.map((pay) => {
           const match = pay.payment_number.match(/\d+$/);
           return match ? parseInt(match[0]) : 0;
-        }));
-        formPaymentNumber = `PAY-${String(lastNum + 1).padStart(4, '0')}`;
-      }
-
-      formPaymentDate = new Date().toISOString().split('T')[0];
-    } catch (e) {
-      logger.error('Failed to load data:', e);
-      toasts.error('Failed to load payments');
-    }
-    loading = false;
-  }
-
-  function toggleInvoice(invoice: Invoice) {
-    const existingIndex = selectedInvoices.findIndex(si => si.invoice_id === invoice.id);
-    if (existingIndex >= 0) {
-      selectedInvoices = selectedInvoices.filter((_, i) => i !== existingIndex);
-    } else {
-      const remainingAmount = invoice.total_amount - invoice.paid_amount;
-      selectedInvoices = [...selectedInvoices, { invoice_id: invoice.id!, amount: remainingAmount }];
-    }
-  }
-
-  async function handleSubmit() {
-    try {
-      // Contact is now optional for free-floating payments
-      const contactId = formContactId && typeof formContactId === 'number' ? formContactId : undefined;
-
-      const result = await createPayment(
-        {
-          payment_number: formPaymentNumber,
-          contact_id: contactId,
-          payment_date: formPaymentDate,
-          amount: formAmount,
-          payment_method: formMethod,
-          reference: formReference || undefined,
-          notes: formNotes || undefined,
-        },
-        selectedInvoices,
-        { mode }
+        }),
       );
-
-      if (!result.ok) {
-        toasts.error('Failed to create payment:\n' + result.warnings.map(w => w.message).join('\n'));
-        return;
-      }
-
-      await loadData();
-      view = 'list';
-      resetForm();
-    } catch (e) {
-      logger.error('Failed to create payment:', e);
-      toasts.error('Failed to create payment: ' + e);
+      formPaymentNumber = `PAY-${String(lastNum + 1).padStart(4, '0')}`;
     }
-  }
 
-  function resetForm() {
-    formContactId = '';
-    formAmount = 0;
-    formMethod = 'transfer';
-    formReference = '';
-    formNotes = '';
-    selectedInvoices = [];
+    formPaymentDate = new Date().toISOString().split('T')[0];
+  } catch (e) {
+    logger.error('Failed to load data:', e);
+    toasts.error('Failed to load payments');
   }
+  loading = false;
+}
 
-  function handleRowClick(payment: Payment) {
-    selectedPayment = payment;
-    showDetailModal = true;
+function toggleInvoice(invoice: Invoice) {
+  const existingIndex = selectedInvoices.findIndex((si) => si.invoice_id === invoice.id);
+  if (existingIndex >= 0) {
+    selectedInvoices = selectedInvoices.filter((_, i) => i !== existingIndex);
+  } else {
+    const remainingAmount = invoice.total_amount - invoice.paid_amount;
+    selectedInvoices = [...selectedInvoices, { invoice_id: invoice.id!, amount: remainingAmount }];
   }
+}
 
-  function closeDetailModal() {
-    showDetailModal = false;
-    selectedPayment = null;
-  }
+async function handleSubmit() {
+  try {
+    // Contact is now optional for free-floating payments
+    const contactId =
+      formContactId && typeof formContactId === 'number' ? formContactId : undefined;
 
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  }
+    const result = await createPayment(
+      {
+        payment_number: formPaymentNumber,
+        contact_id: contactId,
+        payment_date: formPaymentDate,
+        amount: formAmount,
+        payment_method: formMethod,
+        reference: formReference || undefined,
+        notes: formNotes || undefined,
+      },
+      selectedInvoices,
+      { mode },
+    );
 
-  function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-CA');
-  }
-
-  // Smart allocation functions
-  async function generateSuggestions() {
-    if (!formContactId || typeof formContactId !== 'number' || formAmount <= 0) {
-      allocationSuggestion = null;
-      showSuggestions = false;
+    if (!result.ok) {
+      toasts.error(
+        'Failed to create payment:\n' + result.warnings.map((w) => w.message).join('\n'),
+      );
       return;
     }
 
-    // Create a temporary payment object for matching
-    const tempPayment: Payment = {
-      payment_number: formPaymentNumber,
-      contact_id: formContactId,
-      payment_date: formPaymentDate,
-      amount: formAmount,
-      payment_method: formMethod,
-      reference: formReference || undefined,
-      notes: formNotes || undefined,
-      allocated_amount: totalAllocated,
-      status: 'pending',
-      created_at: new Date().toISOString()
-    };
-
-    const suggestion = await arMatchingEngine.matchPayment(tempPayment, openInvoices);
-    allocationSuggestion = suggestion;
-    showSuggestions = true;
+    await loadData();
+    view = 'list';
+    resetForm();
+  } catch (e) {
+    logger.error('Failed to create payment:', e);
+    toasts.error('Failed to create payment: ' + e);
   }
+}
 
-  async function applyFIFO() {
-    if (!formContactId || typeof formContactId !== 'number' || formAmount <= 0) return;
+function resetForm() {
+  formContactId = '';
+  formAmount = 0;
+  formMethod = 'transfer';
+  formReference = '';
+  formNotes = '';
+  selectedInvoices = [];
+}
 
-    const tempPayment: Payment = {
-      payment_number: formPaymentNumber,
-      contact_id: formContactId,
-      payment_date: formPaymentDate,
-      amount: formAmount,
-      payment_method: formMethod,
-      allocated_amount: 0,
-      status: 'pending',
-      created_at: new Date().toISOString()
-    };
+function handleRowClick(payment: Payment) {
+  selectedPayment = payment;
+  showDetailModal = true;
+}
 
-    const fifoAllocation = await arMatchingEngine.matchPayment(tempPayment, openInvoices);
-    selectedInvoices = fifoAllocation.allocations.map(alloc => ({
-      invoice_id: alloc.invoice.id!,
-      amount: alloc.amount
-    }));
-    showSuggestions = false;
-  }
+function closeDetailModal() {
+  showDetailModal = false;
+  selectedPayment = null;
+}
 
-  function applySuggestions() {
-    if (!allocationSuggestion) return;
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(amount);
+}
 
-    selectedInvoices = allocationSuggestion.allocations.map(alloc => ({
-      invoice_id: alloc.invoice.id!,
-      amount: alloc.amount
-    }));
-    showSuggestions = false;
-  }
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-CA');
+}
 
-  function clearAllocations() {
-    selectedInvoices = [];
+// Smart allocation functions
+async function generateSuggestions() {
+  if (!formContactId || typeof formContactId !== 'number' || formAmount <= 0) {
     allocationSuggestion = null;
     showSuggestions = false;
+    return;
   }
 
-  function updateAllocationAmount(invoiceId: number, newAmount: number) {
-    const index = selectedInvoices.findIndex(si => si.invoice_id === invoiceId);
-    if (index >= 0) {
-      selectedInvoices[index].amount = newAmount;
-      selectedInvoices = [...selectedInvoices]; // Trigger reactivity
-    }
+  // Create a temporary payment object for matching
+  const tempPayment: Payment = {
+    payment_number: formPaymentNumber,
+    contact_id: formContactId,
+    payment_date: formPaymentDate,
+    amount: formAmount,
+    payment_method: formMethod,
+    reference: formReference || undefined,
+    notes: formNotes || undefined,
+    allocated_amount: totalAllocated,
+    status: 'pending',
+    created_at: new Date().toISOString(),
+  };
+
+  const suggestion = await arMatchingEngine.matchPayment(tempPayment, openInvoices);
+  allocationSuggestion = suggestion;
+  showSuggestions = true;
+}
+
+async function applyFIFO() {
+  if (!formContactId || typeof formContactId !== 'number' || formAmount <= 0) return;
+
+  const tempPayment: Payment = {
+    payment_number: formPaymentNumber,
+    contact_id: formContactId,
+    payment_date: formPaymentDate,
+    amount: formAmount,
+    payment_method: formMethod,
+    allocated_amount: 0,
+    status: 'pending',
+    created_at: new Date().toISOString(),
+  };
+
+  const fifoAllocation = await arMatchingEngine.matchPayment(tempPayment, openInvoices);
+  selectedInvoices = fifoAllocation.allocations.map((alloc) => ({
+    invoice_id: alloc.invoice.id!,
+    amount: alloc.amount,
+  }));
+  showSuggestions = false;
+}
+
+function applySuggestions() {
+  if (!allocationSuggestion) return;
+
+  selectedInvoices = allocationSuggestion.allocations.map((alloc) => ({
+    invoice_id: alloc.invoice.id!,
+    amount: alloc.amount,
+  }));
+  showSuggestions = false;
+}
+
+function clearAllocations() {
+  selectedInvoices = [];
+  allocationSuggestion = null;
+  showSuggestions = false;
+}
+
+function updateAllocationAmount(invoiceId: number, newAmount: number) {
+  const index = selectedInvoices.findIndex((si) => si.invoice_id === invoiceId);
+  if (index >= 0) {
+    selectedInvoices[index].amount = newAmount;
+    selectedInvoices = [...selectedInvoices]; // Trigger reactivity
   }
+}
 </script>
 
 <div class="payments-view">

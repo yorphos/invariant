@@ -1,18 +1,8 @@
 import { z } from 'zod';
 
-import {
-  IdSchema,
-  NonEmptyStringSchema,
-  OptionalNullableIdSchema,
-} from './common';
+import { IdSchema, NonEmptyStringSchema, OptionalNullableIdSchema } from './common';
 
-export const AccountTypeSchema = z.enum([
-  'asset',
-  'liability',
-  'equity',
-  'revenue',
-  'expense',
-]);
+export const AccountTypeSchema = z.enum(['asset', 'liability', 'equity', 'revenue', 'expense']);
 
 export const AccountSchema = z
   .object({

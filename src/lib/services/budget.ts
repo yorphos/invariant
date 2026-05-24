@@ -71,7 +71,7 @@ export async function createBudget(data: CreateBudgetData): Promise<number> {
   const result = await db.execute(
     `INSERT INTO budget (fiscal_year, name, period_type, notes)
      VALUES (?, ?, ?, ?)`,
-    [data.fiscal_year, data.name, data.period_type, data.notes || null]
+    [data.fiscal_year, data.name, data.period_type, data.notes || null],
   );
 
   const budgetId = result.lastInsertId;
@@ -84,7 +84,7 @@ export async function createBudget(data: CreateBudgetData): Promise<number> {
     await db.execute(
       `INSERT INTO budget_line (budget_id, account_id, period, amount, notes)
        VALUES (?, ?, ?, ?, ?)`,
-      [budgetId, line.account_id, line.period, line.amount, line.notes || null]
+      [budgetId, line.account_id, line.period, line.amount, line.notes || null],
     );
   }
 
@@ -97,10 +97,9 @@ export async function createBudget(data: CreateBudgetData): Promise<number> {
 export async function getBudget(id: number): Promise<BudgetWithLines | null> {
   const db = await getDatabase();
 
-  const budgets = await db.select<BudgetRecord[]>(
-    'SELECT * FROM budget WHERE id = ? LIMIT 1',
-    [id]
-  );
+  const budgets = await db.select<BudgetRecord[]>('SELECT * FROM budget WHERE id = ? LIMIT 1', [
+    id,
+  ]);
 
   if (budgets.length === 0) {
     return null;
@@ -108,7 +107,7 @@ export async function getBudget(id: number): Promise<BudgetWithLines | null> {
 
   const lines = await db.select<BudgetLineRecord[]>(
     'SELECT * FROM budget_line WHERE budget_id = ? ORDER BY account_id, period',
-    [id]
+    [id],
   );
 
   return { ...budgets[0], lines };
@@ -121,15 +120,12 @@ export async function getBudgets(fiscalYear?: number): Promise<BudgetRecord[]> {
   const db = await getDatabase();
 
   if (fiscalYear !== undefined) {
-    return db.select<BudgetRecord[]>(
-      'SELECT * FROM budget WHERE fiscal_year = ? ORDER BY name',
-      [fiscalYear]
-    );
+    return db.select<BudgetRecord[]>('SELECT * FROM budget WHERE fiscal_year = ? ORDER BY name', [
+      fiscalYear,
+    ]);
   }
 
-  return db.select<BudgetRecord[]>(
-    'SELECT * FROM budget ORDER BY fiscal_year DESC, name'
-  );
+  return db.select<BudgetRecord[]>('SELECT * FROM budget ORDER BY fiscal_year DESC, name');
 }
 
 /**
@@ -142,7 +138,7 @@ export async function updateBudgetLines(
     period: number;
     amount: number;
     notes?: string;
-  }>
+  }>,
 ): Promise<void> {
   const db = await getDatabase();
 
@@ -154,7 +150,7 @@ export async function updateBudgetLines(
     await db.execute(
       `INSERT INTO budget_line (budget_id, account_id, period, amount, notes)
        VALUES (?, ?, ?, ?, ?)`,
-      [id, line.account_id, line.period, line.amount, line.notes || null]
+      [id, line.account_id, line.period, line.amount, line.notes || null],
     );
   }
 }
@@ -177,15 +173,14 @@ export async function deleteBudget(id: number): Promise<void> {
 export async function getBudgetVsActual(
   budgetId: number,
   startDate: string,
-  endDate: string
+  endDate: string,
 ): Promise<BudgetVsActualData> {
   const db = await getDatabase();
 
   // Get budget info
-  const budgets = await db.select<BudgetRecord[]>(
-    'SELECT * FROM budget WHERE id = ? LIMIT 1',
-    [budgetId]
-  );
+  const budgets = await db.select<BudgetRecord[]>('SELECT * FROM budget WHERE id = ? LIMIT 1', [
+    budgetId,
+  ]);
 
   if (budgets.length === 0) {
     throw new Error(`Budget with id ${budgetId} not found`);
@@ -221,7 +216,7 @@ export async function getBudgetVsActual(
     WHERE bl.budget_id = ?
     GROUP BY a.code, a.name, a.type, bl.amount
     ORDER BY a.code`,
-    [startDate, endDate, budgetId]
+    [startDate, endDate, budgetId],
   );
 
   // Build response lines with variance calculations
@@ -232,8 +227,7 @@ export async function getBudgetVsActual(
     const budgetAmount = row.budget_amount;
     const actualAmount = row.actual_amount;
     const variance = budgetAmount - actualAmount;
-    const variancePct =
-      budgetAmount !== 0 ? (variance / budgetAmount) * 100 : 0;
+    const variancePct = budgetAmount !== 0 ? (variance / budgetAmount) * 100 : 0;
 
     totalBudget += budgetAmount;
     totalActual += actualAmount;

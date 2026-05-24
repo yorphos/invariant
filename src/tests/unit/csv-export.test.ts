@@ -48,9 +48,7 @@ describe('CSV Export - Basic Conversion', () => {
 
 describe('CSV Export - Special Characters', () => {
   it('should escape commas', () => {
-    const data = [
-      { name: 'Smith, John', age: 30 },
-    ];
+    const data = [{ name: 'Smith, John', age: 30 }];
 
     const csv = toCSV(data);
 
@@ -58,9 +56,7 @@ describe('CSV Export - Special Characters', () => {
   });
 
   it('should escape quotes', () => {
-    const data = [
-      { name: 'John "Johnny" Smith', age: 30 },
-    ];
+    const data = [{ name: 'John "Johnny" Smith', age: 30 }];
 
     const csv = toCSV(data);
 
@@ -68,9 +64,7 @@ describe('CSV Export - Special Characters', () => {
   });
 
   it('should escape newlines', () => {
-    const data = [
-      { name: 'John\nSmith', age: 30 },
-    ];
+    const data = [{ name: 'John\nSmith', age: 30 }];
 
     const csv = toCSV(data);
 
@@ -78,9 +72,7 @@ describe('CSV Export - Special Characters', () => {
   });
 
   it('should handle multiple special characters', () => {
-    const data = [
-      { description: 'Invoice for "Acme, Inc."\nDue: Jan 1' },
-    ];
+    const data = [{ description: 'Invoice for "Acme, Inc."\nDue: Jan 1' }];
 
     const csv = toCSV(data);
 
@@ -91,7 +83,7 @@ describe('CSV Export - Special Characters', () => {
 describe('CSV Export - Financial Data', () => {
   it('should export account balances', () => {
     const data = [
-      { account: '1000 - Cash', balance: 5000.50 },
+      { account: '1000 - Cash', balance: 5000.5 },
       { account: '1100 - Accounts Receivable', balance: 2500.25 },
     ];
 
@@ -152,16 +144,14 @@ describe('CSV Export - Formatting Helpers', () => {
   it('should format dates from Date object', () => {
     const date = new Date('2026-01-24T10:30:00Z');
     const formatted = formatDateForCSV(date);
-    
+
     expect(formatted).toBe('2026-01-24');
   });
 });
 
 describe('CSV Export - Edge Cases', () => {
   it('should handle null values', () => {
-    const data = [
-      { name: 'Alice', notes: null },
-    ];
+    const data = [{ name: 'Alice', notes: null }];
 
     const csv = toCSV(data);
 
@@ -169,9 +159,7 @@ describe('CSV Export - Edge Cases', () => {
   });
 
   it('should handle undefined values', () => {
-    const data = [
-      { name: 'Alice', notes: undefined },
-    ];
+    const data = [{ name: 'Alice', notes: undefined }];
 
     const csv = toCSV(data);
 
@@ -179,9 +167,7 @@ describe('CSV Export - Edge Cases', () => {
   });
 
   it('should handle zero values', () => {
-    const data = [
-      { account: 'Test', balance: 0 },
-    ];
+    const data = [{ account: 'Test', balance: 0 }];
 
     const csv = toCSV(data);
 
@@ -201,9 +187,7 @@ describe('CSV Export - Edge Cases', () => {
   });
 
   it('should handle large numbers', () => {
-    const data = [
-      { amount: 1000000.50 },
-    ];
+    const data = [{ amount: 1000000.5 }];
 
     const csv = toCSV(data);
 

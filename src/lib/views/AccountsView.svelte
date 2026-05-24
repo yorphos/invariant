@@ -1,216 +1,223 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { persistenceService } from '../services/persistence';
-  import { getSystemAccountRolesMap, type SystemAccountRole } from '../services/system-accounts';
-  import { seedDefaultAccounts } from '../services/seed';
-  import type { Account, PolicyMode, AccountType } from '../domain/types';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import { confirmAction } from '../utils/confirm-action';
-  import Button from '../ui/Button.svelte';
-  import Input from '../ui/Input.svelte';
-  import Select from '../ui/Select.svelte';
-  import Card from '../ui/Card.svelte';
-  import Modal from '../ui/Modal.svelte';
-  import Table from '../ui/Table.svelte';
+import { onMount } from 'svelte';
+import { persistenceService } from '../services/persistence';
+import { getSystemAccountRolesMap, type SystemAccountRole } from '../services/system-accounts';
+import { seedDefaultAccounts } from '../services/seed';
+import type { Account, PolicyMode, AccountType } from '../domain/types';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import { confirmAction } from '../utils/confirm-action';
+import Button from '../ui/Button.svelte';
+import Input from '../ui/Input.svelte';
+import Select from '../ui/Select.svelte';
+import Card from '../ui/Card.svelte';
+import Modal from '../ui/Modal.svelte';
+import Table from '../ui/Table.svelte';
 
-  export let mode: PolicyMode;
+export let mode: PolicyMode;
 
-  let accounts: Account[] = [];
-  let systemAccountRoles: Map<number, SystemAccountRole[]> = new Map();
-  let loading = true;
-  let showModal = false;
-  let showInitModal = false;
-  let editingAccount: Account | null = null;
-  let filterType: AccountType | 'all' = 'all';
-  let showInactive = false;
+let accounts: Account[] = [];
+let systemAccountRoles: Map<number, SystemAccountRole[]> = new Map();
+let loading = true;
+let showModal = false;
+let showInitModal = false;
+let editingAccount: Account | null = null;
+let filterType: AccountType | 'all' = 'all';
+let showInactive = false;
 
-  // Form fields
-  let formCode = '';
-  let formName = '';
-  let formType: AccountType = 'asset';
-  let formParentId: number | '' = '';
-  let formIsActive = true;
+// Form fields
+let formCode = '';
+let formName = '';
+let formType: AccountType = 'asset';
+let formParentId: number | '' = '';
+let formIsActive = true;
 
-  onMount(async () => {
+onMount(async () => {
+  await loadAccounts();
+});
+
+async function loadAccounts() {
+  loading = true;
+  try {
+    accounts = await persistenceService.getAccounts(true); // Include inactive accounts
+    systemAccountRoles = await getSystemAccountRolesMap();
+
+    // If no accounts exist, show initialization modal
+    if (accounts.length === 0) {
+      showInitModal = true;
+    }
+  } catch (e) {
+    logger.error('Failed to load accounts:', e);
+    toasts.error('Failed to load accounts');
+  }
+  loading = false;
+}
+
+async function handleInitialize() {
+  try {
+    await seedDefaultAccounts();
     await loadAccounts();
-  });
+    showInitModal = false;
+    toasts.success('Chart of Accounts initialized successfully with default accounts!');
+  } catch (e) {
+    logger.error('Failed to initialize accounts:', e);
+    toasts.error('Failed to initialize accounts: ' + e);
+  }
+}
 
-  async function loadAccounts() {
-    loading = true;
-    try {
-      accounts = await persistenceService.getAccounts(true); // Include inactive accounts
-      systemAccountRoles = await getSystemAccountRolesMap();
-      
-      // If no accounts exist, show initialization modal
-      if (accounts.length === 0) {
-        showInitModal = true;
-      }
-    } catch (e) {
-      logger.error('Failed to load accounts:', e);
-      toasts.error('Failed to load accounts');
-    }
-    loading = false;
+function openCreateModal() {
+  if (mode === 'beginner') {
+    toasts.warning(
+      'Creating custom accounts requires Pro Mode. Please switch to Pro Mode in Settings.',
+    );
+    return;
   }
 
-  async function handleInitialize() {
-    try {
-      await seedDefaultAccounts();
-      await loadAccounts();
-      showInitModal = false;
-      toasts.success('Chart of Accounts initialized successfully with default accounts!');
-    } catch (e) {
-      logger.error('Failed to initialize accounts:', e);
-      toasts.error('Failed to initialize accounts: ' + e);
-    }
+  editingAccount = null;
+  formCode = '';
+  formName = '';
+  formType = 'asset';
+  formParentId = '';
+  formIsActive = true;
+  showModal = true;
+}
+
+function openEditModal(account: Account) {
+  if (mode === 'beginner') {
+    toasts.warning('Editing accounts requires Pro Mode. Please switch to Pro Mode in Settings.');
+    return;
   }
 
-  function openCreateModal() {
-    if (mode === 'beginner') {
-      toasts.warning('Creating custom accounts requires Pro Mode. Please switch to Pro Mode in Settings.');
+  editingAccount = account;
+  formCode = account.code;
+  formName = account.name;
+  formType = account.type;
+  formParentId = account.parent_id || '';
+  formIsActive = account.is_active;
+  showModal = true;
+}
+
+function closeModal() {
+  showModal = false;
+  editingAccount = null;
+}
+
+async function handleSubmit() {
+  try {
+    // Validate code uniqueness
+    const existingWithCode = accounts.find(
+      (a) => a.code === formCode && a.id !== editingAccount?.id,
+    );
+    if (existingWithCode) {
+      toasts.error(`Account code "${formCode}" is already used by "${existingWithCode.name}"`);
       return;
     }
 
-    editingAccount = null;
-    formCode = '';
-    formName = '';
-    formType = 'asset';
-    formParentId = '';
-    formIsActive = true;
-    showModal = true;
-  }
-
-  function openEditModal(account: Account) {
-    if (mode === 'beginner') {
-      toasts.warning('Editing accounts requires Pro Mode. Please switch to Pro Mode in Settings.');
-      return;
-    }
-
-    editingAccount = account;
-    formCode = account.code;
-    formName = account.name;
-    formType = account.type;
-    formParentId = account.parent_id || '';
-    formIsActive = account.is_active;
-    showModal = true;
-  }
-
-  function closeModal() {
-    showModal = false;
-    editingAccount = null;
-  }
-
-  async function handleSubmit() {
-    try {
-      // Validate code uniqueness
-      const existingWithCode = accounts.find(a => a.code === formCode && a.id !== editingAccount?.id);
-      if (existingWithCode) {
-        toasts.error(`Account code "${formCode}" is already used by "${existingWithCode.name}"`);
-        return;
-      }
-      
-      // Warn if changing code for a system account
-      if (editingAccount && editingAccount.id !== undefined) {
-        const roles = systemAccountRoles.get(editingAccount.id);
-        if (roles && roles.length > 0 && formCode !== editingAccount.code) {
-          const roleNames = roles.map(r => formatRoleName(r)).join(', ');
-          const confirmed = await confirmAction(
-            'System Account Warning',
-            `Warning: This account is configured as a system account for: ${roleNames}\n\n` +
+    // Warn if changing code for a system account
+    if (editingAccount && editingAccount.id !== undefined) {
+      const roles = systemAccountRoles.get(editingAccount.id);
+      if (roles && roles.length > 0 && formCode !== editingAccount.code) {
+        const roleNames = roles.map((r) => formatRoleName(r)).join(', ');
+        const confirmed = await confirmAction(
+          'System Account Warning',
+          `Warning: This account is configured as a system account for: ${roleNames}\n\n` +
             `Changing the account code is allowed, but make sure this is intentional.\n\n` +
-            `The system account mapping will remain intact (it uses the account ID, not the code).`
-          );
-          if (!confirmed) return;
-        }
+            `The system account mapping will remain intact (it uses the account ID, not the code).`,
+        );
+        if (!confirmed) return;
       }
-      
-      const accountData = {
-        code: formCode,
-        name: formName,
-        type: formType,
-        parent_id: typeof formParentId === 'number' ? formParentId : null,
-        is_active: formIsActive,
-      };
-
-      if (editingAccount && editingAccount.id !== undefined) {
-        // Update existing account
-        await persistenceService.updateAccount(editingAccount.id, accountData);
-      } else {
-        // Create new account
-        await persistenceService.createAccount(accountData);
-      }
-      
-      await loadAccounts();
-      closeModal();
-    } catch (e) {
-      logger.error('Failed to save account:', e);
-      toasts.error('Failed to save account: ' + e);
-    }
-  }
-  
-  function formatRoleName(role: SystemAccountRole): string {
-    return role
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  }
-
-  async function toggleAccountStatus(account: Account) {
-    if (mode === 'beginner') {
-      toasts.warning('Managing account status requires Pro Mode.');
-      return;
     }
 
-    try {
-      await persistenceService.updateAccount(account.id, {
-        ...account,
-        is_active: !account.is_active
-      });
-      await loadAccounts();
-    } catch (e) {
-      logger.error('Failed to update account status:', e);
-      toasts.error('Failed to update account status: ' + e);
+    const accountData = {
+      code: formCode,
+      name: formName,
+      type: formType,
+      parent_id: typeof formParentId === 'number' ? formParentId : null,
+      is_active: formIsActive,
+    };
+
+    if (editingAccount && editingAccount.id !== undefined) {
+      // Update existing account
+      await persistenceService.updateAccount(editingAccount.id, accountData);
+    } else {
+      // Create new account
+      await persistenceService.createAccount(accountData);
     }
+
+    await loadAccounts();
+    closeModal();
+  } catch (e) {
+    logger.error('Failed to save account:', e);
+    toasts.error('Failed to save account: ' + e);
+  }
+}
+
+function formatRoleName(role: SystemAccountRole): string {
+  return role
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+async function toggleAccountStatus(account: Account) {
+  if (mode === 'beginner') {
+    toasts.warning('Managing account status requires Pro Mode.');
+    return;
   }
 
-  // Group accounts by type
-  $: groupedAccounts = accounts
-    .filter(a => filterType === 'all' || a.type === filterType)
-    .filter(a => showInactive || a.is_active)
-    .reduce((groups, account) => {
+  try {
+    await persistenceService.updateAccount(account.id, {
+      ...account,
+      is_active: !account.is_active,
+    });
+    await loadAccounts();
+  } catch (e) {
+    logger.error('Failed to update account status:', e);
+    toasts.error('Failed to update account status: ' + e);
+  }
+}
+
+// Group accounts by type
+$: groupedAccounts = accounts
+  .filter((a) => filterType === 'all' || a.type === filterType)
+  .filter((a) => showInactive || a.is_active)
+  .reduce(
+    (groups, account) => {
       if (!groups[account.type]) {
         groups[account.type] = [];
       }
       groups[account.type].push(account);
       return groups;
-    }, {} as Record<AccountType, Account[]>);
+    },
+    {} as Record<AccountType, Account[]>,
+  );
 
-  // Get account type display name
-  function getTypeDisplay(type: AccountType): string {
-    return type.charAt(0).toUpperCase() + type.slice(1) + 's';
-  }
+// Get account type display name
+function getTypeDisplay(type: AccountType): string {
+  return type.charAt(0).toUpperCase() + type.slice(1) + 's';
+}
 
-  // Get account type color
-  function getTypeColor(type: AccountType): string {
-    const colors = {
-      asset: '#2980b9',
-      liability: '#e74c3c',
-      equity: '#8e44ad',
-      revenue: '#27ae60',
-      expense: '#d68910'
-    };
-    return colors[type];
-  }
+// Get account type color
+function getTypeColor(type: AccountType): string {
+  const colors = {
+    asset: '#2980b9',
+    liability: '#e74c3c',
+    equity: '#8e44ad',
+    revenue: '#27ae60',
+    expense: '#d68910',
+  };
+  return colors[type];
+}
 
-  // Check if account can be edited/deleted (has no journal entries)
-  async function canModifyAccount(account: Account): Promise<boolean> {
-    try {
-      const result = await persistenceService.hasAccountTransactions(account.id);
-      return !result;
-    } catch {
-      return false;
-    }
+// Check if account can be edited/deleted (has no journal entries)
+async function canModifyAccount(account: Account): Promise<boolean> {
+  try {
+    const result = await persistenceService.hasAccountTransactions(account.id);
+    return !result;
+  } catch {
+    return false;
   }
+}
 </script>
 
 <div class="accounts-view">

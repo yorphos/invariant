@@ -1,21 +1,24 @@
 <script lang="ts">
-  export let value: string | number = '';
-  export let type: 'text' | 'number' | 'email' | 'date' | 'tel' = 'text';
-  export let label = '';
-  export let placeholder = '';
-  export let disabled = false;
-  export let required = false;
-  export let error = '';
-  export let step: string | undefined = undefined;
-  export let min: string | number | undefined = undefined;
-  export let max: string | number | undefined = undefined;
-  export let helperText: string | undefined = undefined;
-  export let oninput: ((e: Event & { currentTarget: HTMLInputElement }) => void) | undefined = undefined;
-  export let onchange: ((e: Event & { currentTarget: HTMLInputElement }) => void) | undefined = undefined;
-  export let onblur: ((e: FocusEvent & { currentTarget: HTMLInputElement }) => void) | undefined = undefined;
+export let value: string | number = '';
+export let type: 'text' | 'number' | 'email' | 'date' | 'tel' = 'text';
+export let label = '';
+export let placeholder = '';
+export let disabled = false;
+export let required = false;
+export let error = '';
+export let step: string | undefined = undefined;
+export let min: string | number | undefined = undefined;
+export let max: string | number | undefined = undefined;
+export let helperText: string | undefined = undefined;
+export let oninput: ((e: Event & { currentTarget: HTMLInputElement }) => void) | undefined =
+  undefined;
+export let onchange: ((e: Event & { currentTarget: HTMLInputElement }) => void) | undefined =
+  undefined;
+export let onblur: ((e: FocusEvent & { currentTarget: HTMLInputElement }) => void) | undefined =
+  undefined;
 
-  // Generate unique ID for label-input association
-  const id = `input-${Math.random().toString(36).substr(2, 9)}`;
+// Generate unique ID for label-input association
+const id = `input-${Math.random().toString(36).substr(2, 9)}`;
 </script>
 
 <div class="input-group">

@@ -33,7 +33,7 @@ function createThemeStore() {
 
       apply(theme);
       set(theme);
-    }
+    },
   };
 }
 

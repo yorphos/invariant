@@ -1,165 +1,172 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { persistenceService } from '../services/persistence';
-  import { getDatabase } from '../services/database';
-  import { createExpense } from '../domain/expense-operations';
-  import type { Account, Contact, JournalEntry, PolicyMode } from '../domain/types';
-  import Button from '../ui/Button.svelte';
-  import Input from '../ui/Input.svelte';
-  import Select from '../ui/Select.svelte';
-  import Card from '../ui/Card.svelte';
-  import Table from '../ui/Table.svelte';
-  import FileUpload from '../ui/FileUpload.svelte';
-  import { storeDocument, attachDocument, getEntityDocuments, deleteDocument } from '../services/document-storage';
-  import type { DocumentWithAttachment } from '../domain/types';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
+import { onMount } from 'svelte';
+import { persistenceService } from '../services/persistence';
+import { getDatabase } from '../services/database';
+import { createExpense } from '../domain/expense-operations';
+import type { Account, Contact, JournalEntry, PolicyMode } from '../domain/types';
+import Button from '../ui/Button.svelte';
+import Input from '../ui/Input.svelte';
+import Select from '../ui/Select.svelte';
+import Card from '../ui/Card.svelte';
+import Table from '../ui/Table.svelte';
+import FileUpload from '../ui/FileUpload.svelte';
+import {
+  storeDocument,
+  attachDocument,
+  getEntityDocuments,
+  deleteDocument,
+} from '../services/document-storage';
+import type { DocumentWithAttachment } from '../domain/types';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
 
-  export let mode: PolicyMode;
+export let mode: PolicyMode;
 
-  let expenses: JournalEntry[] = [];
-  let expenseAccounts: Account[] = [];
-  let assetAccounts: Account[] = [];
-  let vendors: Contact[] = [];
-  let loading = true;
-  let view: 'list' | 'create' = 'list';
+let expenses: JournalEntry[] = [];
+let expenseAccounts: Account[] = [];
+let assetAccounts: Account[] = [];
+let vendors: Contact[] = [];
+let loading = true;
+let view: 'list' | 'create' = 'list';
 
-  // Form fields
-  let formDescription = '';
-  let formAmount = 0;
-  let formDate = '';
-  let formVendorId: number | '' = '';
-  let formExpenseAccountId: number | '' = '';
-  let formPaymentAccountId: number | '' = '';
-  let formReference = '';
-  let formNotes = '';
-  let attachedFiles: File[] = [];
-  let uploadError = '';
+// Form fields
+let formDescription = '';
+let formAmount = 0;
+let formDate = '';
+let formVendorId: number | '' = '';
+let formExpenseAccountId: number | '' = '';
+let formPaymentAccountId: number | '' = '';
+let formReference = '';
+let formNotes = '';
+let attachedFiles: File[] = [];
+let uploadError = '';
 
-  onMount(async () => {
-    await loadData();
-  });
+onMount(async () => {
+  await loadData();
+});
 
-  async function loadData() {
-    loading = true;
-    try {
-      [expenseAccounts, assetAccounts, vendors] = await Promise.all([
-        persistenceService.getAccountsByType('expense'),
-        persistenceService.getAccountsByType('asset'),
-        persistenceService.getContacts('vendor')
-      ]);
+async function loadData() {
+  loading = true;
+  try {
+    [expenseAccounts, assetAccounts, vendors] = await Promise.all([
+      persistenceService.getAccountsByType('expense'),
+      persistenceService.getAccountsByType('asset'),
+      persistenceService.getContacts('vendor'),
+    ]);
 
-      // Get recent expense entries
-      const db = await getDatabase();
-      expenses = await db.select<JournalEntry[]>(
-        `SELECT * FROM journal_entry 
+    // Get recent expense entries
+    const db = await getDatabase();
+    expenses = await db.select<JournalEntry[]>(
+      `SELECT * FROM journal_entry 
          WHERE description LIKE 'Expense:%' OR event_id IN (
            SELECT id FROM transaction_event WHERE event_type = 'expense_recorded'
          )
-         ORDER BY entry_date DESC LIMIT 50`
-      );
+         ORDER BY entry_date DESC LIMIT 50`,
+    );
 
-      formDate = new Date().toISOString().split('T')[0];
-    } catch (e) {
-      logger.error('Failed to load data:', e);
-      toasts.error('Failed to load expenses');
-    }
-    loading = false;
+    formDate = new Date().toISOString().split('T')[0];
+  } catch (e) {
+    logger.error('Failed to load data:', e);
+    toasts.error('Failed to load expenses');
   }
+  loading = false;
+}
 
-  async function handleSubmit() {
-    try {
-      if (typeof formExpenseAccountId !== 'number' || typeof formPaymentAccountId !== 'number') {
-        toasts.warning('Please select expense and payment accounts');
-        return;
-      }
+async function handleSubmit() {
+  try {
+    if (typeof formExpenseAccountId !== 'number' || typeof formPaymentAccountId !== 'number') {
+      toasts.warning('Please select expense and payment accounts');
+      return;
+    }
 
-      const result = await createExpense(
-        {
-          description: formDescription,
-          amount: formAmount,
-          expense_date: formDate,
-          vendor_id: typeof formVendorId === 'number' ? formVendorId : undefined,
-          expense_account_id: formExpenseAccountId,
-          payment_account_id: formPaymentAccountId,
-          reference: formReference || undefined,
-          notes: formNotes || undefined,
-        },
-        { mode }
+    const result = await createExpense(
+      {
+        description: formDescription,
+        amount: formAmount,
+        expense_date: formDate,
+        vendor_id: typeof formVendorId === 'number' ? formVendorId : undefined,
+        expense_account_id: formExpenseAccountId,
+        payment_account_id: formPaymentAccountId,
+        reference: formReference || undefined,
+        notes: formNotes || undefined,
+      },
+      { mode },
+    );
+
+    if (!result.ok) {
+      toasts.error(
+        'Failed to record expense:\n' + result.warnings.map((w) => w.message).join('\n'),
       );
+      return;
+    }
 
-      if (!result.ok) {
-        toasts.error('Failed to record expense:\n' + result.warnings.map(w => w.message).join('\n'));
-        return;
-      }
+    // Handle file uploads if there are any
+    if (
+      attachedFiles.length > 0 &&
+      result.ok &&
+      'journal_entry_id' in result &&
+      result.journal_entry_id
+    ) {
+      try {
+        for (const file of attachedFiles) {
+          // Read file as ArrayBuffer
+          const arrayBuffer = await file.arrayBuffer();
+          const content = new Uint8Array(arrayBuffer);
 
-      // Handle file uploads if there are any
-      if (attachedFiles.length > 0 && result.ok && 'journal_entry_id' in result && result.journal_entry_id) {
-        try {
-          for (const file of attachedFiles) {
-            // Read file as ArrayBuffer
-            const arrayBuffer = await file.arrayBuffer();
-            const content = new Uint8Array(arrayBuffer);
-            
-            // Store document
-            const documentId = await storeDocument(
-              content,
-              file.name,
-              file.type || 'application/octet-stream',
-              'receipt'
-            );
-            
-            // Attach to journal entry (since expenses don't have separate entity table)
-            await attachDocument(
-              documentId,
-              'journal_entry',
-              result.journal_entry_id,
-              'supporting'
-            );
-          }
-        } catch (e) {
-          logger.error('Failed to upload attachments:', e);
-      toasts.warning('Expense recorded but failed to upload some attachments: ' + e);
-          toasts.error('Expense recorded but failed to upload some attachments: ' + e);
+          // Store document
+          const documentId = await storeDocument(
+            content,
+            file.name,
+            file.type || 'application/octet-stream',
+            'receipt',
+          );
+
+          // Attach to journal entry (since expenses don't have separate entity table)
+          await attachDocument(documentId, 'journal_entry', result.journal_entry_id, 'supporting');
         }
+      } catch (e) {
+        logger.error('Failed to upload attachments:', e);
+        toasts.warning('Expense recorded but failed to upload some attachments: ' + e);
+        toasts.error('Expense recorded but failed to upload some attachments: ' + e);
       }
-
-      await loadData();
-      view = 'list';
-      resetForm();
-    } catch (e) {
-      logger.error('Failed to record expense:', e);
-      toasts.error('Failed to record expense: ' + e);
     }
-  }
 
-  function resetForm() {
-    formDescription = '';
-    formAmount = 0;
-    formVendorId = '';
-    formExpenseAccountId = '';
-    formPaymentAccountId = '';
-    formReference = '';
-    formNotes = '';
-    attachedFiles = [];
-    uploadError = '';
+    await loadData();
+    view = 'list';
+    resetForm();
+  } catch (e) {
+    logger.error('Failed to record expense:', e);
+    toasts.error('Failed to record expense: ' + e);
   }
+}
 
-  function handleFilesSelected(files: File[]) {
-    attachedFiles = files;
-    uploadError = '';
-  }
+function resetForm() {
+  formDescription = '';
+  formAmount = 0;
+  formVendorId = '';
+  formExpenseAccountId = '';
+  formPaymentAccountId = '';
+  formReference = '';
+  formNotes = '';
+  attachedFiles = [];
+  uploadError = '';
+}
 
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  }
+function handleFilesSelected(files: File[]) {
+  attachedFiles = files;
+  uploadError = '';
+}
 
-  function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-CA');
-  }
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(amount);
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-CA');
+}
 </script>
 
 <div class="expenses-view">

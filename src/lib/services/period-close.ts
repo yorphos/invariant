@@ -1,6 +1,6 @@
 /**
  * Period Close Service
- * 
+ *
  * Handles fiscal year closing process:
  * - Generates closing journal entries
  * - Zeros out revenue and expense accounts
@@ -55,9 +55,7 @@ export interface ClosingEntry {
  */
 export async function getFiscalYears(): Promise<FiscalYear[]> {
   const db = await getDatabase();
-  return db.select<FiscalYear[]>(
-    'SELECT * FROM fiscal_year ORDER BY year DESC'
-  );
+  return db.select<FiscalYear[]>('SELECT * FROM fiscal_year ORDER BY year DESC');
 }
 
 /**
@@ -67,7 +65,7 @@ export async function getFiscalYear(year: number): Promise<FiscalYear | null> {
   const db = await getDatabase();
   const results = await db.select<FiscalYear[]>(
     'SELECT * FROM fiscal_year WHERE year = ? LIMIT 1',
-    [year]
+    [year],
   );
   return results[0] || null;
 }
@@ -77,28 +75,28 @@ export async function getFiscalYear(year: number): Promise<FiscalYear | null> {
  */
 export async function createFiscalYear(year: number): Promise<number> {
   const db = await getDatabase();
-  
+
   // Check if year already exists
   const existing = await getFiscalYear(year);
   if (existing) {
     throw new Error(`Fiscal year ${year} already exists`);
   }
-  
+
   const startDate = `${year}-01-01`;
   const endDate = `${year}-12-31`;
-  
+
   const result = await db.execute(
     `INSERT INTO fiscal_year (year, start_date, end_date, status)
      VALUES (?, ?, ?, 'open')`,
-    [year, startDate, endDate]
+    [year, startDate, endDate],
   );
-  
+
   const fiscalYearId = result.lastInsertId;
-  
+
   if (!fiscalYearId) {
     throw new Error('Failed to create fiscal year');
   }
-  
+
   // Create 12 monthly periods
   const months = [
     { num: 1, name: 'January', days: 31 },
@@ -114,20 +112,20 @@ export async function createFiscalYear(year: number): Promise<number> {
     { num: 11, name: 'November', days: 30 },
     { num: 12, name: 'December', days: 31 },
   ];
-  
+
   for (const month of months) {
     const monthStr = month.num.toString().padStart(2, '0');
     const periodStart = `${year}-${monthStr}-01`;
     const periodEnd = `${year}-${monthStr}-${month.days}`;
-    
+
     await db.execute(
       `INSERT INTO fiscal_period 
        (fiscal_year_id, period_number, period_name, start_date, end_date, status)
        VALUES (?, ?, ?, ?, ?, 'open')`,
-      [fiscalYearId, month.num, `${month.name} ${year}`, periodStart, periodEnd]
+      [fiscalYearId, month.num, `${month.name} ${year}`, periodStart, periodEnd],
     );
   }
-  
+
   return fiscalYearId;
 }
 
@@ -141,23 +139,25 @@ export async function previewClosingEntries(year: number): Promise<{
   totalExpenses: number;
 }> {
   const db = await getDatabase();
-  
+
   const fiscalYear = await getFiscalYear(year);
   if (!fiscalYear) {
     throw new Error(`Fiscal year ${year} not found`);
   }
-  
+
   if (fiscalYear.status === 'closed') {
     throw new Error(`Fiscal year ${year} is already closed`);
   }
-  
+
   // Get all revenue accounts with their balances for this year
-  const revenueAccounts = await db.select<Array<{
-    id: number;
-    code: string;
-    name: string;
-    balance: number;
-  }>>(
+  const revenueAccounts = await db.select<
+    Array<{
+      id: number;
+      code: string;
+      name: string;
+      balance: number;
+    }>
+  >(
     `SELECT 
       a.id,
       a.code,
@@ -174,16 +174,18 @@ export async function previewClosingEntries(year: number): Promise<{
     GROUP BY a.id, a.code, a.name
     HAVING ABS(balance) > 0.01
     ORDER BY a.code`,
-    [fiscalYear.start_date, fiscalYear.end_date]
+    [fiscalYear.start_date, fiscalYear.end_date],
   );
-  
+
   // Get all expense accounts with their balances for this year
-  const expenseAccounts = await db.select<Array<{
-    id: number;
-    code: string;
-    name: string;
-    balance: number;
-  }>>(
+  const expenseAccounts = await db.select<
+    Array<{
+      id: number;
+      code: string;
+      name: string;
+      balance: number;
+    }>
+  >(
     `SELECT 
       a.id,
       a.code,
@@ -200,15 +202,15 @@ export async function previewClosingEntries(year: number): Promise<{
     GROUP BY a.id, a.code, a.name
     HAVING ABS(balance) > 0.01
     ORDER BY a.code`,
-    [fiscalYear.start_date, fiscalYear.end_date]
+    [fiscalYear.start_date, fiscalYear.end_date],
   );
-  
+
   const totalRevenue = revenueAccounts.reduce((sum, acc) => sum + acc.balance, 0);
   const totalExpenses = expenseAccounts.reduce((sum, acc) => sum + acc.balance, 0);
   const netIncome = totalRevenue - totalExpenses;
-  
+
   const entries: ClosingEntry[] = [];
-  
+
   // Step 1: Debit all revenue accounts (zero them out)
   for (const acc of revenueAccounts) {
     if (Math.abs(acc.balance) > 0.01) {
@@ -222,7 +224,7 @@ export async function previewClosingEntries(year: number): Promise<{
       });
     }
   }
-  
+
   // Step 2: Credit all expense accounts (zero them out)
   for (const acc of expenseAccounts) {
     if (Math.abs(acc.balance) > 0.01) {
@@ -236,16 +238,16 @@ export async function previewClosingEntries(year: number): Promise<{
       });
     }
   }
-  
+
   // Step 3: Post net income to Retained Earnings
   const retainedEarningsId = await getSystemAccountId('retained_earnings');
   const accounts = await persistenceService.getAccounts();
-  const retainedEarningsAccount = accounts.find(a => a.id === retainedEarningsId);
-  
+  const retainedEarningsAccount = accounts.find((a) => a.id === retainedEarningsId);
+
   if (!retainedEarningsAccount) {
     throw new Error('Retained Earnings account not found');
   }
-  
+
   if (netIncome > 0) {
     // Profit: Credit Retained Earnings
     entries.push({
@@ -267,7 +269,7 @@ export async function previewClosingEntries(year: number): Promise<{
       description: `${year} net loss transferred to Retained Earnings`,
     });
   }
-  
+
   return {
     entries,
     netIncome,
@@ -285,7 +287,7 @@ export async function previewClosingEntries(year: number): Promise<{
  */
 export async function closeFiscalYear(
   year: number,
-  context: PolicyContext
+  context: PolicyContext,
 ): Promise<{
   ok: boolean;
   journal_entry_id?: number;
@@ -294,7 +296,7 @@ export async function closeFiscalYear(
 }> {
   try {
     const db = await getDatabase();
-    
+
     // Get fiscal year
     const fiscalYear = await getFiscalYear(year);
     if (!fiscalYear) {
@@ -303,33 +305,35 @@ export async function closeFiscalYear(
         warnings: [{ level: 'error', message: `Fiscal year ${year} not found` }],
       };
     }
-    
+
     if (fiscalYear.status === 'closed') {
       return {
         ok: false,
         warnings: [{ level: 'error', message: `Fiscal year ${year} is already closed` }],
       };
     }
-    
+
     // Check if next year exists, create if not
     const nextYear = await getFiscalYear(year + 1);
     if (!nextYear) {
       await createFiscalYear(year + 1);
     }
-    
+
     // Preview closing entries
     const preview = await previewClosingEntries(year);
-    
+
     if (preview.entries.length === 0) {
       return {
         ok: false,
-        warnings: [{ 
-          level: 'error', 
-          message: `No revenue or expense transactions found for ${year}. Nothing to close.` 
-        }],
+        warnings: [
+          {
+            level: 'error',
+            message: `No revenue or expense transactions found for ${year}. Nothing to close.`,
+          },
+        ],
       };
     }
-    
+
     // Create transaction event
     const eventId = await persistenceService.createTransactionEvent({
       event_type: 'fiscal_year_closed',
@@ -337,15 +341,15 @@ export async function closeFiscalYear(
       reference: `FY${year}`,
       created_by: context.mode === 'pro' ? 'user' : 'system',
     });
-    
+
     // Create closing journal entry
-    const journalLines = preview.entries.map(entry => ({
+    const journalLines = preview.entries.map((entry) => ({
       account_id: entry.account_id,
       debit_amount: entry.debit_amount,
       credit_amount: entry.credit_amount,
       description: entry.description,
     }));
-    
+
     const journalEntryId = await persistenceService.createJournalEntry(
       {
         event_id: eventId,
@@ -354,9 +358,9 @@ export async function closeFiscalYear(
         reference: `FY${year}-CLOSE`,
         status: 'posted',
       },
-      journalLines
+      journalLines,
     );
-    
+
     // Update fiscal year status
     await db.execute(
       `UPDATE fiscal_year 
@@ -366,9 +370,9 @@ export async function closeFiscalYear(
            closing_journal_entry_id = ?,
            updated_at = datetime('now')
        WHERE id = ?`,
-      [context.mode === 'pro' ? 'user' : 'system', journalEntryId, fiscalYear.id]
+      [context.mode === 'pro' ? 'user' : 'system', journalEntryId, fiscalYear.id],
     );
-    
+
     return {
       ok: true,
       journal_entry_id: journalEntryId,
@@ -377,12 +381,12 @@ export async function closeFiscalYear(
     };
   } catch (error) {
     logger.error('Fiscal year close error:', error);
-    
+
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-    
+
     return {
       ok: false,
       warnings: [{ level: 'error', message: errorMessage }],
@@ -395,7 +399,7 @@ export async function closeFiscalYear(
  */
 export async function reopenFiscalYear(
   year: number,
-  context: PolicyContext
+  context: PolicyContext,
 ): Promise<{
   ok: boolean;
   warnings: Array<{ level: 'warning' | 'error'; message: string }>;
@@ -403,16 +407,18 @@ export async function reopenFiscalYear(
   if (context.mode !== 'pro') {
     return {
       ok: false,
-      warnings: [{ 
-        level: 'error', 
-        message: 'Reopening closed fiscal years is only allowed in Pro mode' 
-      }],
+      warnings: [
+        {
+          level: 'error',
+          message: 'Reopening closed fiscal years is only allowed in Pro mode',
+        },
+      ],
     };
   }
-  
+
   try {
     const db = await getDatabase();
-    
+
     const fiscalYear = await getFiscalYear(year);
     if (!fiscalYear) {
       return {
@@ -420,24 +426,24 @@ export async function reopenFiscalYear(
         warnings: [{ level: 'error', message: `Fiscal year ${year} not found` }],
       };
     }
-    
+
     if (fiscalYear.status === 'open') {
       return {
         ok: false,
         warnings: [{ level: 'error', message: `Fiscal year ${year} is already open` }],
       };
     }
-    
+
     // Void the closing journal entry if it exists
     if (fiscalYear.closing_journal_entry_id) {
       await db.execute(
         `UPDATE journal_entry 
          SET status = 'void', updated_at = datetime('now')
          WHERE id = ?`,
-        [fiscalYear.closing_journal_entry_id]
+        [fiscalYear.closing_journal_entry_id],
       );
     }
-    
+
     // Reopen the fiscal year
     await db.execute(
       `UPDATE fiscal_year 
@@ -447,26 +453,26 @@ export async function reopenFiscalYear(
            closing_journal_entry_id = NULL,
            updated_at = datetime('now')
        WHERE id = ?`,
-      [fiscalYear.id]
+      [fiscalYear.id],
     );
-    
+
     return {
       ok: true,
       warnings: [
-        { 
-          level: 'warning', 
-          message: 'Fiscal year reopened. Revenue and expense accounts will need to be re-closed.' 
-        }
+        {
+          level: 'warning',
+          message: 'Fiscal year reopened. Revenue and expense accounts will need to be re-closed.',
+        },
       ],
     };
   } catch (error) {
     logger.error('Fiscal year reopen error:', error);
-    
+
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-    
+
     return {
       ok: false,
       warnings: [{ level: 'error', message: errorMessage }],

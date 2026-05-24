@@ -1,358 +1,348 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { persistenceService } from '../services/persistence';
-  import {
-    getReconciliations,
-    getUnreconciledTransactions,
-    getBookBalance,
-    createReconciliation,
-    addReconciliationItems,
-    removeReconciliationItems,
-    calculateReconciliationDifference,
-    completeReconciliation,
-    cancelReconciliation,
-    getReconciliationSummary
-  } from '../services/bank-reconciliation';
-  import type {
-    Account,
-    BankReconciliation,
-    UnreconciledTransaction,
-    PolicyMode
-  } from '../domain/types';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import { confirmAction } from '../utils/confirm-action';
-  import Button from '../ui/Button.svelte';
-  import Input from '../ui/Input.svelte';
-  import Select from '../ui/Select.svelte';
-  import Card from '../ui/Card.svelte';
-  import Table from '../ui/Table.svelte';
-  import Modal from '../ui/Modal.svelte';
+import { onMount } from 'svelte';
+import { persistenceService } from '../services/persistence';
+import {
+  getReconciliations,
+  getUnreconciledTransactions,
+  getBookBalance,
+  createReconciliation,
+  addReconciliationItems,
+  removeReconciliationItems,
+  calculateReconciliationDifference,
+  completeReconciliation,
+  cancelReconciliation,
+  getReconciliationSummary,
+} from '../services/bank-reconciliation';
+import type {
+  Account,
+  BankReconciliation,
+  UnreconciledTransaction,
+  PolicyMode,
+} from '../domain/types';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import { confirmAction } from '../utils/confirm-action';
+import Button from '../ui/Button.svelte';
+import Input from '../ui/Input.svelte';
+import Select from '../ui/Select.svelte';
+import Card from '../ui/Card.svelte';
+import Table from '../ui/Table.svelte';
+import Modal from '../ui/Modal.svelte';
 
-  export let mode: PolicyMode;
+export let mode: PolicyMode;
 
-  let accounts: Account[] = [];
-  let selectedAccountId: number | '' = '';
-  let reconciliations: BankReconciliation[] = [];
-  let loading = true;
-  let view: 'list' | 'create' | 'reconcile' = 'list';
-  
-  // Reconciliation form
-  let statementDate = '';
-  let statementBalance = 0;
-  let bookBalance = 0;
-  let currentReconciliationId: number | null = null;
-  let unreconciledTransactions: UnreconciledTransaction[] = [];
-  let clearedTransactionIds: Set<number> = new Set();
-  
-  // Summary stats
-  let reconSummary: {
-    lastReconciliationDate: string | null;
-    unreconciledTransactionCount: number;
-    lastReconciledBalance: number | null;
-  } | null = null;
-  
-  // Reconciliation difference
-  let reconDifference: {
-    statementBalance: number;
-    clearedBalance: number;
-    difference: number;
-    isBalanced: boolean;
-  } | null = null;
+let accounts: Account[] = [];
+let selectedAccountId: number | '' = '';
+let reconciliations: BankReconciliation[] = [];
+let loading = true;
+let view: 'list' | 'create' | 'reconcile' = 'list';
 
-  // Adjustment modal state
-  let showAdjustmentModal = false;
-  let adjustmentAccountId: number | '' = '';
-  let adjustmentDescription = 'Bank reconciliation adjustment';
-  let creatingAdjustment = false;
+// Reconciliation form
+let statementDate = '';
+let statementBalance = 0;
+let bookBalance = 0;
+let currentReconciliationId: number | null = null;
+let unreconciledTransactions: UnreconciledTransaction[] = [];
+let clearedTransactionIds: Set<number> = new Set();
 
-  $: bankAccounts = accounts.filter(a => a.type === 'asset' && a.is_active);
-  $: expenseAccounts = accounts.filter(a => a.type === 'expense' && a.is_active);
-  $: bankAccountOptions = [
-    { value: '', label: 'Select account...' },
-    ...bankAccounts.map(acc => ({ value: acc.id, label: `${acc.code} - ${acc.name}` }))
-  ];
-  $: clearedBalance = unreconciledTransactions
-    .filter(txn => clearedTransactionIds.has(txn.journal_line_id))
-    .reduce((sum, txn) => sum + (txn.debit_amount - txn.credit_amount), 0);
-  $: difference = clearedBalance - statementBalance;
-  $: isBalanced = Math.abs(difference) < 0.01;
+// Summary stats
+let reconSummary: {
+  lastReconciliationDate: string | null;
+  unreconciledTransactionCount: number;
+  lastReconciledBalance: number | null;
+} | null = null;
 
-  onMount(async () => {
-    await loadAccounts();
-  });
+// Reconciliation difference
+let reconDifference: {
+  statementBalance: number;
+  clearedBalance: number;
+  difference: number;
+  isBalanced: boolean;
+} | null = null;
 
-  async function loadAccounts() {
-    loading = true;
-    try {
-      accounts = await persistenceService.getAccounts();
-      statementDate = new Date().toISOString().split('T')[0];
-    } catch (e) {
-      logger.error('Failed to load accounts:', e);
-      toasts.error('Failed to load accounts for reconciliation');
-    }
-    loading = false;
+// Adjustment modal state
+let showAdjustmentModal = false;
+let adjustmentAccountId: number | '' = '';
+let adjustmentDescription = 'Bank reconciliation adjustment';
+let creatingAdjustment = false;
+
+$: bankAccounts = accounts.filter((a) => a.type === 'asset' && a.is_active);
+$: expenseAccounts = accounts.filter((a) => a.type === 'expense' && a.is_active);
+$: bankAccountOptions = [
+  { value: '', label: 'Select account...' },
+  ...bankAccounts.map((acc) => ({ value: acc.id, label: `${acc.code} - ${acc.name}` })),
+];
+$: clearedBalance = unreconciledTransactions
+  .filter((txn) => clearedTransactionIds.has(txn.journal_line_id))
+  .reduce((sum, txn) => sum + (txn.debit_amount - txn.credit_amount), 0);
+$: difference = clearedBalance - statementBalance;
+$: isBalanced = Math.abs(difference) < 0.01;
+
+onMount(async () => {
+  await loadAccounts();
+});
+
+async function loadAccounts() {
+  loading = true;
+  try {
+    accounts = await persistenceService.getAccounts();
+    statementDate = new Date().toISOString().split('T')[0];
+  } catch (e) {
+    logger.error('Failed to load accounts:', e);
+    toasts.error('Failed to load accounts for reconciliation');
+  }
+  loading = false;
+}
+
+async function handleAccountChange() {
+  if (selectedAccountId && typeof selectedAccountId === 'number') {
+    await loadReconciliations();
+    await loadSummary();
+  }
+}
+
+async function loadReconciliations() {
+  if (!selectedAccountId || typeof selectedAccountId !== 'number') return;
+
+  try {
+    reconciliations = await getReconciliations(selectedAccountId);
+  } catch (e) {
+    logger.error('Failed to load reconciliations:', e);
+    toasts.error('Failed to load reconciliations');
+  }
+}
+
+async function loadSummary() {
+  if (!selectedAccountId || typeof selectedAccountId !== 'number') return;
+
+  try {
+    reconSummary = await getReconciliationSummary(selectedAccountId);
+  } catch (e) {
+    logger.error('Failed to load summary:', e);
+    toasts.error('Failed to load reconciliation summary');
+  }
+}
+
+async function startNewReconciliation() {
+  if (!selectedAccountId || (typeof selectedAccountId === 'number') === false) {
+    toasts.warning('Please select a bank account');
+    return;
   }
 
-  async function handleAccountChange() {
-    if (selectedAccountId && typeof selectedAccountId === 'number') {
-      await loadReconciliations();
-      await loadSummary();
-    }
+  try {
+    // Get book balance
+    bookBalance = await getBookBalance(selectedAccountId as number, statementDate);
+
+    // Load unreconciled transactions
+    unreconciledTransactions = await getUnreconciledTransactions(
+      selectedAccountId as number,
+      statementDate,
+    );
+
+    clearedTransactionIds.clear();
+    view = 'create';
+  } catch (e) {
+    logger.error('Failed to start reconciliation:', e);
+    toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+  }
+}
+
+function toggleTransaction(txn: UnreconciledTransaction) {
+  if (clearedTransactionIds.has(txn.journal_line_id)) {
+    clearedTransactionIds.delete(txn.journal_line_id);
+  } else {
+    clearedTransactionIds.add(txn.journal_line_id);
+  }
+  clearedTransactionIds = clearedTransactionIds; // Trigger reactivity
+}
+
+async function saveReconciliation() {
+  if (!selectedAccountId || typeof selectedAccountId !== 'number') {
+    toasts.warning('Please select a bank account');
+    return;
   }
 
-  async function loadReconciliations() {
-    if (!selectedAccountId || typeof selectedAccountId !== 'number') return;
-    
-    try {
-      reconciliations = await getReconciliations(selectedAccountId);
-    } catch (e) {
-      logger.error('Failed to load reconciliations:', e);
-      toasts.error('Failed to load reconciliations');
-    }
+  if (statementBalance === 0) {
+    toasts.warning('Please enter the statement balance');
+    return;
   }
 
-  async function loadSummary() {
-    if (!selectedAccountId || typeof selectedAccountId !== 'number') return;
-    
-    try {
-      reconSummary = await getReconciliationSummary(selectedAccountId);
-    } catch (e) {
-      logger.error('Failed to load summary:', e);
-      toasts.error('Failed to load reconciliation summary');
+  try {
+    // Create the reconciliation
+    const reconId = await createReconciliation(selectedAccountId, statementDate, statementBalance, {
+      mode,
+    });
+
+    // Add cleared items
+    if (clearedTransactionIds.size > 0) {
+      await addReconciliationItems(reconId, Array.from(clearedTransactionIds), { mode });
     }
+
+    currentReconciliationId = reconId;
+    view = 'reconcile';
+
+    // Calculate difference
+    await updateReconciliationDifference();
+  } catch (e) {
+    logger.error('Failed to save reconciliation:', e);
+    toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+  }
+}
+
+async function updateReconciliationDifference() {
+  if (!currentReconciliationId) return;
+
+  try {
+    reconDifference = await calculateReconciliationDifference(currentReconciliationId);
+  } catch (e) {
+    logger.error('Failed to calculate difference:', e);
+    toasts.error('Failed to calculate reconciliation difference');
+  }
+}
+
+async function handleComplete() {
+  if (!currentReconciliationId) return;
+
+  if (!reconDifference?.isBalanced) {
+    const confirmed = await confirmAction(
+      'Reconciliation Not Balanced',
+      `This reconciliation does not balance (difference: $${Math.abs(reconDifference?.difference || 0).toFixed(2)}). ` +
+        `Are you sure you want to complete it?`,
+    );
+    if (!confirmed) return;
   }
 
-  async function startNewReconciliation() {
-    if (!selectedAccountId || typeof selectedAccountId === 'number' === false) {
-      toasts.warning('Please select a bank account');
-      return;
-    }
-    
-    try {
-      // Get book balance
-      bookBalance = await getBookBalance(selectedAccountId as number, statementDate);
-      
-      // Load unreconciled transactions
-      unreconciledTransactions = await getUnreconciledTransactions(
-        selectedAccountId as number,
-        statementDate
-      );
-      
-      clearedTransactionIds.clear();
-      view = 'create';
-    } catch (e) {
-      logger.error('Failed to start reconciliation:', e);
-      toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
-    }
-  }
+  try {
+    await completeReconciliation(currentReconciliationId, { mode });
+    toasts.success('Reconciliation completed successfully!');
 
-  function toggleTransaction(txn: UnreconciledTransaction) {
-    if (clearedTransactionIds.has(txn.journal_line_id)) {
-      clearedTransactionIds.delete(txn.journal_line_id);
-    } else {
-      clearedTransactionIds.add(txn.journal_line_id);
-    }
-    clearedTransactionIds = clearedTransactionIds; // Trigger reactivity
-  }
-
-  async function saveReconciliation() {
-    if (!selectedAccountId || typeof selectedAccountId !== 'number') {
-      toasts.warning('Please select a bank account');
-      return;
-    }
-    
-    if (statementBalance === 0) {
-      toasts.warning('Please enter the statement balance');
-      return;
-    }
-    
-    try {
-      // Create the reconciliation
-      const reconId = await createReconciliation(
-        selectedAccountId,
-        statementDate,
-        statementBalance,
-        { mode }
-      );
-      
-      // Add cleared items
-      if (clearedTransactionIds.size > 0) {
-        await addReconciliationItems(
-          reconId,
-          Array.from(clearedTransactionIds),
-          { mode }
-        );
-      }
-      
-      currentReconciliationId = reconId;
-      view = 'reconcile';
-      
-      // Calculate difference
-      await updateReconciliationDifference();
-    } catch (e) {
-      logger.error('Failed to save reconciliation:', e);
-      toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
-    }
-  }
-
-  async function updateReconciliationDifference() {
-    if (!currentReconciliationId) return;
-    
-    try {
-      reconDifference = await calculateReconciliationDifference(currentReconciliationId);
-    } catch (e) {
-      logger.error('Failed to calculate difference:', e);
-      toasts.error('Failed to calculate reconciliation difference');
-    }
-  }
-
-  async function handleComplete() {
-    if (!currentReconciliationId) return;
-    
-    if (!reconDifference?.isBalanced) {
-      const confirmed = await confirmAction(
-        'Reconciliation Not Balanced',
-        `This reconciliation does not balance (difference: $${Math.abs(reconDifference?.difference || 0).toFixed(2)}). ` +
-        `Are you sure you want to complete it?`
-      );
-      if (!confirmed) return;
-    }
-    
-    try {
-      await completeReconciliation(currentReconciliationId, { mode });
-      toasts.success('Reconciliation completed successfully!');
-      
-      // Reset and reload
-      currentReconciliationId = null;
-      reconDifference = null;
-      clearedTransactionIds.clear();
-      view = 'list';
-      await loadReconciliations();
-      await loadSummary();
-    } catch (e) {
-      logger.error('Failed to complete reconciliation:', e);
-      toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
-    }
-  }
-
-  async function handleCancel() {
-    if (currentReconciliationId) {
-      try {
-        await cancelReconciliation(currentReconciliationId, { mode });
-} catch (e) {
-      logger.error('Failed to cancel reconciliation:', e);
-      toasts.error('Failed to cancel reconciliation');
-      }
-    }
-    
+    // Reset and reload
     currentReconciliationId = null;
     reconDifference = null;
     clearedTransactionIds.clear();
     view = 'list';
+    await loadReconciliations();
+    await loadSummary();
+  } catch (e) {
+    logger.error('Failed to complete reconciliation:', e);
+    toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
   }
+}
 
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  }
-
-  function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-CA');
-  }
-
-  async function createAdjustmentEntry() {
-    if (!selectedAccountId || typeof selectedAccountId !== 'number') {
-      toasts.error('Please select a bank account');
-      return;
-    }
-    
-    if (!adjustmentAccountId || typeof adjustmentAccountId !== 'number') {
-      toasts.error('Please select an adjustment account');
-      return;
-    }
-    
-    const diff = reconDifference?.difference ?? difference;
-    if (Math.abs(diff) < 0.01) {
-      toasts.warning('No adjustment needed - reconciliation is already balanced');
-      return;
-    }
-    
-    creatingAdjustment = true;
-    
+async function handleCancel() {
+  if (currentReconciliationId) {
     try {
-      // Create transaction event for audit trail
-      const eventId = await persistenceService.createTransactionEvent({
-        event_type: 'reconciliation_adjustment',
-        description: adjustmentDescription,
-        reference: `Recon-${statementDate}`,
-        created_by: 'user',
-        metadata: JSON.stringify({
-          bank_account_id: selectedAccountId,
-          statement_date: statementDate,
-          adjustment_amount: diff
-        })
-      });
-      
-      // Create journal entry with lines
-      // If diff > 0: cleared balance exceeds statement, so we need to CREDIT the bank (reduce it)
-      // If diff < 0: statement exceeds cleared, so we need to DEBIT the bank (increase it)
-      const absAmount = Math.abs(diff);
-      const bankDebit = diff < 0 ? absAmount : 0;
-      const bankCredit = diff > 0 ? absAmount : 0;
-      const expenseDebit = diff > 0 ? absAmount : 0;
-      const expenseCredit = diff < 0 ? absAmount : 0;
-      
-      await persistenceService.createJournalEntry(
-        {
-          event_id: eventId,
-          entry_date: statementDate,
-          description: adjustmentDescription,
-          reference: `Recon-Adj-${statementDate}`,
-          status: 'posted'
-        },
-        [
-          { 
-            account_id: selectedAccountId, 
-            debit_amount: bankDebit, 
-            credit_amount: bankCredit, 
-            description: `Bank adjustment - ${adjustmentDescription}` 
-          },
-          { 
-            account_id: adjustmentAccountId, 
-            debit_amount: expenseDebit, 
-            credit_amount: expenseCredit, 
-            description: `Adjustment expense - ${adjustmentDescription}` 
-          }
-        ]
-      );
-      
-      toasts.success(`Adjustment entry created for ${formatCurrency(absAmount)}`);
-      showAdjustmentModal = false;
-      
-      // Reload transactions and recalculate
-      unreconciledTransactions = await getUnreconciledTransactions(
-        selectedAccountId,
-        statementDate
-      );
-      
-      // If we're in reconcile view, update the difference
-      if (currentReconciliationId) {
-        await updateReconciliationDifference();
-      }
-      
-      // Reset adjustment form
-      adjustmentAccountId = '';
-      adjustmentDescription = 'Bank reconciliation adjustment';
+      await cancelReconciliation(currentReconciliationId, { mode });
     } catch (e) {
-      logger.error('Failed to create adjustment entry:', e);
-      toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
-    } finally {
-      creatingAdjustment = false;
+      logger.error('Failed to cancel reconciliation:', e);
+      toasts.error('Failed to cancel reconciliation');
     }
   }
+
+  currentReconciliationId = null;
+  reconDifference = null;
+  clearedTransactionIds.clear();
+  view = 'list';
+}
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(amount);
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-CA');
+}
+
+async function createAdjustmentEntry() {
+  if (!selectedAccountId || typeof selectedAccountId !== 'number') {
+    toasts.error('Please select a bank account');
+    return;
+  }
+
+  if (!adjustmentAccountId || typeof adjustmentAccountId !== 'number') {
+    toasts.error('Please select an adjustment account');
+    return;
+  }
+
+  const diff = reconDifference?.difference ?? difference;
+  if (Math.abs(diff) < 0.01) {
+    toasts.warning('No adjustment needed - reconciliation is already balanced');
+    return;
+  }
+
+  creatingAdjustment = true;
+
+  try {
+    // Create transaction event for audit trail
+    const eventId = await persistenceService.createTransactionEvent({
+      event_type: 'reconciliation_adjustment',
+      description: adjustmentDescription,
+      reference: `Recon-${statementDate}`,
+      created_by: 'user',
+      metadata: JSON.stringify({
+        bank_account_id: selectedAccountId,
+        statement_date: statementDate,
+        adjustment_amount: diff,
+      }),
+    });
+
+    // Create journal entry with lines
+    // If diff > 0: cleared balance exceeds statement, so we need to CREDIT the bank (reduce it)
+    // If diff < 0: statement exceeds cleared, so we need to DEBIT the bank (increase it)
+    const absAmount = Math.abs(diff);
+    const bankDebit = diff < 0 ? absAmount : 0;
+    const bankCredit = diff > 0 ? absAmount : 0;
+    const expenseDebit = diff > 0 ? absAmount : 0;
+    const expenseCredit = diff < 0 ? absAmount : 0;
+
+    await persistenceService.createJournalEntry(
+      {
+        event_id: eventId,
+        entry_date: statementDate,
+        description: adjustmentDescription,
+        reference: `Recon-Adj-${statementDate}`,
+        status: 'posted',
+      },
+      [
+        {
+          account_id: selectedAccountId,
+          debit_amount: bankDebit,
+          credit_amount: bankCredit,
+          description: `Bank adjustment - ${adjustmentDescription}`,
+        },
+        {
+          account_id: adjustmentAccountId,
+          debit_amount: expenseDebit,
+          credit_amount: expenseCredit,
+          description: `Adjustment expense - ${adjustmentDescription}`,
+        },
+      ],
+    );
+
+    toasts.success(`Adjustment entry created for ${formatCurrency(absAmount)}`);
+    showAdjustmentModal = false;
+
+    // Reload transactions and recalculate
+    unreconciledTransactions = await getUnreconciledTransactions(selectedAccountId, statementDate);
+
+    // If we're in reconcile view, update the difference
+    if (currentReconciliationId) {
+      await updateReconciliationDifference();
+    }
+
+    // Reset adjustment form
+    adjustmentAccountId = '';
+    adjustmentDescription = 'Bank reconciliation adjustment';
+  } catch (e) {
+    logger.error('Failed to create adjustment entry:', e);
+    toasts.error(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+  } finally {
+    creatingAdjustment = false;
+  }
+}
 </script>
 
 <div class="reconciliation-view">

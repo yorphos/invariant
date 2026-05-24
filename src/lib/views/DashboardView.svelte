@@ -1,88 +1,90 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { persistenceService } from '../services/persistence';
-  import { getDatabase } from '../services/database';
-  import type { Invoice, Payment, PolicyMode } from '../domain/types';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import Card from '../ui/Card.svelte';
+import { onMount } from 'svelte';
+import { persistenceService } from '../services/persistence';
+import { getDatabase } from '../services/database';
+import type { Invoice, Payment, PolicyMode } from '../domain/types';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import Card from '../ui/Card.svelte';
 
-  export let mode: PolicyMode;
-  export let onNavigate: (view: 'dashboard' | 'contacts' | 'invoices' | 'payments' | 'expenses' | 'reports' | 'settings') => void;
+export let mode: PolicyMode;
+export let onNavigate: (
+  view: 'dashboard' | 'contacts' | 'invoices' | 'payments' | 'expenses' | 'reports' | 'settings',
+) => void;
 
-  let loading = true;
-  let stats = {
-    totalInvoices: 0,
-    openInvoices: 0,
-    totalAR: 0,
-    totalRevenue: 0,
-    totalExpenses: 0,
-    recentInvoices: [] as Invoice[],
-    recentPayments: [] as Payment[],
-  };
+let loading = true;
+let stats = {
+  totalInvoices: 0,
+  openInvoices: 0,
+  totalAR: 0,
+  totalRevenue: 0,
+  totalExpenses: 0,
+  recentInvoices: [] as Invoice[],
+  recentPayments: [] as Payment[],
+};
 
-  onMount(async () => {
-    await loadDashboard();
-  });
+onMount(async () => {
+  await loadDashboard();
+});
 
-  async function loadDashboard() {
-    loading = true;
-    try {
-      const db = await getDatabase();
+async function loadDashboard() {
+  loading = true;
+  try {
+    const db = await getDatabase();
 
-      // Get invoice stats
-      const invoices = await persistenceService.getInvoices();
-      const openInvoices = invoices.filter(inv => 
-        ['sent', 'partial', 'overdue'].includes(inv.status)
-      );
+    // Get invoice stats
+    const invoices = await persistenceService.getInvoices();
+    const openInvoices = invoices.filter((inv) =>
+      ['sent', 'partial', 'overdue'].includes(inv.status),
+    );
 
-      stats.totalInvoices = invoices.length;
-      stats.openInvoices = openInvoices.length;
-      stats.totalAR = openInvoices.reduce((sum, inv) => 
-        sum + (inv.total_amount - inv.paid_amount), 0
-      );
-      stats.recentInvoices = invoices.slice(0, 5);
+    stats.totalInvoices = invoices.length;
+    stats.openInvoices = openInvoices.length;
+    stats.totalAR = openInvoices.reduce(
+      (sum, inv) => sum + (inv.total_amount - inv.paid_amount),
+      0,
+    );
+    stats.recentInvoices = invoices.slice(0, 5);
 
-      // Get payment stats
-      const payments = await persistenceService.getPayments();
-      stats.recentPayments = payments.slice(0, 5);
+    // Get payment stats
+    const payments = await persistenceService.getPayments();
+    stats.recentPayments = payments.slice(0, 5);
 
-      // Get revenue and expense totals
-      const revenueAccounts = await db.select<Array<{ total: number }>>(
-        `SELECT COALESCE(SUM(jl.credit_amount - jl.debit_amount), 0) as total
+    // Get revenue and expense totals
+    const revenueAccounts = await db.select<Array<{ total: number }>>(
+      `SELECT COALESCE(SUM(jl.credit_amount - jl.debit_amount), 0) as total
          FROM journal_line jl
          JOIN account a ON jl.account_id = a.id
          JOIN journal_entry je ON jl.journal_entry_id = je.id
-         WHERE a.type = 'revenue' AND je.status = 'posted'`
-      );
-      stats.totalRevenue = revenueAccounts[0]?.total || 0;
+         WHERE a.type = 'revenue' AND je.status = 'posted'`,
+    );
+    stats.totalRevenue = revenueAccounts[0]?.total || 0;
 
-      const expenseAccounts = await db.select<Array<{ total: number }>>(
-        `SELECT COALESCE(SUM(jl.debit_amount - jl.credit_amount), 0) as total
+    const expenseAccounts = await db.select<Array<{ total: number }>>(
+      `SELECT COALESCE(SUM(jl.debit_amount - jl.credit_amount), 0) as total
          FROM journal_line jl
          JOIN account a ON jl.account_id = a.id
          JOIN journal_entry je ON jl.journal_entry_id = je.id
-         WHERE a.type = 'expense' AND je.status = 'posted'`
-      );
-      stats.totalExpenses = expenseAccounts[0]?.total || 0;
-
-    } catch (e) {
-      logger.error('Failed to load dashboard:', e);
-      toasts.error('Failed to load dashboard data');
-    }
-    loading = false;
+         WHERE a.type = 'expense' AND je.status = 'posted'`,
+    );
+    stats.totalExpenses = expenseAccounts[0]?.total || 0;
+  } catch (e) {
+    logger.error('Failed to load dashboard:', e);
+    toasts.error('Failed to load dashboard data');
   }
+  loading = false;
+}
 
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  }
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(amount);
+}
 
-  function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-CA');
-  }
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-CA');
+}
 </script>
 
 <div class="dashboard">

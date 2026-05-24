@@ -91,30 +91,28 @@ async function initializeMigrations(db: Database): Promise<void> {
 async function runMigrations(db: Database): Promise<void> {
   // Enable foreign keys
   await db.execute('PRAGMA foreign_keys = ON');
-  
+
   // Get list of applied migrations
-  const applied = await db.select<Array<{ id: string }>>(
-    'SELECT id FROM _migrations ORDER BY id'
-  );
-  const appliedIds = new Set(applied.map(m => m.id));
-  
+  const applied = await db.select<Array<{ id: string }>>('SELECT id FROM _migrations ORDER BY id');
+  const appliedIds = new Set(applied.map((m) => m.id));
+
   // Import all migrations
   const migrations = await import('../../../migrations');
-  
+
   // Apply pending migrations in order
   for (const migration of migrations.allMigrations) {
     if (!appliedIds.has(migration.id)) {
       logger.info(`Applying migration ${migration.id}: ${migration.name}`);
-      
+
       // Execute migration
       await db.execute(migration.up);
-      
+
       // Record migration
-      await db.execute(
-        'INSERT INTO _migrations (id, name) VALUES (?, ?)',
-        [migration.id, migration.name]
-      );
-      
+      await db.execute('INSERT INTO _migrations (id, name) VALUES (?, ?)', [
+        migration.id,
+        migration.name,
+      ]);
+
       logger.info(`Migration ${migration.id} applied successfully`);
     }
   }

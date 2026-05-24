@@ -1,15 +1,15 @@
 <script lang="ts">
-  import Modal from './Modal.svelte';
-  import Button from './Button.svelte';
+import Modal from './Modal.svelte';
+import Button from './Button.svelte';
 
-  export let title: string;
-  export let message: string;
-  export let onConfirm: () => void;
-  export let onCancel: () => void;
+export let title: string;
+export let message: string;
+export let onConfirm: () => void;
+export let onCancel: () => void;
 
-  function handleClose() {
-    onCancel();
-  }
+function handleClose() {
+  onCancel();
+}
 </script>
 
 <Modal open={true} {title} onclose={handleClose} size="small">

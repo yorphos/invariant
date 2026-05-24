@@ -1,6 +1,6 @@
 /**
  * Bank Import Service
- * 
+ *
  * Handles importing bank statements from CSV and QBO files,
  * auto-matching transactions, and applying categorization rules.
  */
@@ -16,15 +16,11 @@ import type {
   BankTransactionType,
   Account,
   Contact,
-  JournalEntry
+  JournalEntry,
 } from '../domain/types';
 
 // Re-export types for convenience
-export type {
-  BankStatementImport,
-  BankStatementTransaction,
-  CategorizationRule
-};
+export type { BankStatementImport, BankStatementTransaction, CategorizationRule };
 
 /**
  * Parse CSV bank statement
@@ -38,24 +34,24 @@ export function parseCSVBankStatement(csvText: string): {
   closingBalance?: number;
 } {
   const lines = csvText.trim().split('\n');
-  
+
   if (lines.length < 2) {
     throw new Error('CSV must have at least a header row and one data row');
   }
 
   // Parse header
-  const header = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
-  
+  const header = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/['"]/g, ''));
+
   // Find column indices (flexible matching)
-  const dateIdx = header.findIndex(h => h.includes('date') && !h.includes('post'));
-  const postDateIdx = header.findIndex(h => h.includes('post') && h.includes('date'));
-  const descIdx = header.findIndex(h => h.includes('description') || h.includes('memo'));
-  const amountIdx = header.findIndex(h => h.includes('amount') && !h.includes('balance'));
-  const balanceIdx = header.findIndex(h => h.includes('balance'));
-  const refIdx = header.findIndex(h => h.includes('reference') || h.includes('ref'));
-  const checkIdx = header.findIndex(h => h.includes('check'));
-  const payeeIdx = header.findIndex(h => h.includes('payee') || h.includes('merchant'));
-  const typeIdx = header.findIndex(h => h.includes('type'));
+  const dateIdx = header.findIndex((h) => h.includes('date') && !h.includes('post'));
+  const postDateIdx = header.findIndex((h) => h.includes('post') && h.includes('date'));
+  const descIdx = header.findIndex((h) => h.includes('description') || h.includes('memo'));
+  const amountIdx = header.findIndex((h) => h.includes('amount') && !h.includes('balance'));
+  const balanceIdx = header.findIndex((h) => h.includes('balance'));
+  const refIdx = header.findIndex((h) => h.includes('reference') || h.includes('ref'));
+  const checkIdx = header.findIndex((h) => h.includes('check'));
+  const payeeIdx = header.findIndex((h) => h.includes('payee') || h.includes('merchant'));
+  const typeIdx = header.findIndex((h) => h.includes('type'));
 
   if (dateIdx === -1 || descIdx === -1 || amountIdx === -1) {
     throw new Error('CSV must have columns for: Date, Description, and Amount');
@@ -70,10 +66,10 @@ export function parseCSVBankStatement(csvText: string): {
     if (!line) continue;
 
     const values = parseCSVLine(line);
-    
+
     const txnDate = values[dateIdx];
     const amount = parseFloat(values[amountIdx].replace(/[$,]/g, ''));
-    
+
     // Track date range
     if (!minDate || txnDate < minDate) minDate = txnDate;
     if (!maxDate || txnDate > maxDate) maxDate = txnDate;
@@ -87,8 +83,9 @@ export function parseCSVBankStatement(csvText: string): {
       reference_number: refIdx >= 0 ? values[refIdx] : undefined,
       check_number: checkIdx >= 0 ? values[checkIdx] : undefined,
       payee: payeeIdx >= 0 ? values[payeeIdx] : undefined,
-      transaction_type: typeIdx >= 0 ? normalizeTransactionType(values[typeIdx]) : (amount < 0 ? 'debit' : 'credit'),
-      match_status: 'unmatched'
+      transaction_type:
+        typeIdx >= 0 ? normalizeTransactionType(values[typeIdx]) : amount < 0 ? 'debit' : 'credit',
+      match_status: 'unmatched',
     });
   }
 
@@ -97,7 +94,7 @@ export function parseCSVBankStatement(csvText: string): {
     startDate: minDate,
     endDate: maxDate,
     openingBalance: transactions[0]?.balance,
-    closingBalance: transactions[transactions.length - 1]?.balance
+    closingBalance: transactions[transactions.length - 1]?.balance,
   };
 }
 
@@ -108,10 +105,10 @@ function parseCSVLine(line: string): string[] {
   const fields: string[] = [];
   let currentField = '';
   let inQuotes = false;
-  
+
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
-    
+
     if (char === '"') {
       inQuotes = !inQuotes;
     } else if (char === ',' && !inQuotes) {
@@ -121,7 +118,7 @@ function parseCSVLine(line: string): string[] {
       currentField += char;
     }
   }
-  
+
   fields.push(currentField.trim());
   return fields;
 }
@@ -131,14 +128,14 @@ function parseCSVLine(line: string): string[] {
  */
 function normalizeTransactionType(type: string): BankTransactionType {
   const t = type.toLowerCase();
-  
+
   if (t.includes('debit') || t.includes('withdrawal') || t.includes('payment')) return 'debit';
   if (t.includes('credit') || t.includes('deposit')) return 'credit';
   if (t.includes('check') || t.includes('cheque')) return 'check';
   if (t.includes('fee')) return 'fee';
   if (t.includes('interest')) return 'interest';
   if (t.includes('transfer')) return 'transfer';
-  
+
   return 'other';
 }
 
@@ -149,31 +146,30 @@ export async function createBankImport(
   accountId: number,
   fileName: string,
   fileFormat: BankFileFormat,
-  importedBy: string
+  importedBy: string,
 ): Promise<number> {
   const db = await getDatabase();
-  
+
   // Verify account exists
-  const accounts = await db.select<Account[]>(
-    'SELECT * FROM account WHERE id = ? LIMIT 1',
-    [accountId]
-  );
-  
+  const accounts = await db.select<Account[]>('SELECT * FROM account WHERE id = ? LIMIT 1', [
+    accountId,
+  ]);
+
   if (!accounts[0]) {
     throw new Error(`Account ID ${accountId} does not exist`);
   }
-  
+
   const result = await db.execute(
     `INSERT INTO bank_statement_import 
      (account_id, file_name, file_format, total_transactions, imported_transactions, matched_transactions, status, imported_by)
      VALUES (?, ?, ?, 0, 0, 0, 'pending', ?)`,
-    [accountId, fileName, fileFormat, importedBy]
+    [accountId, fileName, fileFormat, importedBy],
   );
-  
+
   if (!result.lastInsertId) {
     throw new Error('Failed to create bank import record');
   }
-  
+
   return result.lastInsertId;
 }
 
@@ -182,10 +178,10 @@ export async function createBankImport(
  */
 export async function addTransactionsToImport(
   importId: number,
-  transactions: Partial<BankStatementTransaction>[]
+  transactions: Partial<BankStatementTransaction>[],
 ): Promise<void> {
   const db = await getDatabase();
-  
+
   for (const txn of transactions) {
     await db.execute(
       `INSERT INTO bank_statement_transaction 
@@ -205,11 +201,11 @@ export async function addTransactionsToImport(
         txn.transaction_type || 'other',
         txn.category || null,
         txn.memo || null,
-        txn.match_status || 'unmatched'
-      ]
+        txn.match_status || 'unmatched',
+      ],
     );
   }
-  
+
   // Update import record
   await db.execute(
     `UPDATE bank_statement_import 
@@ -217,7 +213,7 @@ export async function addTransactionsToImport(
          status = 'completed',
          updated_at = datetime('now')
      WHERE id = ?`,
-    [transactions.length, importId]
+    [transactions.length, importId],
   );
 }
 
@@ -228,21 +224,21 @@ export async function importCSVBankStatement(
   accountId: number,
   fileName: string,
   csvText: string,
-  importedBy: string
+  importedBy: string,
 ): Promise<{
   importId: number;
   transactionCount: number;
   autoMatchedCount: number;
 }> {
   const db = await getDatabase();
-  
+
   // Parse CSV
-  const { transactions, startDate, endDate, openingBalance, closingBalance } = 
+  const { transactions, startDate, endDate, openingBalance, closingBalance } =
     parseCSVBankStatement(csvText);
-  
+
   // Create import record
   const importId = await createBankImport(accountId, fileName, 'csv', importedBy);
-  
+
   // Update with statement details
   await db.execute(
     `UPDATE bank_statement_import 
@@ -251,22 +247,22 @@ export async function importCSVBankStatement(
          opening_balance = ?,
          closing_balance = ?
      WHERE id = ?`,
-    [startDate, endDate, openingBalance, closingBalance, importId]
+    [startDate, endDate, openingBalance, closingBalance, importId],
   );
-  
+
   // Add transactions
   await addTransactionsToImport(importId, transactions);
-  
+
   // Apply categorization rules
   await applyCategorizationRules(importId);
-  
+
   // Auto-match transactions
   const autoMatchedCount = await autoMatchTransactions(importId, accountId);
-  
+
   return {
     importId,
     transactionCount: transactions.length,
-    autoMatchedCount
+    autoMatchedCount,
   };
 }
 
@@ -275,13 +271,13 @@ export async function importCSVBankStatement(
  */
 export async function getCategorizationRules(): Promise<CategorizationRule[]> {
   const db = await getDatabase();
-  
+
   const results = await db.select<CategorizationRule[]>(
     `SELECT * FROM categorization_rule
      WHERE is_active = 1
-     ORDER BY priority DESC, id ASC`
+     ORDER BY priority DESC, id ASC`,
   );
-  
+
   return results;
 }
 
@@ -290,19 +286,19 @@ export async function getCategorizationRules(): Promise<CategorizationRule[]> {
  */
 export async function applyCategorizationRules(importId: number): Promise<number> {
   const db = await getDatabase();
-  
+
   // Get all unmatched transactions
   const transactions = await db.select<BankStatementTransaction[]>(
     `SELECT * FROM bank_statement_transaction
      WHERE import_id = ? AND match_status = 'unmatched'`,
-    [importId]
+    [importId],
   );
-  
+
   // Get active rules
   const rules = await getCategorizationRules();
-  
+
   let appliedCount = 0;
-  
+
   for (const txn of transactions) {
     // Try each rule in priority order
     for (const rule of rules) {
@@ -319,32 +315,32 @@ export async function applyCategorizationRules(importId: number): Promise<number
             rule.assign_account_id || null,
             rule.assign_contact_id || null,
             rule.assign_category || txn.category,
-            txn.id
-          ]
+            txn.id,
+          ],
         );
-        
+
         // Log rule application
         await db.execute(
           `INSERT INTO rule_application_log (rule_id, bank_transaction_id)
            VALUES (?, ?)`,
-          [rule.id, txn.id]
+          [rule.id, txn.id],
         );
-        
+
         // Update rule statistics
         await db.execute(
           `UPDATE categorization_rule
            SET times_applied = times_applied + 1,
                last_applied_at = datetime('now')
            WHERE id = ?`,
-          [rule.id]
+          [rule.id],
         );
-        
+
         appliedCount++;
         break; // Only apply first matching rule
       }
     }
   }
-  
+
   return appliedCount;
 }
 
@@ -357,27 +353,27 @@ function matchesRule(txn: BankStatementTransaction, rule: CategorizationRule): b
     const regex = new RegExp(rule.description_pattern, 'i');
     if (!regex.test(txn.description)) return false;
   }
-  
+
   // Check payee pattern
   if (rule.payee_pattern && txn.payee) {
     const regex = new RegExp(rule.payee_pattern, 'i');
     if (!regex.test(txn.payee)) return false;
   }
-  
+
   // Check amount range
   if (rule.amount_min !== undefined && rule.amount_min !== null) {
     if (Math.abs(txn.amount) < rule.amount_min) return false;
   }
-  
+
   if (rule.amount_max !== undefined && rule.amount_max !== null) {
     if (Math.abs(txn.amount) > rule.amount_max) return false;
   }
-  
+
   // Check transaction type
   if (rule.transaction_type && txn.transaction_type !== rule.transaction_type) {
     return false;
   }
-  
+
   return true;
 }
 
@@ -385,21 +381,18 @@ function matchesRule(txn: BankStatementTransaction, rule: CategorizationRule): b
  * Auto-match imported transactions to existing journal entries
  * Matches by date, amount, and description similarity
  */
-export async function autoMatchTransactions(
-  importId: number,
-  accountId: number
-): Promise<number> {
+export async function autoMatchTransactions(importId: number, accountId: number): Promise<number> {
   const db = await getDatabase();
-  
+
   // Get unmatched transactions
   const transactions = await db.select<BankStatementTransaction[]>(
     `SELECT * FROM bank_statement_transaction
      WHERE import_id = ? AND match_status = 'unmatched'`,
-    [importId]
+    [importId],
   );
-  
+
   let matchedCount = 0;
-  
+
   for (const txn of transactions) {
     // Find potential matches:
     // - Posted journal entries
@@ -410,15 +403,17 @@ export async function autoMatchTransactions(
     dateStart.setDate(dateStart.getDate() - 3);
     const dateEnd = new Date(txn.transaction_date);
     dateEnd.setDate(dateEnd.getDate() + 3);
-    
-    const potentialMatches = await db.select<Array<{
-      journal_entry_id: number;
-      entry_date: string;
-      description: string;
-      reference: string;
-      debit_amount: number;
-      credit_amount: number;
-    }>>(
+
+    const potentialMatches = await db.select<
+      Array<{
+        journal_entry_id: number;
+        entry_date: string;
+        description: string;
+        reference: string;
+        debit_amount: number;
+        credit_amount: number;
+      }>
+    >(
       `SELECT 
          je.id as journal_entry_id,
          je.entry_date,
@@ -433,35 +428,41 @@ export async function autoMatchTransactions(
          AND DATE(je.entry_date) BETWEEN DATE(?) AND DATE(?)
          AND jl.reconciliation_id IS NULL
        ORDER BY ABS(JULIANDAY(je.entry_date) - JULIANDAY(?)) ASC`,
-      [accountId, dateStart.toISOString().split('T')[0], dateEnd.toISOString().split('T')[0], txn.transaction_date]
+      [
+        accountId,
+        dateStart.toISOString().split('T')[0],
+        dateEnd.toISOString().split('T')[0],
+        txn.transaction_date,
+      ],
     );
-    
+
     // Find best match
-    let bestMatch: typeof potentialMatches[0] | null = null;
+    let bestMatch: (typeof potentialMatches)[0] | null = null;
     let bestScore = 0;
-    
+
     for (const match of potentialMatches) {
       // Calculate amount match (bank transaction amount matches journal line debit or credit)
-      const amountMatch = txn.amount < 0 
-        ? Math.abs(txn.amount) === match.credit_amount
-        : Math.abs(txn.amount) === match.debit_amount;
-      
+      const amountMatch =
+        txn.amount < 0
+          ? Math.abs(txn.amount) === match.credit_amount
+          : Math.abs(txn.amount) === match.debit_amount;
+
       if (!amountMatch) continue;
-      
+
       // Calculate description similarity (simple contains check)
       const descSimilarity = calculateStringSimilarity(
         txn.description.toLowerCase(),
-        match.description.toLowerCase()
+        match.description.toLowerCase(),
       );
-      
-      const score = 0.7 + (descSimilarity * 0.3);
-      
+
+      const score = 0.7 + descSimilarity * 0.3;
+
       if (score > bestScore && score > 0.7) {
         bestScore = score;
         bestMatch = match;
       }
     }
-    
+
     if (bestMatch && bestScore > 0.7) {
       // Auto-match this transaction
       await db.execute(
@@ -470,21 +471,21 @@ export async function autoMatchTransactions(
              matched_journal_entry_id = ?,
              matched_confidence = ?
          WHERE id = ?`,
-        [bestMatch.journal_entry_id, bestScore, txn.id]
+        [bestMatch.journal_entry_id, bestScore, txn.id],
       );
-      
+
       matchedCount++;
     }
   }
-  
+
   // Update import statistics
   await db.execute(
     `UPDATE bank_statement_import
      SET matched_transactions = ?
      WHERE id = ?`,
-    [matchedCount, importId]
+    [matchedCount, importId],
   );
-  
+
   return matchedCount;
 }
 
@@ -495,14 +496,16 @@ export async function autoMatchTransactions(
  */
 export async function checkDuplicateTransactions(
   transactions: Partial<BankStatementTransaction>[],
-  accountId: number
-): Promise<{
-  transactionIndex: number;
-  duplicateOf: number;
-  confidence: number;
-  existingEntryDate: string;
-  existingDescription: string;
-}[]> {
+  accountId: number,
+): Promise<
+  {
+    transactionIndex: number;
+    duplicateOf: number;
+    confidence: number;
+    existingEntryDate: string;
+    existingDescription: string;
+  }[]
+> {
   const db = await getDatabase();
   const duplicates: {
     transactionIndex: number;
@@ -523,13 +526,15 @@ export async function checkDuplicateTransactions(
     const dateEnd = new Date(txnDate);
     dateEnd.setDate(dateEnd.getDate() + 3);
 
-    const potentialMatches = await db.select<Array<{
-      journal_entry_id: number;
-      entry_date: string;
-      description: string;
-      debit_amount: number;
-      credit_amount: number;
-    }>>(
+    const potentialMatches = await db.select<
+      Array<{
+        journal_entry_id: number;
+        entry_date: string;
+        description: string;
+        debit_amount: number;
+        credit_amount: number;
+      }>
+    >(
       `SELECT 
          je.id as journal_entry_id,
          je.entry_date,
@@ -542,31 +547,35 @@ export async function checkDuplicateTransactions(
          AND jl.account_id = ?
          AND DATE(je.entry_date) BETWEEN DATE(?) AND DATE(?)
        ORDER BY ABS(JULIANDAY(je.entry_date) - JULIANDAY(?)) ASC`,
-      [accountId, dateStart.toISOString().split('T')[0], dateEnd.toISOString().split('T')[0], txn.transaction_date]
+      [
+        accountId,
+        dateStart.toISOString().split('T')[0],
+        dateEnd.toISOString().split('T')[0],
+        txn.transaction_date,
+      ],
     );
 
-    let bestMatch: typeof potentialMatches[0] | null = null;
+    let bestMatch: (typeof potentialMatches)[0] | null = null;
     let bestScore = 0;
 
     for (const match of potentialMatches) {
       // Check amount match
-      const amountMatch = txn.amount < 0
-        ? Math.abs(txn.amount) === match.credit_amount
-        : Math.abs(txn.amount) === match.debit_amount;
+      const amountMatch =
+        txn.amount < 0
+          ? Math.abs(txn.amount) === match.credit_amount
+          : Math.abs(txn.amount) === match.debit_amount;
 
       if (!amountMatch) continue;
 
       // Check description similarity
       const descSimilarity = calculateStringSimilarity(
         (txn.description || '').toLowerCase(),
-        match.description.toLowerCase()
+        match.description.toLowerCase(),
       );
 
       // Date proximity bonus (same day = higher confidence)
       const sameDay = txn.transaction_date === match.entry_date;
-      const score = sameDay
-        ? 0.8 + (descSimilarity * 0.2)
-        : 0.6 + (descSimilarity * 0.3);
+      const score = sameDay ? 0.8 + descSimilarity * 0.2 : 0.6 + descSimilarity * 0.3;
 
       if (score > bestScore && score > 0.6) {
         bestScore = score;
@@ -580,7 +589,7 @@ export async function checkDuplicateTransactions(
         duplicateOf: bestMatch.journal_entry_id,
         confidence: Math.round(bestScore * 100) / 100,
         existingEntryDate: bestMatch.entry_date,
-        existingDescription: bestMatch.description
+        existingDescription: bestMatch.description,
       });
     }
   }
@@ -594,10 +603,10 @@ export async function checkDuplicateTransactions(
 function calculateStringSimilarity(str1: string, str2: string): number {
   const words1 = new Set(str1.split(/\s+/));
   const words2 = new Set(str2.split(/\s+/));
-  
-  const intersection = new Set([...words1].filter(w => words2.has(w)));
+
+  const intersection = new Set([...words1].filter((w) => words2.has(w)));
   const union = new Set([...words1, ...words2]);
-  
+
   return union.size > 0 ? intersection.size / union.size : 0;
 }
 
@@ -606,12 +615,12 @@ function calculateStringSimilarity(str1: string, str2: string): number {
  */
 export async function getBankImport(importId: number): Promise<BankStatementImport | null> {
   const db = await getDatabase();
-  
+
   const results = await db.select<BankStatementImport[]>(
     'SELECT * FROM bank_statement_import WHERE id = ? LIMIT 1',
-    [importId]
+    [importId],
   );
-  
+
   return results[0] || null;
 }
 
@@ -620,14 +629,14 @@ export async function getBankImport(importId: number): Promise<BankStatementImpo
  */
 export async function getImportTransactions(importId: number): Promise<BankStatementTransaction[]> {
   const db = await getDatabase();
-  
+
   const results = await db.select<BankStatementTransaction[]>(
     `SELECT * FROM bank_statement_transaction
      WHERE import_id = ?
      ORDER BY transaction_date DESC, id DESC`,
-    [importId]
+    [importId],
   );
-  
+
   return results;
 }
 
@@ -636,14 +645,14 @@ export async function getImportTransactions(importId: number): Promise<BankState
  */
 export async function getAccountImports(accountId: number): Promise<BankStatementImport[]> {
   const db = await getDatabase();
-  
+
   const results = await db.select<BankStatementImport[]>(
     `SELECT * FROM bank_statement_import
      WHERE account_id = ?
      ORDER BY import_date DESC`,
-    [accountId]
+    [accountId],
   );
-  
+
   return results;
 }
 
@@ -651,10 +660,13 @@ export async function getAccountImports(accountId: number): Promise<BankStatemen
  * Create a categorization rule
  */
 export async function createCategorizationRule(
-  rule: Omit<CategorizationRule, 'id' | 'times_applied' | 'last_applied_at' | 'created_at' | 'updated_at'>
+  rule: Omit<
+    CategorizationRule,
+    'id' | 'times_applied' | 'last_applied_at' | 'created_at' | 'updated_at'
+  >,
 ): Promise<number> {
   const db = await getDatabase();
-  
+
   const result = await db.execute(
     `INSERT INTO categorization_rule 
      (rule_name, priority, is_active, description_pattern, payee_pattern, 
@@ -673,14 +685,14 @@ export async function createCategorizationRule(
       rule.assign_account_id || null,
       rule.assign_contact_id || null,
       rule.assign_category || null,
-      rule.notes_template || null
-    ]
+      rule.notes_template || null,
+    ],
   );
-  
+
   if (!result.lastInsertId) {
     throw new Error('Failed to create categorization rule');
   }
-  
+
   return result.lastInsertId;
 }
 
@@ -689,13 +701,13 @@ export async function createCategorizationRule(
  */
 export async function updateCategorizationRule(
   ruleId: number,
-  updates: Partial<CategorizationRule>
+  updates: Partial<CategorizationRule>,
 ): Promise<void> {
   const db = await getDatabase();
-  
+
   const fields: string[] = [];
   const values: SqlParams = [];
-  
+
   if (updates.rule_name !== undefined) {
     fields.push('rule_name = ?');
     values.push(updates.rule_name);
@@ -744,18 +756,15 @@ export async function updateCategorizationRule(
     fields.push('notes_template = ?');
     values.push(updates.notes_template || null);
   }
-  
+
   if (fields.length === 0) {
     return; // Nothing to update
   }
-  
+
   fields.push('updated_at = datetime("now")');
   values.push(ruleId);
-  
-  await db.execute(
-    `UPDATE categorization_rule SET ${fields.join(', ')} WHERE id = ?`,
-    values
-  );
+
+  await db.execute(`UPDATE categorization_rule SET ${fields.join(', ')} WHERE id = ?`, values);
 }
 
 /**
@@ -763,11 +772,8 @@ export async function updateCategorizationRule(
  */
 export async function deleteCategorizationRule(ruleId: number): Promise<void> {
   const db = await getDatabase();
-  
-  await db.execute(
-    'DELETE FROM categorization_rule WHERE id = ?',
-    [ruleId]
-  );
+
+  await db.execute('DELETE FROM categorization_rule WHERE id = ?', [ruleId]);
 }
 
 /**
@@ -779,7 +785,7 @@ export async function importBankTransactionAsJournalEntry(
   bankAccountId: number, // The bank/cash account affected
   categoriesAccountId: number, // The expense/revenue/other account
   contactId?: number,
-  notes?: string
+  notes?: string,
 ): Promise<{
   ok: boolean;
   journal_entry_id?: number;
@@ -787,55 +793,61 @@ export async function importBankTransactionAsJournalEntry(
   warnings: { level: 'error' | 'warning'; message: string }[];
 }> {
   const db = await getDatabase();
-  
+
   try {
     // Get the bank transaction
     const transactions = await db.select<BankStatementTransaction[]>(
       'SELECT * FROM bank_statement_transaction WHERE id = ?',
-      [transactionId]
+      [transactionId],
     );
-    
+
     if (!transactions || transactions.length === 0) {
       throw new Error(`Bank transaction ${transactionId} not found`);
     }
-    
+
     const transaction = transactions[0];
-    
+
     // Check if already matched
-    if (transaction.match_status === 'auto_matched' || transaction.match_status === 'manual_matched') {
+    if (
+      transaction.match_status === 'auto_matched' ||
+      transaction.match_status === 'manual_matched'
+    ) {
       return {
         ok: false,
-        warnings: [{
-          level: 'error',
-          message: 'Transaction is already matched'
-        }]
+        warnings: [
+          {
+            level: 'error',
+            message: 'Transaction is already matched',
+          },
+        ],
       };
     }
-    
+
     // Validate accounts exist
     const accounts = await db.select<{ id: number; code: string; name: string; type: string }[]>(
       'SELECT id, code, name, type FROM account WHERE id IN (?, ?)',
-      [bankAccountId, categoriesAccountId]
+      [bankAccountId, categoriesAccountId],
     );
-    
+
     if (accounts.length !== 2) {
       throw new Error('One or both accounts not found');
     }
-    
-    const bankAccount = accounts.find(a => a.id === bankAccountId);
-    const categoryAccount = accounts.find(a => a.id === categoriesAccountId);
-    
+
+    const bankAccount = accounts.find((a) => a.id === bankAccountId);
+    const categoryAccount = accounts.find((a) => a.id === categoriesAccountId);
+
     if (!bankAccount || !categoryAccount) {
       throw new Error('Account validation failed');
     }
-    
+
     // Determine transaction direction
     // For bank transactions:
     // - Debit = money in (increase bank asset)
     // - Credit = money out (decrease bank asset)
-    const isMoneyIn = transaction.transaction_type === 'deposit' || transaction.transaction_type === 'credit';
+    const isMoneyIn =
+      transaction.transaction_type === 'deposit' || transaction.transaction_type === 'credit';
     const amount = Math.abs(transaction.amount);
-    
+
     // Create transaction event
     const eventResult = await db.execute(
       `INSERT INTO transaction_event 
@@ -845,15 +857,15 @@ export async function importBankTransactionAsJournalEntry(
         'bank_transaction_imported',
         `${transaction.description} - ${transaction.payee || 'Unknown'}`,
         transaction.reference_number || null,
-        'bank_import'
-      ]
+        'bank_import',
+      ],
     );
-    
+
     const eventId = eventResult.lastInsertId;
     if (!eventId) {
       throw new Error('Failed to create transaction event');
     }
-    
+
     // Create journal entry
     // Money in: DR Bank, CR Revenue/Other
     // Money out: DR Expense/Other, CR Bank
@@ -865,15 +877,15 @@ export async function importBankTransactionAsJournalEntry(
         eventId,
         transaction.transaction_date,
         `${transaction.description} - ${transaction.payee || ''}`.trim(),
-        transaction.reference_number || null
-      ]
+        transaction.reference_number || null,
+      ],
     );
-    
+
     const journalEntryId = journalEntryResult.lastInsertId;
     if (!journalEntryId) {
       throw new Error('Failed to create journal entry');
     }
-    
+
     // Create journal lines
     if (isMoneyIn) {
       // Money coming in
@@ -882,15 +894,15 @@ export async function importBankTransactionAsJournalEntry(
         `INSERT INTO journal_line 
          (journal_entry_id, line_number, account_id, debit_amount, credit_amount, description)
          VALUES (?, 1, ?, ?, 0, ?)`,
-        [journalEntryId, bankAccountId, amount, 'Deposit to bank']
+        [journalEntryId, bankAccountId, amount, 'Deposit to bank'],
       );
-      
+
       // CR Revenue/Other (increase revenue or decrease liability)
       await db.execute(
         `INSERT INTO journal_line 
          (journal_entry_id, line_number, account_id, debit_amount, credit_amount, description)
          VALUES (?, 2, ?, 0, ?, ?)`,
-        [journalEntryId, categoriesAccountId, amount, transaction.description]
+        [journalEntryId, categoriesAccountId, amount, transaction.description],
       );
     } else {
       // Money going out
@@ -899,18 +911,18 @@ export async function importBankTransactionAsJournalEntry(
         `INSERT INTO journal_line 
          (journal_entry_id, line_number, account_id, debit_amount, credit_amount, description)
          VALUES (?, 1, ?, ?, 0, ?)`,
-        [journalEntryId, categoriesAccountId, amount, transaction.description]
+        [journalEntryId, categoriesAccountId, amount, transaction.description],
       );
-      
+
       // CR Bank (decrease asset)
       await db.execute(
         `INSERT INTO journal_line 
          (journal_entry_id, line_number, account_id, debit_amount, credit_amount, description)
          VALUES (?, 2, ?, 0, ?, ?)`,
-        [journalEntryId, bankAccountId, amount, 'Payment from bank']
+        [journalEntryId, bankAccountId, amount, 'Payment from bank'],
       );
     }
-    
+
     // Update bank transaction to mark as matched
     await db.execute(
       `UPDATE bank_statement_transaction 
@@ -919,30 +931,31 @@ export async function importBankTransactionAsJournalEntry(
            confidence_score = 100.0,
            notes = ?
        WHERE id = ?`,
-      [journalEntryId, notes || null, transactionId]
+      [journalEntryId, notes || null, transactionId],
     );
-    
+
     return {
       ok: true,
       journal_entry_id: journalEntryId,
       event_id: eventId,
-      warnings: []
+      warnings: [],
     };
-    
   } catch (error) {
     logger.error('Bank transaction import error:', error);
-    
+
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-    
+
     return {
       ok: false,
-      warnings: [{
-        level: 'error',
-        message: `Failed to import transaction: ${errorMessage}`
-      }]
+      warnings: [
+        {
+          level: 'error',
+          message: `Failed to import transaction: ${errorMessage}`,
+        },
+      ],
     };
   }
 }

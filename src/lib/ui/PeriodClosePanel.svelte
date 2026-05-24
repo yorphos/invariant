@@ -1,105 +1,112 @@
 <script lang="ts">
-  import Modal from './Modal.svelte';
-  import { confirmAction } from '../utils/confirm-action';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import {
-    getFiscalYears,
-    closeFiscalYear,
-    previewClosingEntries,
-    type FiscalYear,
-    type ClosingEntry
-  } from '../services/period-close';
-  import type { PolicyMode } from '../domain/types';
+import Modal from './Modal.svelte';
+import { confirmAction } from '../utils/confirm-action';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import {
+  getFiscalYears,
+  closeFiscalYear,
+  previewClosingEntries,
+  type FiscalYear,
+  type ClosingEntry,
+} from '../services/period-close';
+import type { PolicyMode } from '../domain/types';
 
-  interface Props {
-    open: boolean;
-    mode: PolicyMode;
-    onclose?: () => void;
+interface Props {
+  open: boolean;
+  mode: PolicyMode;
+  onclose?: () => void;
+}
+
+let { open, mode, onclose = () => {} }: Props = $props();
+
+let fiscalYears: FiscalYear[] = $state([]);
+let closingPreview: {
+  entries: ClosingEntry[];
+  netIncome: number;
+  totalRevenue: number;
+  totalExpenses: number;
+} | null = $state(null);
+let selectedYearToClose: number | null = $state(null);
+let closingInProgress = $state(false);
+
+$effect(() => {
+  if (open && fiscalYears.length === 0) {
+    loadFiscalYears();
   }
+});
 
-  let { open, mode, onclose = () => {} }: Props = $props();
-
-  let fiscalYears: FiscalYear[] = $state([]);
-  let closingPreview: { entries: ClosingEntry[]; netIncome: number; totalRevenue: number; totalExpenses: number } | null = $state(null);
-  let selectedYearToClose: number | null = $state(null);
-  let closingInProgress = $state(false);
-
-  $effect(() => {
-    if (open && fiscalYears.length === 0) {
-      loadFiscalYears();
-    }
-  });
-
-  async function loadFiscalYears() {
-    try {
-      fiscalYears = await getFiscalYears();
-    } catch (e) {
-      logger.error('Failed to load fiscal years:', e);
-      toasts.error('Failed to load fiscal years');
-    }
+async function loadFiscalYears() {
+  try {
+    fiscalYears = await getFiscalYears();
+  } catch (e) {
+    logger.error('Failed to load fiscal years:', e);
+    toasts.error('Failed to load fiscal years');
   }
+}
 
-  async function handlePreviewClose(year: number) {
-    try {
-      closingInProgress = true;
-      selectedYearToClose = year;
-      closingPreview = await previewClosingEntries(year);
-    } catch (e) {
-      toasts.error(`Failed to preview closing entries: ${e}`);
-      closingPreview = null;
-      selectedYearToClose = null;
-    } finally {
-      closingInProgress = false;
-    }
+async function handlePreviewClose(year: number) {
+  try {
+    closingInProgress = true;
+    selectedYearToClose = year;
+    closingPreview = await previewClosingEntries(year);
+  } catch (e) {
+    toasts.error(`Failed to preview closing entries: ${e}`);
+    closingPreview = null;
+    selectedYearToClose = null;
+  } finally {
+    closingInProgress = false;
   }
+}
 
-  async function handleConfirmClose() {
-    if (!selectedYearToClose) return;
+async function handleConfirmClose() {
+  if (!selectedYearToClose) return;
 
-    const confirmed = await confirmAction(
-      'Close Fiscal Year',
-      `Are you sure you want to close fiscal year ${selectedYearToClose}?\n\n` +
+  const confirmed = await confirmAction(
+    'Close Fiscal Year',
+    `Are you sure you want to close fiscal year ${selectedYearToClose}?\n\n` +
       `This will:\n` +
       `- Zero out all revenue and expense accounts\n` +
       `- Transfer net income to Retained Earnings\n` +
       `- Mark the year as closed\n\n` +
-      `This action creates a permanent journal entry.`
-    );
+      `This action creates a permanent journal entry.`,
+  );
 
-    if (!confirmed) return;
+  if (!confirmed) return;
 
-    try {
-      closingInProgress = true;
-      const result = await closeFiscalYear(selectedYearToClose, { mode });
+  try {
+    closingInProgress = true;
+    const result = await closeFiscalYear(selectedYearToClose, { mode });
 
-      if (result.ok) {
-        toasts.success(`Fiscal year ${selectedYearToClose} closed successfully! Net Income: $${result.net_income?.toFixed(2) || '0.00'}`);
-        closingPreview = null;
-        selectedYearToClose = null;
-        await loadFiscalYears();
-      } else {
-        const errorMsg = result.warnings.map((w: { message: string }) => w.message).join('\n');
-        toasts.error(`Failed to close fiscal year:\n${errorMsg}`);
-      }
-    } catch (e) {
-      toasts.error(`Failed to close fiscal year: ${e}`);
-    } finally {
-      closingInProgress = false;
+    if (result.ok) {
+      toasts.success(
+        `Fiscal year ${selectedYearToClose} closed successfully! Net Income: $${result.net_income?.toFixed(2) || '0.00'}`,
+      );
+      closingPreview = null;
+      selectedYearToClose = null;
+      await loadFiscalYears();
+    } else {
+      const errorMsg = result.warnings.map((w: { message: string }) => w.message).join('\n');
+      toasts.error(`Failed to close fiscal year:\n${errorMsg}`);
     }
+  } catch (e) {
+    toasts.error(`Failed to close fiscal year: ${e}`);
+  } finally {
+    closingInProgress = false;
   }
+}
 
-  function handleCancelClose() {
-    closingPreview = null;
-    selectedYearToClose = null;
-  }
+function handleCancelClose() {
+  closingPreview = null;
+  selectedYearToClose = null;
+}
 
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  }
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(amount);
+}
 </script>
 
 <Modal {open} title="Fiscal Year Close" size="large" {onclose}>

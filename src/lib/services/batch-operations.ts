@@ -2,13 +2,7 @@ import { createInvoice, voidInvoice, type InvoiceInput } from '../domain/invoice
 import { createPayment } from '../domain/payment-operations';
 import { persistenceService } from './persistence';
 import { getDatabase } from './database';
-import type { 
-  Invoice, 
-  InvoiceLine, 
-  Payment, 
-  PolicyContext,
-  PolicyMode 
-} from '../domain/types';
+import type { Invoice, InvoiceLine, Payment, PolicyContext, PolicyMode } from '../domain/types';
 
 /**
  * Result of a batch operation on a single item
@@ -67,7 +61,7 @@ export class BatchOperationsService {
    */
   async batchCreateInvoices(
     invoices: BatchInvoiceInput[],
-    context: PolicyContext
+    context: PolicyContext,
   ): Promise<BatchOperationResult> {
     const results: BatchItemResult[] = [];
     let successCount = 0;
@@ -75,18 +69,18 @@ export class BatchOperationsService {
 
     for (let i = 0; i < invoices.length; i++) {
       const { invoiceData, lines } = invoices[i];
-      
+
       try {
         // Create invoice using existing domain logic
         const result = await createInvoice(invoiceData, lines, context);
-        
+
         if (result.ok) {
           results.push({
             success: true,
             itemIndex: i,
             itemDescription: `Invoice ${invoiceData.invoice_number}`,
-            warnings: result.warnings.map(w => w.message),
-            createdId: result.invoice_id
+            warnings: result.warnings.map((w) => w.message),
+            createdId: result.invoice_id,
           });
           successCount++;
         } else {
@@ -94,7 +88,7 @@ export class BatchOperationsService {
             success: false,
             itemIndex: i,
             itemDescription: `Invoice ${invoiceData.invoice_number}`,
-            error: result.warnings.map(w => w.message).join('; ')
+            error: result.warnings.map((w) => w.message).join('; '),
           });
           failureCount++;
         }
@@ -103,7 +97,7 @@ export class BatchOperationsService {
           success: false,
           itemIndex: i,
           itemDescription: `Invoice ${invoiceData.invoice_number}`,
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
         failureCount++;
       }
@@ -113,7 +107,7 @@ export class BatchOperationsService {
       totalItems: invoices.length,
       successCount,
       failureCount,
-      results
+      results,
     };
   }
 
@@ -125,7 +119,7 @@ export class BatchOperationsService {
    */
   async importPaymentsFromCSV(
     rows: PaymentImportRow[],
-    mode: PolicyMode
+    mode: PolicyMode,
   ): Promise<BatchOperationResult> {
     const results: BatchItemResult[] = [];
     let successCount = 0;
@@ -134,12 +128,12 @@ export class BatchOperationsService {
     // Get all contacts and invoices upfront for matching
     const [contacts, invoices] = await Promise.all([
       persistenceService.getContacts(),
-      persistenceService.getInvoices()
+      persistenceService.getInvoices(),
     ]);
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      
+
       try {
         // Validate required fields
         if (!row.paymentNumber || !row.paymentDate || !row.amount) {
@@ -153,40 +147,40 @@ export class BatchOperationsService {
         // Find customer by name (if provided)
         let contactId: number | undefined;
         if (row.customerName) {
-          const contact = contacts.find(c => 
-            c.name.toLowerCase() === row.customerName.toLowerCase() &&
-            (c.type === 'customer' || c.type === 'both')
+          const contact = contacts.find(
+            (c) =>
+              c.name.toLowerCase() === row.customerName.toLowerCase() &&
+              (c.type === 'customer' || c.type === 'both'),
           );
-          
+
           if (!contact) {
             throw new Error(`Customer "${row.customerName}" not found`);
           }
-          
+
           contactId = contact.id!;
         }
 
         // Parse invoice numbers (if provided)
         const allocations: Array<{ invoice_id: number; amount: number }> = [];
-        
+
         if (row.invoiceNumbers && row.invoiceNumbers.trim()) {
-          const invoiceNums = row.invoiceNumbers.split(',').map(s => s.trim());
-          
+          const invoiceNums = row.invoiceNumbers.split(',').map((s) => s.trim());
+
           for (const invNum of invoiceNums) {
-            const invoice = invoices.find(inv => 
-              inv.invoice_number === invNum &&
-              inv.contact_id === contactId
+            const invoice = invoices.find(
+              (inv) => inv.invoice_number === invNum && inv.contact_id === contactId,
             );
-            
+
             if (!invoice) {
               throw new Error(`Invoice "${invNum}" not found for customer "${row.customerName}"`);
             }
-            
+
             // For simplicity, split payment equally among invoices
             // In practice, you might want more sophisticated allocation
             const allocAmount = row.amount / invoiceNums.length;
             allocations.push({
               invoice_id: invoice.id!,
-              amount: allocAmount
+              amount: allocAmount,
             });
           }
         }
@@ -200,10 +194,10 @@ export class BatchOperationsService {
             amount: row.amount,
             payment_method: row.paymentMethod,
             reference: row.reference,
-            notes: row.notes
+            notes: row.notes,
           },
           allocations,
-          { mode }
+          { mode },
         );
 
         if (result.ok) {
@@ -211,8 +205,8 @@ export class BatchOperationsService {
             success: true,
             itemIndex: i,
             itemDescription: `Payment ${row.paymentNumber}`,
-            warnings: result.warnings.map(w => w.message),
-            createdId: result.payment_id
+            warnings: result.warnings.map((w) => w.message),
+            createdId: result.payment_id,
           });
           successCount++;
         } else {
@@ -220,7 +214,7 @@ export class BatchOperationsService {
             success: false,
             itemIndex: i,
             itemDescription: `Payment ${row.paymentNumber}`,
-            error: result.warnings.map(w => w.message).join('; ')
+            error: result.warnings.map((w) => w.message).join('; '),
           });
           failureCount++;
         }
@@ -229,7 +223,7 @@ export class BatchOperationsService {
           success: false,
           itemIndex: i,
           itemDescription: `Payment ${row.paymentNumber}`,
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
         failureCount++;
       }
@@ -239,7 +233,7 @@ export class BatchOperationsService {
       totalItems: rows.length,
       successCount,
       failureCount,
-      results
+      results,
     };
   }
 
@@ -254,7 +248,7 @@ export class BatchOperationsService {
   async bulkUpdateInvoiceStatus(
     invoiceIds: number[],
     newStatus: 'draft' | 'sent' | 'void',
-    mode: PolicyMode
+    mode: PolicyMode,
   ): Promise<BatchOperationResult> {
     const results: BatchItemResult[] = [];
     let successCount = 0;
@@ -265,8 +259,8 @@ export class BatchOperationsService {
 
     for (let i = 0; i < invoiceIds.length; i++) {
       const invoiceId = invoiceIds[i];
-      const invoice = invoices.find(inv => inv.id === invoiceId);
-      
+      const invoice = invoices.find((inv) => inv.id === invoiceId);
+
       try {
         if (!invoice) {
           throw new Error(`Invoice ID ${invoiceId} not found`);
@@ -290,39 +284,34 @@ export class BatchOperationsService {
 
         // Update status
         const db = await getDatabase();
-        
+
         if (newStatus === 'void') {
           // Use the proper void operation for complete audit trail
-          const voidResult = await voidInvoice(
-            invoiceId,
-            `Bulk void operation`,
-            { mode }
-          );
-          
+          const voidResult = await voidInvoice(invoiceId, `Bulk void operation`, { mode });
+
           if (!voidResult.ok) {
-            throw new Error(voidResult.warnings.map(w => w.message).join('; '));
+            throw new Error(voidResult.warnings.map((w) => w.message).join('; '));
           }
         } else {
           // For draft/sent status changes, update directly
-          await db.execute(
-            'UPDATE invoice SET status = ? WHERE id = ?',
-            [newStatus, invoiceId]
-          );
+          await db.execute('UPDATE invoice SET status = ? WHERE id = ?', [newStatus, invoiceId]);
         }
 
         results.push({
           success: true,
           itemIndex: i,
           itemDescription: `Invoice ${invoice.invoice_number}`,
-          createdId: invoiceId
+          createdId: invoiceId,
         });
         successCount++;
       } catch (error) {
         results.push({
           success: false,
           itemIndex: i,
-          itemDescription: invoice ? `Invoice ${invoice.invoice_number}` : `Invoice ID ${invoiceId}`,
-          error: error instanceof Error ? error.message : String(error)
+          itemDescription: invoice
+            ? `Invoice ${invoice.invoice_number}`
+            : `Invoice ID ${invoiceId}`,
+          error: error instanceof Error ? error.message : String(error),
         });
         failureCount++;
       }
@@ -332,7 +321,7 @@ export class BatchOperationsService {
       totalItems: invoiceIds.length,
       successCount,
       failureCount,
-      results
+      results,
     };
   }
 
@@ -345,10 +334,10 @@ export class BatchOperationsService {
     const fields: string[] = [];
     let currentField = '';
     let inQuotes = false;
-    
+
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
-      
+
       if (char === '"') {
         inQuotes = !inQuotes;
       } else if (char === ',' && !inQuotes) {
@@ -358,10 +347,10 @@ export class BatchOperationsService {
         currentField += char;
       }
     }
-    
+
     // Push the last field
     fields.push(currentField.trim());
-    
+
     return fields;
   }
 
@@ -372,23 +361,23 @@ export class BatchOperationsService {
    */
   parsePaymentCSV(csvText: string): PaymentImportRow[] {
     const lines = csvText.trim().split('\n');
-    
+
     if (lines.length < 2) {
       throw new Error('CSV must have at least a header row and one data row');
     }
 
     // Parse header
-    const header = this.parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
-    
+    const header = this.parseCSVLine(lines[0]).map((h) => h.trim().toLowerCase());
+
     // Expected headers (flexible matching)
-    const paymentNumberIdx = header.findIndex(h => h.includes('payment') && h.includes('number'));
-    const customerNameIdx = header.findIndex(h => h.includes('customer') || h.includes('client'));
-    const paymentDateIdx = header.findIndex(h => h.includes('date'));
-    const amountIdx = header.findIndex(h => h.includes('amount'));
-    const methodIdx = header.findIndex(h => h.includes('method') || h.includes('type'));
-    const referenceIdx = header.findIndex(h => h.includes('reference') || h.includes('ref'));
-    const notesIdx = header.findIndex(h => h.includes('notes') || h.includes('memo'));
-    const invoiceNumbersIdx = header.findIndex(h => h.includes('invoice'));
+    const paymentNumberIdx = header.findIndex((h) => h.includes('payment') && h.includes('number'));
+    const customerNameIdx = header.findIndex((h) => h.includes('customer') || h.includes('client'));
+    const paymentDateIdx = header.findIndex((h) => h.includes('date'));
+    const amountIdx = header.findIndex((h) => h.includes('amount'));
+    const methodIdx = header.findIndex((h) => h.includes('method') || h.includes('type'));
+    const referenceIdx = header.findIndex((h) => h.includes('reference') || h.includes('ref'));
+    const notesIdx = header.findIndex((h) => h.includes('notes') || h.includes('memo'));
+    const invoiceNumbersIdx = header.findIndex((h) => h.includes('invoice'));
 
     if (paymentNumberIdx === -1 || paymentDateIdx === -1 || amountIdx === -1) {
       throw new Error('CSV must have columns for: Payment Number, Date, and Amount');
@@ -396,22 +385,24 @@ export class BatchOperationsService {
 
     // Parse data rows
     const rows: PaymentImportRow[] = [];
-    
+
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue; // Skip empty lines
-      
-      const values = this.parseCSVLine(line).map(v => v.trim());
-      
+
+      const values = this.parseCSVLine(line).map((v) => v.trim());
+
       const paymentMethod = methodIdx >= 0 ? values[methodIdx].toLowerCase() : 'transfer';
       let method: 'cash' | 'check' | 'transfer' | 'card' | 'other' = 'transfer';
-      
+
       if (paymentMethod.includes('cash')) method = 'cash';
-      else if (paymentMethod.includes('check') || paymentMethod.includes('cheque')) method = 'check';
-      else if (paymentMethod.includes('transfer') || paymentMethod.includes('eft')) method = 'transfer';
+      else if (paymentMethod.includes('check') || paymentMethod.includes('cheque'))
+        method = 'check';
+      else if (paymentMethod.includes('transfer') || paymentMethod.includes('eft'))
+        method = 'transfer';
       else if (paymentMethod.includes('card') || paymentMethod.includes('credit')) method = 'card';
       else method = 'other';
-      
+
       rows.push({
         paymentNumber: values[paymentNumberIdx],
         customerName: customerNameIdx >= 0 ? values[customerNameIdx] : '',
@@ -420,7 +411,7 @@ export class BatchOperationsService {
         paymentMethod: method,
         reference: referenceIdx >= 0 ? values[referenceIdx] : undefined,
         notes: notesIdx >= 0 ? values[notesIdx] : undefined,
-        invoiceNumbers: invoiceNumbersIdx >= 0 ? values[invoiceNumbersIdx] : undefined
+        invoiceNumbers: invoiceNumbersIdx >= 0 ? values[invoiceNumbersIdx] : undefined,
       });
     }
 

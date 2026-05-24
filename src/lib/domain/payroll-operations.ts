@@ -1,19 +1,19 @@
 /**
  * Payroll Operations
- * 
+ *
  * Business logic for payroll processing:
  * - Payroll run creation and management
  * - Employee line items with deductions
  * - Canadian tax calculations (CPP, EI, federal income tax)
  * - Payroll posting (DR Salary Expense, CR Cash/Payables)
- * 
+ *
  * Accounting Principles:
  * - Payroll run creates journal entry when approved
  * - DR Salary Expense (gross + employer portions)
  * - CR Cash (net pay)
  * - CR CPP Payable, EI Payable, Income Tax Payable (employee + employer portions)
  * - Immutable after posting (void to correct)
- * 
+ *
  * Tax Rates (2026 - approximate):
  * - CPP: 5.95% employee, 5.95% employer on pensionable earnings
  * - CPP Basic Exemption: $3,500/year ($292/month, $135/biweekly)
@@ -25,12 +25,7 @@
 
 import { getDatabase } from '../services/database';
 import { assertPeriodOpen } from '../services/period-guard';
-import type { 
-  PayrollRun, 
-  PayrollLine, 
-  PayrollCalculation,
-  PolicyContext 
-} from '../domain/types';
+import type { PayrollRun, PayrollLine, PayrollCalculation, PolicyContext } from '../domain/types';
 
 export interface PayrollRunInput {
   run_number: string;
@@ -76,11 +71,11 @@ const TAX_RATES_2026 = {
   income_tax: {
     // Federal tax brackets 2026 (simplified)
     brackets: [
-      { limit: 55867, rate: 0.15 },      // 15% up to $55,867
-      { limit: 111733, rate: 0.205 },    // 20.5% up to $111,733
-      { limit: 173205, rate: 0.26 },     // 26% up to $173,205
-      { limit: 246752, rate: 0.29 },     // 29% up to $246,752
-      { limit: Infinity, rate: 0.33 },   // 33% above $246,752
+      { limit: 55867, rate: 0.15 }, // 15% up to $55,867
+      { limit: 111733, rate: 0.205 }, // 20.5% up to $111,733
+      { limit: 173205, rate: 0.26 }, // 26% up to $173,205
+      { limit: 246752, rate: 0.29 }, // 29% up to $246,752
+      { limit: Infinity, rate: 0.33 }, // 33% above $246,752
     ],
     basic_personal_amount: 15705, // 2026 federal basic personal amount
   },
@@ -93,7 +88,7 @@ const TAX_RATES_2026 = {
 export function calculateCPP(
   grossPay: number,
   payPeriodType: 'monthly' | 'biweekly' | 'weekly' = 'biweekly',
-  ytdPensionable: number = 0
+  ytdPensionable: number = 0,
 ): { employee: number; employer: number } {
   // Determine basic exemption for period
   let basicExemption: number;
@@ -111,7 +106,7 @@ export function calculateCPP(
   // Check if we've hit the annual maximum
   const remainingPensionable = Math.max(
     0,
-    TAX_RATES_2026.cpp.maximum_pensionable_annual - ytdPensionable
+    TAX_RATES_2026.cpp.maximum_pensionable_annual - ytdPensionable,
   );
 
   const contributablePay = Math.min(pensionableEarnings, remainingPensionable);
@@ -130,13 +125,10 @@ export function calculateCPP(
  */
 export function calculateEI(
   grossPay: number,
-  ytdInsurable: number = 0
+  ytdInsurable: number = 0,
 ): { employee: number; employer: number } {
   // Check if we've hit the annual maximum
-  const remainingInsurable = Math.max(
-    0,
-    TAX_RATES_2026.ei.maximum_insurable_annual - ytdInsurable
-  );
+  const remainingInsurable = Math.max(0, TAX_RATES_2026.ei.maximum_insurable_annual - ytdInsurable);
 
   const insurablePay = Math.min(grossPay, remainingInsurable);
 
@@ -156,13 +148,16 @@ export function calculateEI(
  */
 export function calculateIncomeTax(
   grossPay: number,
-  payPeriodsPerYear: number = 26 // Biweekly default
+  payPeriodsPerYear: number = 26, // Biweekly default
 ): number {
   // Annualize the gross pay
   const annualizedIncome = grossPay * payPeriodsPerYear;
 
   // Apply basic personal amount (tax-free)
-  const taxableIncome = Math.max(0, annualizedIncome - TAX_RATES_2026.income_tax.basic_personal_amount);
+  const taxableIncome = Math.max(
+    0,
+    annualizedIncome - TAX_RATES_2026.income_tax.basic_personal_amount,
+  );
 
   // Calculate tax using progressive brackets
   let tax = 0;
@@ -188,23 +183,17 @@ export function calculateIncomeTax(
  */
 export function calculatePayroll(
   employee: EmployeePayInput,
-  payPeriodType: 'monthly' | 'biweekly' | 'weekly' = 'biweekly'
+  payPeriodType: 'monthly' | 'biweekly' | 'weekly' = 'biweekly',
 ): PayrollCalculation {
   // Calculate CPP
-  const cpp = calculateCPP(
-    employee.gross_pay,
-    payPeriodType,
-    employee.ytd_cpp_pensionable || 0
-  );
+  const cpp = calculateCPP(employee.gross_pay, payPeriodType, employee.ytd_cpp_pensionable || 0);
 
   // Calculate EI
-  const ei = calculateEI(
-    employee.gross_pay,
-    employee.ytd_ei_insurable || 0
-  );
+  const ei = calculateEI(employee.gross_pay, employee.ytd_ei_insurable || 0);
 
   // Calculate income tax
-  const payPeriodsPerYear = payPeriodType === 'monthly' ? 12 : payPeriodType === 'biweekly' ? 26 : 52;
+  const payPeriodsPerYear =
+    payPeriodType === 'monthly' ? 12 : payPeriodType === 'biweekly' ? 26 : 52;
   const incomeTax = calculateIncomeTax(employee.gross_pay, payPeriodsPerYear);
 
   // Other deductions
@@ -236,7 +225,7 @@ export function calculatePayroll(
 export async function createPayrollRun(
   runData: PayrollRunInput,
   employees: EmployeePayInput[],
-  context: PolicyContext = { mode: 'beginner' }
+  context: PolicyContext = { mode: 'beginner' },
 ): Promise<{ payroll_run_id: number }> {
   // Validation
   if (!runData.run_number || runData.run_number.trim() === '') {
@@ -260,7 +249,7 @@ export async function createPayrollRun(
   // Check for duplicate run number
   const existing = await db.select<PayrollRun[]>(
     'SELECT id FROM payroll_run WHERE run_number = ? LIMIT 1',
-    [runData.run_number]
+    [runData.run_number],
   );
 
   if (existing.length > 0) {
@@ -269,7 +258,7 @@ export async function createPayrollRun(
 
   // Calculate payroll for all employees
   const calculations: Array<{ employee: EmployeePayInput; calc: PayrollCalculation }> = [];
-  
+
   for (const employee of employees) {
     if (!employee.employee_name || employee.employee_name.trim() === '') {
       throw new Error('Employee name is required');
@@ -285,8 +274,9 @@ export async function createPayrollRun(
   // Calculate totals
   const totalGross = calculations.reduce((sum, c) => sum + c.calc.gross_pay, 0);
   const totalDeductions = calculations.reduce(
-    (sum, c) => sum + c.calc.cpp_employee + c.calc.ei_employee + c.calc.income_tax + c.calc.other_deductions,
-    0
+    (sum, c) =>
+      sum + c.calc.cpp_employee + c.calc.ei_employee + c.calc.income_tax + c.calc.other_deductions,
+    0,
   );
   const totalNet = calculations.reduce((sum, c) => sum + c.calc.net_pay, 0);
 
@@ -305,7 +295,7 @@ export async function createPayrollRun(
       totalGross,
       totalDeductions,
       totalNet,
-    ]
+    ],
   );
 
   const payrollRunId = runResult.lastInsertId!;
@@ -327,7 +317,7 @@ export async function createPayrollRun(
         calc.income_tax,
         calc.other_deductions,
         calc.net_pay,
-      ]
+      ],
     );
   }
 
@@ -345,17 +335,16 @@ export async function approvePayrollRun(
   cppPayableAccountId: number, // CPP payable (liability)
   eiPayableAccountId: number, // EI payable (liability)
   taxPayableAccountId: number, // Income tax payable (liability)
-  context: PolicyContext = { mode: 'beginner' }
+  context: PolicyContext = { mode: 'beginner' },
 ): Promise<PostingResult> {
   const warnings: Array<{ severity: 'info' | 'warning' | 'error'; message: string }> = [];
 
   const db = await getDatabase();
 
   // Get payroll run
-  const runs = await db.select<PayrollRun[]>(
-    'SELECT * FROM payroll_run WHERE id = ? LIMIT 1',
-    [payrollRunId]
-  );
+  const runs = await db.select<PayrollRun[]>('SELECT * FROM payroll_run WHERE id = ? LIMIT 1', [
+    payrollRunId,
+  ]);
 
   if (runs.length === 0) {
     throw new Error(`Payroll run ${payrollRunId} not found`);
@@ -364,13 +353,15 @@ export async function approvePayrollRun(
   const run = runs[0];
 
   if (run.status !== 'draft') {
-    throw new Error(`Payroll run ${run.run_number} is not in draft status (current: ${run.status})`);
+    throw new Error(
+      `Payroll run ${run.run_number} is not in draft status (current: ${run.status})`,
+    );
   }
 
   // Get payroll lines
   const lines = await db.select<PayrollLine[]>(
     'SELECT * FROM payroll_line WHERE payroll_run_id = ?',
-    [payrollRunId]
+    [payrollRunId],
   );
 
   if (lines.length === 0) {
@@ -392,9 +383,10 @@ export async function approvePayrollRun(
   for (const line of lines) {
     // Employer CPP = same as employee
     totalCPPEmployer += line.cpp_amount;
-    
+
     // Employer EI = employee × 1.4
-    totalEIEmployer += Math.round(line.ei_amount * TAX_RATES_2026.ei.employer_multiplier * 100) / 100;
+    totalEIEmployer +=
+      Math.round(line.ei_amount * TAX_RATES_2026.ei.employer_multiplier * 100) / 100;
   }
 
   await assertPeriodOpen(run.pay_date);
@@ -407,7 +399,7 @@ export async function approvePayrollRun(
       'payroll',
       `Payroll run ${run.run_number} for ${run.period_start} to ${run.period_end}`,
       run.run_number,
-    ]
+    ],
   );
 
   const eventId = eventResult.lastInsertId!;
@@ -416,12 +408,7 @@ export async function approvePayrollRun(
   const jeResult = await db.execute(
     `INSERT INTO journal_entry (event_id, entry_date, description, reference, status, posted_at, posted_by)
      VALUES (?, ?, ?, ?, 'posted', datetime('now'), 'system')`,
-    [
-      eventId,
-      run.pay_date,
-      `Payroll for ${run.period_start} to ${run.period_end}`,
-      run.run_number,
-    ]
+    [eventId, run.pay_date, `Payroll for ${run.period_start} to ${run.period_end}`, run.run_number],
   );
 
   const journalEntryId = jeResult.lastInsertId!;
@@ -429,28 +416,18 @@ export async function approvePayrollRun(
   // Post journal lines:
   // DR Salary Expense (gross + employer CPP + employer EI)
   const totalExpense = totalGross + totalCPPEmployer + totalEIEmployer;
-  
+
   await db.execute(
     `INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount, description)
      VALUES (?, ?, ?, 0.00, ?)`,
-    [
-      journalEntryId,
-      salaryExpenseAccountId,
-      totalExpense,
-      `Payroll expense - ${run.run_number}`,
-    ]
+    [journalEntryId, salaryExpenseAccountId, totalExpense, `Payroll expense - ${run.run_number}`],
   );
 
   // CR Cash (net pay to employees)
   await db.execute(
     `INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount, description)
      VALUES (?, ?, 0.00, ?, ?)`,
-    [
-      journalEntryId,
-      cashAccountId,
-      totalNet,
-      `Net pay - ${run.run_number}`,
-    ]
+    [journalEntryId, cashAccountId, totalNet, `Net pay - ${run.run_number}`],
   );
 
   // CR CPP Payable (employee + employer portions)
@@ -458,12 +435,7 @@ export async function approvePayrollRun(
   await db.execute(
     `INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount, description)
      VALUES (?, ?, 0.00, ?, ?)`,
-    [
-      journalEntryId,
-      cppPayableAccountId,
-      totalCPPPayable,
-      `CPP payable - ${run.run_number}`,
-    ]
+    [journalEntryId, cppPayableAccountId, totalCPPPayable, `CPP payable - ${run.run_number}`],
   );
 
   // CR EI Payable (employee + employer portions)
@@ -471,24 +443,14 @@ export async function approvePayrollRun(
   await db.execute(
     `INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount, description)
      VALUES (?, ?, 0.00, ?, ?)`,
-    [
-      journalEntryId,
-      eiPayableAccountId,
-      totalEIPayable,
-      `EI payable - ${run.run_number}`,
-    ]
+    [journalEntryId, eiPayableAccountId, totalEIPayable, `EI payable - ${run.run_number}`],
   );
 
   // CR Income Tax Payable
   await db.execute(
     `INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount, description)
      VALUES (?, ?, 0.00, ?, ?)`,
-    [
-      journalEntryId,
-      taxPayableAccountId,
-      totalIncomeTax,
-      `Income tax payable - ${run.run_number}`,
-    ]
+    [journalEntryId, taxPayableAccountId, totalIncomeTax, `Income tax payable - ${run.run_number}`],
   );
 
   // CR Other Deductions (if any) - use same tax payable account for simplicity
@@ -501,7 +463,7 @@ export async function approvePayrollRun(
         taxPayableAccountId,
         totalOtherDeductions,
         `Other deductions - ${run.run_number}`,
-      ]
+      ],
     );
   }
 
@@ -510,7 +472,7 @@ export async function approvePayrollRun(
     `UPDATE payroll_run 
      SET status = 'approved', event_id = ?, updated_at = datetime('now')
      WHERE id = ?`,
-    [eventId, payrollRunId]
+    [eventId, payrollRunId],
   );
 
   return {
@@ -526,17 +488,16 @@ export async function approvePayrollRun(
  */
 export async function voidPayrollRun(
   payrollRunId: number,
-  context: PolicyContext = { mode: 'beginner' }
+  context: PolicyContext = { mode: 'beginner' },
 ): Promise<PostingResult> {
   const warnings: Array<{ severity: 'info' | 'warning' | 'error'; message: string }> = [];
 
   const db = await getDatabase();
 
   // Get payroll run
-  const runs = await db.select<PayrollRun[]>(
-    'SELECT * FROM payroll_run WHERE id = ? LIMIT 1',
-    [payrollRunId]
-  );
+  const runs = await db.select<PayrollRun[]>('SELECT * FROM payroll_run WHERE id = ? LIMIT 1', [
+    payrollRunId,
+  ]);
 
   if (runs.length === 0) {
     throw new Error(`Payroll run ${payrollRunId} not found`);
@@ -549,7 +510,9 @@ export async function voidPayrollRun(
   }
 
   if (run.status === 'paid') {
-    throw new Error(`Cannot void payroll run ${run.run_number} - it has been paid. Contact your accountant.`);
+    throw new Error(
+      `Cannot void payroll run ${run.run_number} - it has been paid. Contact your accountant.`,
+    );
   }
 
   // If approved, need to create reversal entry
@@ -560,11 +523,7 @@ export async function voidPayrollRun(
     const eventResult = await db.execute(
       `INSERT INTO transaction_event (event_type, description, reference, created_at)
        VALUES (?, ?, ?, datetime('now'))`,
-      [
-        'payroll_void',
-        `VOID: Payroll run ${run.run_number}`,
-        `VOID-${run.run_number}`,
-      ]
+      ['payroll_void', `VOID: Payroll run ${run.run_number}`, `VOID-${run.run_number}`],
     );
 
     const eventId = eventResult.lastInsertId!;
@@ -572,19 +531,21 @@ export async function voidPayrollRun(
     // Get original journal entry
     const originalJE = await db.select<{ id: number }[]>(
       'SELECT id FROM journal_entry WHERE event_id = ? LIMIT 1',
-      [run.event_id]
+      [run.event_id],
     );
 
     if (originalJE.length > 0) {
       // Get original lines
-      const originalLines = await db.select<Array<{
-        account_id: number;
-        debit_amount: number;
-        credit_amount: number;
-        description: string;
-      }>>(
+      const originalLines = await db.select<
+        Array<{
+          account_id: number;
+          debit_amount: number;
+          credit_amount: number;
+          description: string;
+        }>
+      >(
         'SELECT account_id, debit_amount, credit_amount, description FROM journal_line WHERE journal_entry_id = ?',
-        [originalJE[0].id]
+        [originalJE[0].id],
       );
 
       // Create reversal journal entry
@@ -596,7 +557,7 @@ export async function voidPayrollRun(
           run.pay_date,
           `VOID: Payroll for ${run.period_start} to ${run.period_end}`,
           `VOID-${run.run_number}`,
-        ]
+        ],
       );
 
       const reversalJEId = jeResult.lastInsertId!;
@@ -610,9 +571,9 @@ export async function voidPayrollRun(
             reversalJEId,
             line.account_id,
             line.credit_amount, // Swap
-            line.debit_amount,  // Swap
+            line.debit_amount, // Swap
             `VOID: ${line.description}`,
-          ]
+          ],
         );
       }
     }
@@ -623,7 +584,7 @@ export async function voidPayrollRun(
     `UPDATE payroll_run 
      SET status = 'void', updated_at = datetime('now')
      WHERE id = ?`,
-    [payrollRunId]
+    [payrollRunId],
   );
 
   return {

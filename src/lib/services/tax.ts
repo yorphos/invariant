@@ -1,6 +1,6 @@
 /**
  * Tax Service
- * 
+ *
  * Handles tax code and tax rate lookups
  */
 
@@ -12,9 +12,7 @@ import type { TaxCode, TaxRate } from '../domain/types';
  */
 export async function getTaxCodes(): Promise<TaxCode[]> {
   const db = await getDatabase();
-  return db.select<TaxCode[]>(
-    'SELECT * FROM tax_code WHERE is_active = 1 ORDER BY code'
-  );
+  return db.select<TaxCode[]>('SELECT * FROM tax_code WHERE is_active = 1 ORDER BY code');
 }
 
 /**
@@ -22,19 +20,19 @@ export async function getTaxCodes(): Promise<TaxCode[]> {
  */
 export async function getTaxCodeById(id: number): Promise<TaxCode | null> {
   const db = await getDatabase();
-  const results = await db.select<TaxCode[]>(
-    'SELECT * FROM tax_code WHERE id = ?',
-    [id]
-  );
+  const results = await db.select<TaxCode[]>('SELECT * FROM tax_code WHERE id = ?', [id]);
   return results[0] || null;
 }
 
 /**
  * Get the effective tax rate for a tax code on a specific date
  */
-export async function getTaxRate(taxCodeId: number, effectiveDate: string): Promise<TaxRate | null> {
+export async function getTaxRate(
+  taxCodeId: number,
+  effectiveDate: string,
+): Promise<TaxRate | null> {
   const db = await getDatabase();
-  
+
   const results = await db.select<TaxRate[]>(
     `SELECT * FROM tax_rate 
      WHERE tax_code_id = ? 
@@ -42,9 +40,9 @@ export async function getTaxRate(taxCodeId: number, effectiveDate: string): Prom
      AND (effective_to IS NULL OR effective_to >= ?)
      ORDER BY effective_from DESC
      LIMIT 1`,
-    [taxCodeId, effectiveDate, effectiveDate]
+    [taxCodeId, effectiveDate, effectiveDate],
   );
-  
+
   return results[0] || null;
 }
 
@@ -55,18 +53,16 @@ export async function calculateTax(
   subtotal: number,
   taxCodeId: number,
   effectiveDate: string,
-  isTaxInclusive = false
+  isTaxInclusive = false,
 ): Promise<{ taxAmount: number; taxRate: number; accountId: number | null; netSubtotal: number }> {
   const taxRate = await getTaxRate(taxCodeId, effectiveDate);
-  
+
   if (!taxRate) {
     throw new Error(`No tax rate found for tax code ${taxCodeId} on date ${effectiveDate}`);
   }
 
   const normalizedSubtotal = subtotal;
-  const netSubtotal = isTaxInclusive
-    ? normalizedSubtotal / (1 + taxRate.rate)
-    : normalizedSubtotal;
+  const netSubtotal = isTaxInclusive ? normalizedSubtotal / (1 + taxRate.rate) : normalizedSubtotal;
   const taxAmount = isTaxInclusive
     ? normalizedSubtotal - netSubtotal
     : normalizedSubtotal * taxRate.rate;
@@ -84,14 +80,13 @@ export async function calculateTax(
  */
 export async function getDefaultTaxCode(): Promise<TaxCode> {
   const db = await getDatabase();
-  const results = await db.select<TaxCode[]>(
-    'SELECT * FROM tax_code WHERE code = ? LIMIT 1',
-    ['HST-ON']
-  );
-  
+  const results = await db.select<TaxCode[]>('SELECT * FROM tax_code WHERE code = ? LIMIT 1', [
+    'HST-ON',
+  ]);
+
   if (!results[0]) {
     throw new Error('Default tax code (HST-ON) not found. Database may need re-seeding.');
   }
-  
+
   return results[0];
 }

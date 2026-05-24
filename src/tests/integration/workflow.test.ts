@@ -11,39 +11,44 @@ describe('Integration - Full Workflow: Invoice → Payment → Reconciliation', 
   async function createInvoice(
     reference: string,
     customerId: number,
-    amount: number
+    amount: number,
   ): Promise<number> {
-    const eventId = db.prepare(`
+    const eventId = db
+      .prepare(`
       INSERT INTO transaction_event (event_type, description, reference, created_by)
       VALUES (?, ?, ?, ?)
-    `).run('invoice_created', `Invoice ${reference}`, reference, 'test_user').lastInsertRowid as number;
+    `)
+      .run('invoice_created', `Invoice ${reference}`, reference, 'test_user')
+      .lastInsertRowid as number;
 
-    const entryId = db.prepare(`
+    const entryId = db
+      .prepare(`
       INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
       VALUES (?, ?, ?, ?, ?)
-    `).run(eventId, '2026-01-25', 'Invoice Entry', reference, 'draft').lastInsertRowid as number;
+    `)
+      .run(eventId, '2026-01-25', 'Invoice Entry', reference, 'draft').lastInsertRowid as number;
 
     const arAccountId = db.prepare("SELECT id FROM account WHERE code = '1100'").get() as any;
     const revenueAccountId = db.prepare("SELECT id FROM account WHERE code = '4000'").get() as any;
     const taxAccountId = db.prepare("SELECT id FROM account WHERE code = '2100'").get() as any;
 
-    const subtotal = Math.round(amount / 1.13 * 100) / 100;
+    const subtotal = Math.round((amount / 1.13) * 100) / 100;
     const tax = Math.round((amount - subtotal) * 100) / 100;
 
     db.prepare(`
       INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
       VALUES (?, ?, ?, ?)
-    `).run(entryId, arAccountId.id, amount, 0.00);
+    `).run(entryId, arAccountId.id, amount, 0.0);
 
     db.prepare(`
       INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
       VALUES (?, ?, ?, ?)
-    `).run(entryId, revenueAccountId.id, 0.00, subtotal);
+    `).run(entryId, revenueAccountId.id, 0.0, subtotal);
 
     db.prepare(`
       INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
       VALUES (?, ?, ?, ?)
-    `).run(entryId, taxAccountId.id, 0.00, tax);
+    `).run(entryId, taxAccountId.id, 0.0, tax);
 
     db.prepare(`
       UPDATE journal_entry
@@ -57,17 +62,22 @@ describe('Integration - Full Workflow: Invoice → Payment → Reconciliation', 
   async function createPayment(
     reference: string,
     customerId: number,
-    amount: number
+    amount: number,
   ): Promise<number> {
-    const eventId = db.prepare(`
+    const eventId = db
+      .prepare(`
       INSERT INTO transaction_event (event_type, description, reference, created_by)
       VALUES (?, ?, ?, ?)
-    `).run('payment_received', `Payment ${reference}`, reference, 'test_user').lastInsertRowid as number;
+    `)
+      .run('payment_received', `Payment ${reference}`, reference, 'test_user')
+      .lastInsertRowid as number;
 
-    const entryId = db.prepare(`
+    const entryId = db
+      .prepare(`
       INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
       VALUES (?, ?, ?, ?, ?)
-    `).run(eventId, '2026-01-26', 'Payment Entry', reference, 'draft').lastInsertRowid as number;
+    `)
+      .run(eventId, '2026-01-26', 'Payment Entry', reference, 'draft').lastInsertRowid as number;
 
     const cashAccountId = db.prepare("SELECT id FROM account WHERE code = '1000'").get() as any;
     const arAccountId = db.prepare("SELECT id FROM account WHERE code = '1100'").get() as any;
@@ -75,12 +85,12 @@ describe('Integration - Full Workflow: Invoice → Payment → Reconciliation', 
     db.prepare(`
       INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
       VALUES (?, ?, ?, ?)
-    `).run(entryId, cashAccountId.id, amount, 0.00);
+    `).run(entryId, cashAccountId.id, amount, 0.0);
 
     db.prepare(`
       INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
       VALUES (?, ?, ?, ?)
-    `).run(entryId, arAccountId.id, 0.00, amount);
+    `).run(entryId, arAccountId.id, 0.0, amount);
 
     db.prepare(`
       UPDATE journal_entry
@@ -92,9 +102,12 @@ describe('Integration - Full Workflow: Invoice → Payment → Reconciliation', 
   }
 
   async function getAccountBalance(accountCode: string): Promise<number> {
-    const account = db.prepare("SELECT id, type FROM account WHERE code = ?").get(accountCode) as any;
-    
-    const result = db.prepare(`
+    const account = db
+      .prepare('SELECT id, type FROM account WHERE code = ?')
+      .get(accountCode) as any;
+
+    const result = db
+      .prepare(`
       SELECT 
         SUM(CASE 
           WHEN debit_amount > 0 THEN debit_amount 
@@ -107,7 +120,8 @@ describe('Integration - Full Workflow: Invoice → Payment → Reconciliation', 
       FROM journal_line jl
       JOIN journal_entry je ON jl.journal_entry_id = je.id
       WHERE jl.account_id = ? AND je.status = 'posted'
-    `).get(account.id) as any;
+    `)
+      .get(account.id) as any;
 
     if (account.type === 'asset' || account.type === 'expense') {
       return (result.total_debit || 0) - (result.total_credit || 0);
@@ -117,13 +131,15 @@ describe('Integration - Full Workflow: Invoice → Payment → Reconciliation', 
   }
 
   async function isJournalEntryBalanced(entryId: number): Promise<boolean> {
-    const result = db.prepare(`
+    const result = db
+      .prepare(`
       SELECT 
         SUM(debit_amount) as total_debit,
         SUM(credit_amount) as total_credit
       FROM journal_line
       WHERE journal_entry_id = ?
-    `).get(entryId) as any;
+    `)
+      .get(entryId) as any;
 
     const totalDebit = result.total_debit || 0;
     const totalCredit = result.total_credit || 0;
@@ -133,7 +149,7 @@ describe('Integration - Full Workflow: Invoice → Payment → Reconciliation', 
 
   describe('Invoice Creation', () => {
     it('should create invoice with balanced journal entry', async () => {
-      const entryId = await createInvoice('INV-001', 1, 1130.00);
+      const entryId = await createInvoice('INV-001', 1, 1130.0);
 
       const isBalanced = await isJournalEntryBalanced(entryId);
 
@@ -143,43 +159,43 @@ describe('Integration - Full Workflow: Invoice → Payment → Reconciliation', 
     it('should update Accounts Receivable balance', async () => {
       const arBalanceBefore = await getAccountBalance('1100');
 
-      await createInvoice('INV-001', 1, 1130.00);
+      await createInvoice('INV-001', 1, 1130.0);
 
       const arBalanceAfter = await getAccountBalance('1100');
       const arChange = arBalanceAfter - arBalanceBefore;
 
-      expect(arChange).toBe(1130.00);
+      expect(arChange).toBe(1130.0);
     });
 
     it('should update Revenue and HST Payable balances', async () => {
       const revenueBalanceBefore = await getAccountBalance('4000');
       const taxBalanceBefore = await getAccountBalance('2100');
 
-      await createInvoice('INV-001', 1, 1130.00);
+      await createInvoice('INV-001', 1, 1130.0);
 
       const revenueBalanceAfter = await getAccountBalance('4000');
       const taxBalanceAfter = await getAccountBalance('2100');
 
-      expect(revenueBalanceAfter - revenueBalanceBefore).toBeCloseTo(1000.00, 2);
-      expect(taxBalanceAfter - taxBalanceBefore).toBeCloseTo(130.00, 2);
+      expect(revenueBalanceAfter - revenueBalanceBefore).toBeCloseTo(1000.0, 2);
+      expect(taxBalanceAfter - taxBalanceBefore).toBeCloseTo(130.0, 2);
     });
 
     it('should create multiple invoices and track balances correctly', async () => {
-      await createInvoice('INV-001', 1, 1130.00);
-      await createInvoice('INV-002', 1, 2260.00);
-      await createInvoice('INV-003', 1, 565.00);
+      await createInvoice('INV-001', 1, 1130.0);
+      await createInvoice('INV-002', 1, 2260.0);
+      await createInvoice('INV-003', 1, 565.0);
 
       const arBalance = await getAccountBalance('1100');
       const revenueBalance = await getAccountBalance('4000');
 
-      expect(arBalance).toBe(3955.00);
-      expect(revenueBalance).toBeCloseTo(3500.00, 2);
+      expect(arBalance).toBe(3955.0);
+      expect(revenueBalance).toBeCloseTo(3500.0, 2);
     });
   });
 
   describe('Payment Processing', () => {
     it('should create payment with balanced journal entry', async () => {
-      const entryId = await createPayment('PMT-001', 1, 1000.00);
+      const entryId = await createPayment('PMT-001', 1, 1000.0);
 
       const isBalanced = await isJournalEntryBalanced(entryId);
 
@@ -187,56 +203,56 @@ describe('Integration - Full Workflow: Invoice → Payment → Reconciliation', 
     });
 
     it('should update Cash and Accounts Receivable balances', async () => {
-      await createInvoice('INV-001', 1, 1130.00);
+      await createInvoice('INV-001', 1, 1130.0);
 
       const cashBefore = await getAccountBalance('1000');
       const arBefore = await getAccountBalance('1100');
 
-      await createPayment('PMT-001', 1, 1000.00);
+      await createPayment('PMT-001', 1, 1000.0);
 
       const cashAfter = await getAccountBalance('1000');
       const arAfter = await getAccountBalance('1100');
 
-      expect(cashAfter - cashBefore).toBe(1000.00);
-      expect(arBefore - arAfter).toBe(1000.00);
+      expect(cashAfter - cashBefore).toBe(1000.0);
+      expect(arBefore - arAfter).toBe(1000.0);
     });
 
     it('should handle partial payment correctly', async () => {
-      await createInvoice('INV-001', 1, 1130.00);
+      await createInvoice('INV-001', 1, 1130.0);
 
       const arBeforePayment = await getAccountBalance('1100');
 
-      await createPayment('PMT-001', 1, 500.00);
+      await createPayment('PMT-001', 1, 500.0);
 
       const arAfterPayment = await getAccountBalance('1100');
       const outstanding = arAfterPayment;
 
-      expect(outstanding).toBe(630.00);
+      expect(outstanding).toBe(630.0);
     });
 
     it('should handle multiple payments correctly', async () => {
-      await createInvoice('INV-001', 1, 1130.00);
+      await createInvoice('INV-001', 1, 1130.0);
 
-      await createPayment('PMT-001', 1, 500.00);
-      await createPayment('PMT-002', 1, 630.00);
+      await createPayment('PMT-001', 1, 500.0);
+      await createPayment('PMT-002', 1, 630.0);
 
       const arBalance = await getAccountBalance('1100');
       const cashBalance = await getAccountBalance('1000');
 
       expect(arBalance).toBe(0);
-      expect(cashBalance).toBe(1130.00);
+      expect(cashBalance).toBe(1130.0);
     });
 
     it('should prevent overpayment beyond invoice total', async () => {
-      await createInvoice('INV-001', 1, 1130.00);
+      await createInvoice('INV-001', 1, 1130.0);
 
       const arBefore = await getAccountBalance('1100');
 
-      await createPayment('PMT-001', 1, 1500.00);
+      await createPayment('PMT-001', 1, 1500.0);
 
       const arAfter = await getAccountBalance('1100');
 
-      expect(arBefore - arAfter).toBe(1500.00);
+      expect(arBefore - arAfter).toBe(1500.0);
     });
   });
 
@@ -246,33 +262,33 @@ describe('Integration - Full Workflow: Invoice → Payment → Reconciliation', 
       const revenueBefore = await getAccountBalance('4000');
       const cashBefore = await getAccountBalance('1000');
 
-      await createInvoice('INV-001', 1, 1130.00);
+      await createInvoice('INV-001', 1, 1130.0);
 
       const arAfterInvoice = await getAccountBalance('1100');
       const revenueAfterInvoice = await getAccountBalance('4000');
 
-      expect(arAfterInvoice - arBefore).toBe(1130.00);
-      expect(revenueAfterInvoice - revenueBefore).toBeCloseTo(1000.00, 2);
+      expect(arAfterInvoice - arBefore).toBe(1130.0);
+      expect(revenueAfterInvoice - revenueBefore).toBeCloseTo(1000.0, 2);
 
-      await createPayment('PMT-001', 1, 1130.00);
+      await createPayment('PMT-001', 1, 1130.0);
 
       const arAfterPayment = await getAccountBalance('1100');
       const cashAfterPayment = await getAccountBalance('1000');
 
       expect(arAfterPayment).toBe(0);
-      expect(cashAfterPayment - cashBefore).toBe(1130.00);
+      expect(cashAfterPayment - cashBefore).toBe(1130.0);
     });
 
     it('should handle multiple invoices and payments correctly', async () => {
-      await createInvoice('INV-001', 1, 1130.00);
-      await createInvoice('INV-002', 1, 2260.00);
-      await createInvoice('INV-003', 1, 565.00);
+      await createInvoice('INV-001', 1, 1130.0);
+      await createInvoice('INV-002', 1, 2260.0);
+      await createInvoice('INV-003', 1, 565.0);
 
       const arBeforePayments = await getAccountBalance('1100');
 
-      await createPayment('PMT-001', 1, 1000.00);
-      await createPayment('PMT-002', 1, 2000.00);
-      await createPayment('PMT-003', 1, 955.00);
+      await createPayment('PMT-001', 1, 1000.0);
+      await createPayment('PMT-002', 1, 2000.0);
+      await createPayment('PMT-003', 1, 955.0);
 
       const arAfterPayments = await getAccountBalance('1100');
 
@@ -282,40 +298,46 @@ describe('Integration - Full Workflow: Invoice → Payment → Reconciliation', 
     it('should maintain double-entry bookkeeping throughout workflow', async () => {
       const entries: number[] = [];
 
-      entries.push(await createInvoice('INV-001', 1, 1130.00));
-      entries.push(await createPayment('PMT-001', 1, 1000.00));
+      entries.push(await createInvoice('INV-001', 1, 1130.0));
+      entries.push(await createPayment('PMT-001', 1, 1000.0));
 
       for (const entryId of entries) {
         const isBalanced = await isJournalEntryBalanced(entryId);
         expect(isBalanced).toBe(true);
       }
 
-      const totalDebits = db.prepare(`
+      const totalDebits = db
+        .prepare(`
         SELECT SUM(debit_amount) as total
         FROM journal_line jl
         JOIN journal_entry je ON jl.journal_entry_id = je.id
         WHERE je.status = 'posted'
-      `).get() as any;
+      `)
+        .get() as any;
 
-      const totalCredits = db.prepare(`
+      const totalCredits = db
+        .prepare(`
         SELECT SUM(credit_amount) as total
         FROM journal_line jl
         JOIN journal_entry je ON jl.journal_entry_id = je.id
         WHERE je.status = 'posted'
-      `).get() as any;
+      `)
+        .get() as any;
 
       expect(totalDebits.total).toBeCloseTo(totalCredits.total, 2);
     });
 
     it('should track audit trail for all transactions', async () => {
-      const invoiceEntryId = await createInvoice('INV-001', 1, 1130.00);
-      const paymentEntryId = await createPayment('PMT-001', 1, 1000.00);
+      const invoiceEntryId = await createInvoice('INV-001', 1, 1130.0);
+      const paymentEntryId = await createPayment('PMT-001', 1, 1000.0);
 
-      const events = db.prepare(`
+      const events = db
+        .prepare(`
         SELECT * FROM transaction_event
         WHERE reference IN ('INV-001', 'PMT-001')
         ORDER BY created_at
-      `).all() as any[];
+      `)
+        .all() as any[];
 
       expect(events.length).toBe(2);
       expect(events[0].event_type).toBe('invoice_created');
@@ -325,37 +347,38 @@ describe('Integration - Full Workflow: Invoice → Payment → Reconciliation', 
 
   describe('Reconciliation', () => {
     it('should reconcile invoice with payment', async () => {
-      await createInvoice('INV-001', 1, 1130.00);
-      await createPayment('PMT-001', 1, 1130.00);
+      await createInvoice('INV-001', 1, 1130.0);
+      await createPayment('PMT-001', 1, 1130.0);
 
       const arBalance = await getAccountBalance('1100');
       const cashBalance = await getAccountBalance('1000');
 
       expect(arBalance).toBe(0);
-      expect(cashBalance).toBe(1130.00);
+      expect(cashBalance).toBe(1130.0);
     });
 
     it('should calculate outstanding balance correctly', async () => {
-      await createInvoice('INV-001', 1, 1130.00);
-      await createInvoice('INV-002', 1, 2260.00);
+      await createInvoice('INV-001', 1, 1130.0);
+      await createInvoice('INV-002', 1, 2260.0);
 
-      await createPayment('PMT-001', 1, 2000.00);
+      await createPayment('PMT-001', 1, 2000.0);
 
       const arBalance = await getAccountBalance('1100');
       const cashBalance = await getAccountBalance('1000');
 
-      expect(arBalance).toBe(1390.00);
-      expect(cashBalance).toBe(2000.00);
+      expect(arBalance).toBe(1390.0);
+      expect(cashBalance).toBe(2000.0);
     });
 
     it('should handle aging correctly', async () => {
-      await createInvoice('INV-001', 1, 1130.00);
-      await createInvoice('INV-002', 1, 2260.00);
-      await createInvoice('INV-003', 1, 565.00);
+      await createInvoice('INV-001', 1, 1130.0);
+      await createInvoice('INV-002', 1, 2260.0);
+      await createInvoice('INV-003', 1, 565.0);
 
-      await createPayment('PMT-001', 1, 3000.00);
+      await createPayment('PMT-001', 1, 3000.0);
 
-      const entries = db.prepare(`
+      const entries = db
+        .prepare(`
         SELECT je.id, je.entry_date, je.description, je.reference,
                SUM(CASE 
                  WHEN jl.debit_amount > 0 THEN jl.debit_amount 
@@ -367,7 +390,8 @@ describe('Integration - Full Workflow: Invoice → Payment → Reconciliation', 
         WHERE a.code = '1100' AND je.status = 'posted'
         GROUP BY je.id
         ORDER BY je.entry_date
-      `).all() as any[];
+      `)
+        .all() as any[];
 
       expect(entries.length).toBeGreaterThanOrEqual(3);
     });
@@ -375,30 +399,30 @@ describe('Integration - Full Workflow: Invoice → Payment → Reconciliation', 
 
   describe('FIFO Payment Allocation', () => {
     it('should allocate payments to oldest invoices first', async () => {
-      await createInvoice('INV-001', 1, 1130.00);
-      await createInvoice('INV-002', 1, 2260.00);
-      await createInvoice('INV-003', 1, 565.00);
+      await createInvoice('INV-001', 1, 1130.0);
+      await createInvoice('INV-002', 1, 2260.0);
+      await createInvoice('INV-003', 1, 565.0);
 
       const arBefore = await getAccountBalance('1100');
 
-      await createPayment('PMT-001', 1, 2000.00);
+      await createPayment('PMT-001', 1, 2000.0);
 
       const arAfter = await getAccountBalance('1100');
       const paidAmount = arBefore - arAfter;
 
-      expect(paidAmount).toBe(2000.00);
+      expect(paidAmount).toBe(2000.0);
     });
 
     it('should handle over-allocation prevention', async () => {
-      await createInvoice('INV-001', 1, 1130.00);
+      await createInvoice('INV-001', 1, 1130.0);
 
       const arBefore = await getAccountBalance('1100');
 
-      await createPayment('PMT-001', 1, 1500.00);
+      await createPayment('PMT-001', 1, 1500.0);
 
       const arAfter = await getAccountBalance('1100');
 
-      expect(arBefore - arAfter).toBe(1500.00);
+      expect(arBefore - arAfter).toBe(1500.0);
     });
   });
 });

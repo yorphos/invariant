@@ -1,276 +1,288 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { persistenceService } from '../services/persistence';
-  import { createCreditNote, applyCreditNote, refundCreditNote, voidCreditNote } from '../domain/credit-note-operations';
-  import type { CreditNote, CreditNoteLine, Contact, Account, Invoice, PolicyMode } from '../domain/types';
-  import Button from '../ui/Button.svelte';
-  import Input from '../ui/Input.svelte';
-  import Select from '../ui/Select.svelte';
-  import Card from '../ui/Card.svelte';
-  import Modal from '../ui/Modal.svelte';
-  import Table from '../ui/Table.svelte';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
+import { onMount } from 'svelte';
+import { persistenceService } from '../services/persistence';
+import {
+  createCreditNote,
+  applyCreditNote,
+  refundCreditNote,
+  voidCreditNote,
+} from '../domain/credit-note-operations';
+import type {
+  CreditNote,
+  CreditNoteLine,
+  Contact,
+  Account,
+  Invoice,
+  PolicyMode,
+} from '../domain/types';
+import Button from '../ui/Button.svelte';
+import Input from '../ui/Input.svelte';
+import Select from '../ui/Select.svelte';
+import Card from '../ui/Card.svelte';
+import Modal from '../ui/Modal.svelte';
+import Table from '../ui/Table.svelte';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
 
-  export let mode: PolicyMode;
+export let mode: PolicyMode;
 
-  let creditNotes: CreditNote[] = [];
-  let contacts: Contact[] = [];
-  let invoices: Invoice[] = [];
-  let revenueAccounts: Account[] = [];
-  let loading = true;
-  let showModal = false;
-  let view: 'list' | 'create' | 'apply' | 'refund' | 'void' = 'list';
-  let selectedCreditNote: CreditNote | null = null;
-  let selectedInvoice: Invoice | null = null;
-  let formSelectedCreditNote: string | number | '' = '';
-  let formSelectedInvoice: string | number | '' = '';
+let creditNotes: CreditNote[] = [];
+let contacts: Contact[] = [];
+let invoices: Invoice[] = [];
+let revenueAccounts: Account[] = [];
+let loading = true;
+let showModal = false;
+let view: 'list' | 'create' | 'apply' | 'refund' | 'void' = 'list';
+let selectedCreditNote: CreditNote | null = null;
+let selectedInvoice: Invoice | null = null;
+let formSelectedCreditNote: string | number | '' = '';
+let formSelectedInvoice: string | number | '' = '';
 
-  let formCreditNoteNumber = '';
-  let formContactId: number | '' = '';
-  let formIssueDate = '';
-  let formNotes = '';
-  let formLines: Array<{
-    description: string;
-    quantity: number;
-    unit_price: number;
-    account_id: number | '';
-  }> = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
-  let applyAmount = 0;
-  let refundNumber = '';
-  let refundDate = '';
-  let refundPaymentMethod = 'cash';
-  let refundAmount = 0;
-  let voidReason = '';
+let formCreditNoteNumber = '';
+let formContactId: number | '' = '';
+let formIssueDate = '';
+let formNotes = '';
+let formLines: Array<{
+  description: string;
+  quantity: number;
+  unit_price: number;
+  account_id: number | '';
+}> = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
+let applyAmount = 0;
+let refundNumber = '';
+let refundDate = '';
+let refundPaymentMethod = 'cash';
+let refundAmount = 0;
+let voidReason = '';
 
-  let taxRate = 0.13;
-  let taxInclusivePricing = false;
+let taxRate = 0.13;
+let taxInclusivePricing = false;
 
-  $: subtotal = formLines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
-  $: taxAmount = taxInclusivePricing
-    ? subtotal - (subtotal / (1 + taxRate))
-    : subtotal * taxRate;
-  $: total = taxInclusivePricing ? subtotal : subtotal + taxAmount;
+$: subtotal = formLines.reduce((sum, line) => sum + line.quantity * line.unit_price, 0);
+$: taxAmount = taxInclusivePricing ? subtotal - subtotal / (1 + taxRate) : subtotal * taxRate;
+$: total = taxInclusivePricing ? subtotal : subtotal + taxAmount;
 
-  $: if (formSelectedCreditNote) {
-    selectedCreditNote = creditNotes.find(cn => cn.id === Number(formSelectedCreditNote)) || null;
-  }
-  $: if (formSelectedInvoice) {
-    selectedInvoice = invoices.find(inv => inv.id === Number(formSelectedInvoice)) || null;
-  }
+$: if (formSelectedCreditNote) {
+  selectedCreditNote = creditNotes.find((cn) => cn.id === Number(formSelectedCreditNote)) || null;
+}
+$: if (formSelectedInvoice) {
+  selectedInvoice = invoices.find((inv) => inv.id === Number(formSelectedInvoice)) || null;
+}
 
-  onMount(async () => {
-    await loadData();
-  });
+onMount(async () => {
+  await loadData();
+});
 
-  async function loadData() {
-    loading = true;
-    try {
-      [creditNotes, contacts, invoices, revenueAccounts] = await Promise.all([
-        persistenceService.getCreditNotes(),
-        persistenceService.getContacts('customer'),
-        persistenceService.getInvoices(),
-        persistenceService.getAccountsByType('revenue')
-      ]);
+async function loadData() {
+  loading = true;
+  try {
+    [creditNotes, contacts, invoices, revenueAccounts] = await Promise.all([
+      persistenceService.getCreditNotes(),
+      persistenceService.getContacts('customer'),
+      persistenceService.getInvoices(),
+      persistenceService.getAccountsByType('revenue'),
+    ]);
 
-      taxRate = 0.13;
+    taxRate = 0.13;
 
-      if (creditNotes.length === 0) {
-        formCreditNoteNumber = 'CN-0001';
-      } else {
-        const lastNum = Math.max(...creditNotes.map(cn => {
+    if (creditNotes.length === 0) {
+      formCreditNoteNumber = 'CN-0001';
+    } else {
+      const lastNum = Math.max(
+        ...creditNotes.map((cn) => {
           const match = cn.credit_note_number.match(/\d+$/);
           return match ? parseInt(match[0]) : 0;
-        }));
-        formCreditNoteNumber = `CN-${String(lastNum + 1).padStart(4, '0')}`;
-      }
-
-      formIssueDate = new Date().toISOString().split('T')[0];
-      refundDate = new Date().toISOString().split('T')[0];
-    } catch (e) {
-      logger.error('Failed to load data:', e);
-      toasts.error('Failed to load credit notes data');
+        }),
+      );
+      formCreditNoteNumber = `CN-${String(lastNum + 1).padStart(4, '0')}`;
     }
-    loading = false;
-  }
 
-  function addLine() {
-    formLines = [...formLines, { description: '', quantity: 1, unit_price: 0, account_id: '' }];
+    formIssueDate = new Date().toISOString().split('T')[0];
+    refundDate = new Date().toISOString().split('T')[0];
+  } catch (e) {
+    logger.error('Failed to load data:', e);
+    toasts.error('Failed to load credit notes data');
   }
+  loading = false;
+}
 
-  function removeLine(index: number) {
-    if (formLines.length > 1) {
-      formLines = formLines.filter((_, i) => i !== index);
+function addLine() {
+  formLines = [...formLines, { description: '', quantity: 1, unit_price: 0, account_id: '' }];
+}
+
+function removeLine(index: number) {
+  if (formLines.length > 1) {
+    formLines = formLines.filter((_, i) => i !== index);
+  }
+}
+
+async function handleCreate() {
+  try {
+    if (!formContactId || typeof formContactId !== 'number') {
+      toasts.error('Please select a customer');
+      return;
     }
-  }
 
-  async function handleCreate() {
-    try {
-      if (!formContactId || typeof formContactId !== 'number') {
-        toasts.error('Please select a customer');
+    for (const line of formLines) {
+      if (!line.description || typeof line.account_id !== 'number') {
+        toasts.error('Please fill in all line items');
         return;
       }
-
-      for (const line of formLines) {
-        if (!line.description || typeof line.account_id !== 'number') {
-          toasts.error('Please fill in all line items');
-          return;
-        }
-      }
-
-      const lines: CreditNoteLine[] = formLines.map((line, index) => ({
-        line_number: index + 1,
-        description: line.description,
-        quantity: line.quantity,
-        unit_price: line.unit_price,
-        amount: line.quantity * line.unit_price,
-        is_tax_inclusive: taxInclusivePricing,
-        account_id: Number(line.account_id),
-      }));
-
-      const result = await createCreditNote(
-        {
-          credit_note_number: formCreditNoteNumber,
-          contact_id: Number(formContactId),
-          issue_date: formIssueDate,
-          notes: formNotes || undefined,
-          tax_code_id: 1,
-        },
-        lines,
-        { mode }
-      );
-
-      if (result.ok) {
-        toasts.success('Credit note created successfully');
-        view = 'list';
-        await loadData();
-        resetForm();
-      } else {
-        toasts.error(result.warnings[0]?.message || 'Failed to create credit note');
-      }
-    } catch (e) {
-      logger.error('Create credit note error:', e);
-      toasts.error('Failed to create credit note');
-    }
-  }
-
-  async function handleApply() {
-    if (!selectedCreditNote || !selectedInvoice || !applyAmount) {
-      toasts.error('Please fill in all fields');
-      return;
     }
 
-    try {
-      const result = await applyCreditNote(
-        selectedCreditNote.id!,
-        selectedInvoice.id!,
-        applyAmount,
-        'Credit note application'
-      );
+    const lines: CreditNoteLine[] = formLines.map((line, index) => ({
+      line_number: index + 1,
+      description: line.description,
+      quantity: line.quantity,
+      unit_price: line.unit_price,
+      amount: line.quantity * line.unit_price,
+      is_tax_inclusive: taxInclusivePricing,
+      account_id: Number(line.account_id),
+    }));
 
-      if (result.ok) {
-        toasts.success('Credit note applied successfully');
-        view = 'list';
-        await loadData();
-        selectedCreditNote = null;
-        selectedInvoice = null;
-        formSelectedCreditNote = '';
-        formSelectedInvoice = '';
-        applyAmount = 0;
-      } else {
-        toasts.error(result.warnings[0]?.message || 'Failed to apply credit note');
-      }
-    } catch (e) {
-      logger.error('Apply credit note error:', e);
-      toasts.error('Failed to apply credit note');
+    const result = await createCreditNote(
+      {
+        credit_note_number: formCreditNoteNumber,
+        contact_id: Number(formContactId),
+        issue_date: formIssueDate,
+        notes: formNotes || undefined,
+        tax_code_id: 1,
+      },
+      lines,
+      { mode },
+    );
+
+    if (result.ok) {
+      toasts.success('Credit note created successfully');
+      view = 'list';
+      await loadData();
+      resetForm();
+    } else {
+      toasts.error(result.warnings[0]?.message || 'Failed to create credit note');
     }
+  } catch (e) {
+    logger.error('Create credit note error:', e);
+    toasts.error('Failed to create credit note');
+  }
+}
+
+async function handleApply() {
+  if (!selectedCreditNote || !selectedInvoice || !applyAmount) {
+    toasts.error('Please fill in all fields');
+    return;
   }
 
-  async function handleRefund() {
-    if (!selectedCreditNote || !refundNumber || !refundAmount) {
-      toasts.error('Please fill in all fields');
-      return;
+  try {
+    const result = await applyCreditNote(
+      selectedCreditNote.id!,
+      selectedInvoice.id!,
+      applyAmount,
+      'Credit note application',
+    );
+
+    if (result.ok) {
+      toasts.success('Credit note applied successfully');
+      view = 'list';
+      await loadData();
+      selectedCreditNote = null;
+      selectedInvoice = null;
+      formSelectedCreditNote = '';
+      formSelectedInvoice = '';
+      applyAmount = 0;
+    } else {
+      toasts.error(result.warnings[0]?.message || 'Failed to apply credit note');
     }
+  } catch (e) {
+    logger.error('Apply credit note error:', e);
+    toasts.error('Failed to apply credit note');
+  }
+}
 
-    try {
-      const result = await refundCreditNote(
-        selectedCreditNote.id!,
-        refundNumber,
-        refundDate,
-        refundPaymentMethod,
-        refundAmount,
-        'Cash refund'
-      );
+async function handleRefund() {
+  if (!selectedCreditNote || !refundNumber || !refundAmount) {
+    toasts.error('Please fill in all fields');
+    return;
+  }
 
-      if (result.ok) {
-        toasts.success('Refund processed successfully');
-        view = 'list';
-        await loadData();
-        selectedCreditNote = null;
-        refundNumber = '';
-        refundAmount = 0;
-        formSelectedCreditNote = '';
-      } else {
-        toasts.error(result.warnings[0]?.message || 'Failed to process refund');
-      }
-      } catch (e) {
-      logger.error('Refund error:', e);
-      toasts.error('Failed to process refund');
+  try {
+    const result = await refundCreditNote(
+      selectedCreditNote.id!,
+      refundNumber,
+      refundDate,
+      refundPaymentMethod,
+      refundAmount,
+      'Cash refund',
+    );
+
+    if (result.ok) {
+      toasts.success('Refund processed successfully');
+      view = 'list';
+      await loadData();
+      selectedCreditNote = null;
+      refundNumber = '';
+      refundAmount = 0;
+      formSelectedCreditNote = '';
+    } else {
+      toasts.error(result.warnings[0]?.message || 'Failed to process refund');
     }
+  } catch (e) {
+    logger.error('Refund error:', e);
+    toasts.error('Failed to process refund');
+  }
+}
+
+async function handleVoid() {
+  if (!selectedCreditNote || !voidReason) {
+    toasts.error('Please provide a reason for voiding');
+    return;
   }
 
-  async function handleVoid() {
-    if (!selectedCreditNote || !voidReason) {
-      toasts.error('Please provide a reason for voiding');
-      return;
+  try {
+    const result = await voidCreditNote(selectedCreditNote.id!, voidReason);
+
+    if (result.ok) {
+      toasts.success('Credit note voided successfully');
+      view = 'list';
+      await loadData();
+      selectedCreditNote = null;
+      voidReason = '';
+      formSelectedCreditNote = '';
+    } else {
+      toasts.error(result.warnings[0]?.message || 'Failed to void credit note');
     }
-
-    try {
-      const result = await voidCreditNote(selectedCreditNote.id!, voidReason);
-
-      if (result.ok) {
-        toasts.success('Credit note voided successfully');
-        view = 'list';
-        await loadData();
-        selectedCreditNote = null;
-        voidReason = '';
-        formSelectedCreditNote = '';
-      } else {
-        toasts.error(result.warnings[0]?.message || 'Failed to void credit note');
-      }
-    } catch (e) {
-      logger.error('Void credit note error:', e);
-      toasts.error('Failed to void credit note');
-    }
+  } catch (e) {
+    logger.error('Void credit note error:', e);
+    toasts.error('Failed to void credit note');
   }
+}
 
-  function resetForm() {
-    formLines = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
-    formNotes = '';
-    formContactId = '';
-  }
+function resetForm() {
+  formLines = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
+  formNotes = '';
+  formContactId = '';
+}
 
-  function getStatusBadge(status: string) {
-    const colors = {
-      draft: 'bg-gray-200 text-gray-800',
-      issued: 'bg-blue-100 text-blue-800',
-      applied: 'bg-green-100 text-green-800',
-      partial: 'bg-yellow-100 text-yellow-800',
-      void: 'bg-red-100 text-red-800',
-    };
-    return colors[status as keyof typeof colors] || 'bg-gray-200 text-gray-800';
-  }
+function getStatusBadge(status: string) {
+  const colors = {
+    draft: 'bg-gray-200 text-gray-800',
+    issued: 'bg-blue-100 text-blue-800',
+    applied: 'bg-green-100 text-green-800',
+    partial: 'bg-yellow-100 text-yellow-800',
+    void: 'bg-red-100 text-red-800',
+  };
+  return colors[status as keyof typeof colors] || 'bg-gray-200 text-gray-800';
+}
 
-  function getCreditNoteStatus(status: string) {
-    const statusMap = {
-      draft: 'Draft',
-      issued: 'Issued',
-      applied: 'Applied',
-      partial: 'Partial',
-      void: 'Void',
-    };
-    return statusMap[status as keyof typeof statusMap] || status;
-  }
+function getCreditNoteStatus(status: string) {
+  const statusMap = {
+    draft: 'Draft',
+    issued: 'Issued',
+    applied: 'Applied',
+    partial: 'Partial',
+    void: 'Void',
+  };
+  return statusMap[status as keyof typeof statusMap] || status;
+}
 </script>
 
 <div class="p-6">

@@ -45,7 +45,7 @@ const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccount[] = [
   { code: '2500', name: 'Long-term Debt', type: 'liability', parent_id: null },
 
   // Equity (3000-3999)
-  { code: '3000', name: 'Owner\'s Equity', type: 'equity', parent_id: null },
+  { code: '3000', name: "Owner's Equity", type: 'equity', parent_id: null },
   { code: '3100', name: 'Retained Earnings', type: 'equity', parent_id: null },
   { code: '3900', name: 'Current Year Earnings', type: 'equity', parent_id: null },
 
@@ -92,15 +92,27 @@ const DEFAULT_CHART_OF_ACCOUNTS: DefaultAccount[] = [
  */
 const SYSTEM_ACCOUNT_MAPPINGS: SystemAccountSeed[] = [
   // Core A/R and A/P
-  { role: 'accounts_receivable', code: '1100', description: 'Primary A/R account for customer invoices' },
+  {
+    role: 'accounts_receivable',
+    code: '1100',
+    description: 'Primary A/R account for customer invoices',
+  },
   { role: 'accounts_payable', code: '2000', description: 'Primary A/P account for vendor bills' },
   { role: 'sales_tax_payable', code: '2220', description: 'Sales tax collected (HST/GST/PST)' },
   { role: 'retained_earnings', code: '3100', description: 'Retained earnings from prior periods' },
-  { role: 'current_year_earnings', code: '3900', description: 'Net income for current fiscal year' },
+  {
+    role: 'current_year_earnings',
+    code: '3900',
+    description: 'Net income for current fiscal year',
+  },
   // Cash and Bank accounts
   { role: 'cash_default', code: '1000', description: 'Default cash account for transactions' },
   { role: 'checking_account', code: '1010', description: 'Primary checking account for payments' },
-  { role: 'customer_deposits', code: '2150', description: 'Liability account for unallocated customer payments' },
+  {
+    role: 'customer_deposits',
+    code: '2150',
+    description: 'Liability account for unallocated customer payments',
+  },
   // Payroll accounts
   { role: 'salary_expense', code: '6100', description: 'Salary and wages expense' },
   { role: 'cpp_payable', code: '2310', description: 'CPP (Canada Pension Plan) payable' },
@@ -121,7 +133,7 @@ export async function seedDefaultAccounts(): Promise<void> {
 
   // Check if accounts already exist
   const existingAccounts = await db.select<Array<{ count: number }>>(
-    'SELECT COUNT(*) as count FROM account'
+    'SELECT COUNT(*) as count FROM account',
   );
 
   if (existingAccounts[0].count > 0) {
@@ -138,7 +150,7 @@ export async function seedDefaultAccounts(): Promise<void> {
     await db.execute(
       `INSERT INTO account (code, name, type, parent_id, is_active) 
        VALUES (?, ?, ?, ?, 1)`,
-      [account.code, account.name, account.type, account.parent_id]
+      [account.code, account.name, account.type, account.parent_id],
     );
   }
 
@@ -157,7 +169,7 @@ async function seedSystemAccounts(): Promise<void> {
 
   // Check if system_account table exists (migration 007 must have run)
   const tableExists = await db.select<Array<{ name: string }>>(
-    `SELECT name FROM sqlite_master WHERE type='table' AND name='system_account'`
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='system_account'`,
   );
 
   if (tableExists.length === 0) {
@@ -167,7 +179,7 @@ async function seedSystemAccounts(): Promise<void> {
 
   // Check how many system accounts are already configured
   const existingMappings = await db.select<Array<{ count: number }>>(
-    'SELECT COUNT(*) as count FROM system_account'
+    'SELECT COUNT(*) as count FROM system_account',
   );
 
   if (existingMappings[0].count >= SYSTEM_ACCOUNT_MAPPINGS.length) {
@@ -182,7 +194,7 @@ async function seedSystemAccounts(): Promise<void> {
     // Get the account ID for this code
     const account = await db.select<Array<{ id: number }>>(
       'SELECT id FROM account WHERE code = ? LIMIT 1',
-      [mapping.code]
+      [mapping.code],
     );
 
     if (account.length === 0) {
@@ -194,7 +206,7 @@ async function seedSystemAccounts(): Promise<void> {
     await db.execute(
       `INSERT OR IGNORE INTO system_account (role, account_id, description)
        VALUES (?, ?, ?)`,
-      [mapping.role, account[0].id, mapping.description]
+      [mapping.role, account[0].id, mapping.description],
     );
     seededCount++;
   }

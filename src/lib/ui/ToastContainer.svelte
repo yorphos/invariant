@@ -1,19 +1,24 @@
 <script lang="ts">
-  import { toasts, type Toast } from '../stores/toast';
+import { toasts, type Toast } from '../stores/toast';
 
-  function getTypeClass(type: Toast['type']): string {
-    return `toast-${type}`;
-  }
+function getTypeClass(type: Toast['type']): string {
+  return `toast-${type}`;
+}
 
-  function getIcon(type: Toast['type']): string {
-    switch (type) {
-      case 'success': return '✓';
-      case 'error': return '✕';
-      case 'warning': return '⚠';
-      case 'info': return 'ℹ';
-      default: return '';
-    }
+function getIcon(type: Toast['type']): string {
+  switch (type) {
+    case 'success':
+      return '✓';
+    case 'error':
+      return '✕';
+    case 'warning':
+      return '⚠';
+    case 'info':
+      return 'ℹ';
+    default:
+      return '';
   }
+}
 </script>
 
 <div class="toast-container">

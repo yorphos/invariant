@@ -27,22 +27,19 @@ export interface PostingResult {
  * Validate bill data and recalculate amounts
  * Shared logic for create operations
  */
-async function validateAndRecalculateBill(
-  billData: BillInput,
-  lines: BillLine[]
-) {
+async function validateAndRecalculateBill(billData: BillInput, lines: BillLine[]) {
   // Validate date logic
   if (new Date(billData.due_date) < new Date(billData.bill_date)) {
     throw new Error('Due date must be on or after bill date');
   }
-  
+
   // Require tax_code_id
   if (!billData.tax_code_id) {
     throw new Error('Tax code is required for bills');
   }
-  
+
   // Recalculate all line amounts server-side (don't trust client)
-  const recalculatedLines = lines.map(line => {
+  const recalculatedLines = lines.map((line) => {
     // Validate required fields
     if (!line.description || line.description.trim() === '') {
       throw new Error('Line item description is required');
@@ -56,35 +53,35 @@ async function validateAndRecalculateBill(
     if (!line.unit_price || line.unit_price <= 0) {
       throw new Error(`Line item "${line.description}" must have a unit price greater than 0`);
     }
-    
+
     // Recalculate amount server-side
     const calculatedAmount = line.quantity * line.unit_price;
-    
+
     // Validate client-provided amount matches (allow 1 cent tolerance for rounding)
     if (line.amount && Math.abs(calculatedAmount - line.amount) > 0.01) {
       throw new Error(
         `Amount mismatch for "${line.description}": ` +
-        `${line.quantity} × $${line.unit_price} = $${calculatedAmount.toFixed(2)}, ` +
-        `but received $${line.amount.toFixed(2)}`
+          `${line.quantity} × $${line.unit_price} = $${calculatedAmount.toFixed(2)}, ` +
+          `but received $${line.amount.toFixed(2)}`,
       );
     }
-    
+
     return {
       ...line,
-      amount: calculatedAmount // Use server-calculated amount
+      amount: calculatedAmount, // Use server-calculated amount
     };
   });
-  
+
   // Calculate totals from recalculated amounts
   const subtotal = recalculatedLines.reduce((sum, line) => sum + line.amount, 0);
-  
+
   // Calculate tax using tax service (looks up rate from database)
   const { taxAmount, accountId: taxAccountId } = await calculateTax(
     subtotal,
     billData.tax_code_id,
-    billData.bill_date
+    billData.bill_date,
   );
-  
+
   const totalAmount = subtotal + taxAmount;
 
   // Validate amounts are positive
@@ -94,7 +91,7 @@ async function validateAndRecalculateBill(
   if (totalAmount <= 0) {
     throw new Error('Bill total must be greater than 0');
   }
-  
+
   return {
     recalculatedLines,
     subtotal,
@@ -114,28 +111,30 @@ async function validateAndRecalculateBill(
 export async function createBill(
   billData: BillInput,
   lines: BillLine[],
-  context: PolicyContext
+  context: PolicyContext,
 ): Promise<PostingResult> {
   try {
-    const { recalculatedLines, subtotal, taxAmount, totalAmount, taxAccountId } = 
+    const { recalculatedLines, subtotal, taxAmount, totalAmount, taxAccountId } =
       await validateAndRecalculateBill(billData, lines);
 
     // Get required accounts first (fail fast if missing)
     const accounts = await persistenceService.getAccounts();
     const apAccount = await getSystemAccount('accounts_payable');
-    
+
     // Tax account comes from tax rate lookup
-    const taxAccount = taxAccountId ? accounts.find(a => a.id === taxAccountId) : null;
-    
+    const taxAccount = taxAccountId ? accounts.find((a) => a.id === taxAccountId) : null;
+
     if (taxAmount > 0 && !taxAccount) {
       throw new Error('Tax account not found for the selected tax code.');
     }
 
     // Validate that all line item accounts exist and are expense accounts
     for (const line of recalculatedLines) {
-      const account = accounts.find(a => a.id === line.account_id);
+      const account = accounts.find((a) => a.id === line.account_id);
       if (!account) {
-        throw new Error(`Account ID ${line.account_id} not found for line item: ${line.description}`);
+        throw new Error(
+          `Account ID ${line.account_id} not found for line item: ${line.description}`,
+        );
       }
       if (account.type !== 'expense') {
         throw new Error(`Account "${account.name}" must be an expense account for bill line items`);
@@ -154,7 +153,7 @@ export async function createBill(
 
     // Create bill record in database
     const db = await getDatabase();
-    
+
     const result = await db.execute(
       `INSERT INTO bill (
         bill_number, vendor_id, event_id, bill_date, due_date,
@@ -174,8 +173,8 @@ export async function createBill(
         0,
         billData.tax_code_id,
         billData.reference || null,
-        billData.notes || null
-      ]
+        billData.notes || null,
+      ],
     );
 
     const billId = result.lastInsertId;
@@ -193,8 +192,8 @@ export async function createBill(
           line.quantity,
           line.unit_price,
           line.amount,
-          line.account_id
-        ]
+          line.account_id,
+        ],
       );
     }
 
@@ -202,9 +201,9 @@ export async function createBill(
     // Debit: Expense accounts (by line)
     // Debit: Tax expense/recoverable
     // Credit: Accounts Payable (total)
-    
+
     const journalLines = [];
-    
+
     // Debit expense accounts (one per line item)
     for (const line of recalculatedLines) {
       journalLines.push({
@@ -214,7 +213,7 @@ export async function createBill(
         description: line.description,
       });
     }
-    
+
     // Debit tax if applicable
     if (taxAmount > 0 && taxAccountId) {
       journalLines.push({
@@ -224,7 +223,7 @@ export async function createBill(
         description: 'Tax on purchases',
       });
     }
-    
+
     // Credit A/P (total amount)
     journalLines.push({
       account_id: apAccount.id!,
@@ -242,7 +241,7 @@ export async function createBill(
         reference: billData.bill_number,
         status: 'posted',
       },
-      journalLines
+      journalLines,
     );
 
     return {
@@ -251,7 +250,6 @@ export async function createBill(
       bill_id: billId,
       journal_entry_id: journalEntryId,
     };
-
   } catch (error) {
     logger.error('Bill creation error:', error);
     return {
@@ -276,28 +274,25 @@ export async function createBill(
 export async function voidBill(
   billId: number,
   reason: string,
-  context: PolicyContext
+  context: PolicyContext,
 ): Promise<PostingResult> {
   try {
     const db = await getDatabase();
-    
+
     // Get bill
-    const bills = await db.select<Bill[]>(
-      'SELECT * FROM bill WHERE id = ?',
-      [billId]
-    );
-    
+    const bills = await db.select<Bill[]>('SELECT * FROM bill WHERE id = ?', [billId]);
+
     if (bills.length === 0) {
       throw new Error('Bill not found');
     }
-    
+
     const bill = bills[0];
-    
+
     // Check if bill can be voided
     if (bill.status === 'void') {
       throw new Error('Bill is already voided');
     }
-    
+
     if (bill.paid_amount > 0) {
       throw new Error('Cannot void a bill with payments applied. Please reverse payments first.');
     }
@@ -307,18 +302,18 @@ export async function voidBill(
     // Get bill lines
     const billLines = await db.select<BillLine[]>(
       'SELECT * FROM bill_line WHERE bill_id = ? ORDER BY line_number',
-      [billId]
+      [billId],
     );
-    
+
     // Get required accounts
     const accounts = await persistenceService.getAccounts();
     const apAccount = await getSystemAccount('accounts_payable');
-    
+
     // Get tax account if bill had tax
     let taxAccount = null;
     if (bill.tax_code_id && bill.tax_amount > 0) {
       const taxInfo = await calculateTax(0, bill.tax_code_id, bill.bill_date);
-      taxAccount = accounts.find(a => a.id === taxInfo.accountId) || null;
+      taxAccount = accounts.find((a) => a.id === taxInfo.accountId) || null;
     }
 
     await assertPeriodOpen(voidDate);
@@ -334,9 +329,9 @@ export async function voidBill(
     // Create reversal journal entries (opposite of original posting)
     // Original was: DR Expenses, DR Tax, CR A/P
     // Reversal is: CR Expenses, CR Tax, DR A/P
-    
+
     const journalLines = [];
-    
+
     // Credit expense accounts (reversal of debits)
     for (const line of billLines) {
       journalLines.push({
@@ -346,7 +341,7 @@ export async function voidBill(
         description: `VOID: ${line.description}`,
       });
     }
-    
+
     // Credit tax (reversal of debit) - only if there was tax
     if (bill.tax_amount > 0 && taxAccount) {
       journalLines.push({
@@ -356,7 +351,7 @@ export async function voidBill(
         description: 'VOID: Tax on purchases',
       });
     }
-    
+
     // Debit A/P (reversal of credit)
     journalLines.push({
       account_id: apAccount.id!,
@@ -374,14 +369,14 @@ export async function voidBill(
         reference: bill.bill_number,
         status: 'posted',
       },
-      journalLines
+      journalLines,
     );
 
     // Update bill status to void
-    await db.execute(
-      'UPDATE bill SET status = ?, updated_at = datetime("now") WHERE id = ?',
-      ['void', billId]
-    );
+    await db.execute('UPDATE bill SET status = ?, updated_at = datetime("now") WHERE id = ?', [
+      'void',
+      billId,
+    ]);
 
     return {
       ok: true,
@@ -389,7 +384,6 @@ export async function voidBill(
       bill_id: billId,
       journal_entry_id: journalEntryId,
     };
-
   } catch (error) {
     logger.error('Bill void error:', error);
     return {
@@ -431,50 +425,52 @@ export interface BillPaymentAllocation {
 export async function createVendorPayment(
   paymentData: VendorPaymentInput,
   allocations: BillPaymentAllocation[],
-  context: PolicyContext
+  context: PolicyContext,
 ): Promise<PostingResult & { vendor_payment_id?: number }> {
   try {
     const db = await getDatabase();
-    
+
     // Validate payment amount
     if (paymentData.amount <= 0) {
       throw new Error('Payment amount must be greater than zero');
     }
-    
+
     // Validate allocations don't exceed payment amount
     const totalAllocated = allocations.reduce((sum, a) => sum + a.amount, 0);
     if (totalAllocated > paymentData.amount) {
-      throw new Error(`Total allocations ($${totalAllocated.toFixed(2)}) exceed payment amount ($${paymentData.amount.toFixed(2)})`);
+      throw new Error(
+        `Total allocations ($${totalAllocated.toFixed(2)}) exceed payment amount ($${paymentData.amount.toFixed(2)})`,
+      );
     }
-    
+
     // Validate each bill allocation
     for (const allocation of allocations) {
       if (allocation.amount <= 0) {
         throw new Error('Bill allocation amounts must be greater than zero');
       }
-      
+
       // Get bill and validate
-      const bills = await db.select<Bill[]>(
-        'SELECT * FROM bill WHERE id = ?',
-        [allocation.bill_id]
-      );
-      
+      const bills = await db.select<Bill[]>('SELECT * FROM bill WHERE id = ?', [
+        allocation.bill_id,
+      ]);
+
       if (bills.length === 0) {
         throw new Error(`Bill ID ${allocation.bill_id} not found`);
       }
-      
+
       const bill = bills[0];
-      
+
       if (bill.status === 'void') {
         throw new Error(`Cannot pay voided bill ${bill.bill_number}`);
       }
-      
+
       // Check for over-payment
       const amountDue = bill.total_amount - bill.paid_amount;
-      if (allocation.amount > amountDue + 0.01) { // 1 cent tolerance
+      if (allocation.amount > amountDue + 0.01) {
+        // 1 cent tolerance
         throw new Error(
           `Allocation to bill ${bill.bill_number} ($${allocation.amount.toFixed(2)}) ` +
-          `exceeds amount due ($${amountDue.toFixed(2)})`
+            `exceeds amount due ($${amountDue.toFixed(2)})`,
         );
       }
     }
@@ -484,7 +480,7 @@ export async function createVendorPayment(
     // Get required accounts
     const apAccount = await getSystemAccount('accounts_payable');
     const cashAccount = await getSystemAccount('cash_default');
-    
+
     // Create transaction event
     const eventId = await persistenceService.createTransactionEvent({
       event_type: 'vendor_payment',
@@ -498,7 +494,7 @@ export async function createVendorPayment(
         allocations: allocations.length,
       }),
     });
-    
+
     // Create vendor payment record
     const vendorPaymentId = await persistenceService.createVendorPayment({
       payment_number: paymentData.payment_number,
@@ -513,7 +509,7 @@ export async function createVendorPayment(
       allocated_amount: totalAllocated,
       status: totalAllocated >= paymentData.amount - 0.01 ? 'allocated' : 'partial',
     });
-    
+
     // Create bill allocations
     for (const allocation of allocations) {
       await persistenceService.createBillAllocation({
@@ -523,7 +519,7 @@ export async function createVendorPayment(
         allocation_date: paymentData.payment_date,
       });
     }
-    
+
     // Post journal entry: DR A/P, CR Cash
     const journalLines = [
       {
@@ -539,7 +535,7 @@ export async function createVendorPayment(
         description: `Payment ${paymentData.payment_number}`,
       },
     ];
-    
+
     const journalEntryId = await persistenceService.createJournalEntry(
       {
         event_id: eventId,
@@ -548,16 +544,15 @@ export async function createVendorPayment(
         reference: paymentData.payment_number,
         status: 'posted',
       },
-      journalLines
+      journalLines,
     );
-    
+
     return {
       ok: true,
       warnings: [],
       vendor_payment_id: vendorPaymentId,
       journal_entry_id: journalEntryId,
     };
-    
   } catch (error) {
     logger.error('Vendor payment creation error:', error);
     return {

@@ -15,7 +15,7 @@
     "build": "vite build",
     "build:tauri": "tauri build",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json && biome check src/",
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json && biome lint src/",
     "lint": "biome check src/",
     "format": "biome format --write src/",
     "tauri": "tauri",

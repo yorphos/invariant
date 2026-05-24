@@ -1,77 +1,73 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import { keyboardStore, formatShortcut, type Shortcut } from '../stores/keyboard';
+import { createEventDispatcher } from 'svelte';
+import { keyboardStore, formatShortcut, type Shortcut } from '../stores/keyboard';
 
-  export let open = false;
+export let open = false;
 
-  const dispatch = createEventDispatcher<{ close: void }>();
+const dispatch = createEventDispatcher<{ close: void }>();
 
-  let query = '';
-  let searchInput: HTMLInputElement | null = null;
+let query = '';
+let searchInput: HTMLInputElement | null = null;
 
-  $: if (open) {
-    query = '';
-  }
+$: if (open) {
+  query = '';
+}
 
-  $: if (open && searchInput) {
-    queueMicrotask(() => {
-      searchInput?.focus();
-      searchInput?.select();
-    });
-  }
-
-  $: shortcuts = $keyboardStore;
-  $: normalizedQuery = query.trim().toLowerCase();
-  $: filteredShortcuts = shortcuts.filter((shortcut) => {
-    if (!normalizedQuery) {
-      return true;
-    }
-
-    const searchableText = [
-      shortcut.description,
-      shortcut.category,
-      formatShortcut(shortcut)
-    ]
-      .join(' ')
-      .toLowerCase();
-
-    return searchableText.includes(normalizedQuery);
+$: if (open && searchInput) {
+  queueMicrotask(() => {
+    searchInput?.focus();
+    searchInput?.select();
   });
+}
 
-  function closePalette() {
-    dispatch('close');
+$: shortcuts = $keyboardStore;
+$: normalizedQuery = query.trim().toLowerCase();
+$: filteredShortcuts = shortcuts.filter((shortcut) => {
+  if (!normalizedQuery) {
+    return true;
   }
 
-  function handleBackdropClick(event: MouseEvent) {
-    if (event.target === event.currentTarget) {
-      closePalette();
-    }
-  }
+  const searchableText = [shortcut.description, shortcut.category, formatShortcut(shortcut)]
+    .join(' ')
+    .toLowerCase();
 
-  function handleKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      closePalette();
-      return;
-    }
+  return searchableText.includes(normalizedQuery);
+});
 
-    if (event.key === 'Enter' && filteredShortcuts.length > 0) {
-      event.preventDefault();
-      filteredShortcuts[0].action();
-      closePalette();
-    }
-  }
+function closePalette() {
+  dispatch('close');
+}
 
-  function runShortcut(shortcut: Shortcut) {
-    shortcut.action();
+function handleBackdropClick(event: MouseEvent) {
+  if (event.target === event.currentTarget) {
     closePalette();
   }
+}
 
-  function getCategoryLabel(category: Shortcut['category']) {
-    if (category === 'navigation') return 'Navigation';
-    if (category === 'action') return 'Actions';
-    return 'General';
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closePalette();
+    return;
   }
+
+  if (event.key === 'Enter' && filteredShortcuts.length > 0) {
+    event.preventDefault();
+    filteredShortcuts[0].action();
+    closePalette();
+  }
+}
+
+function runShortcut(shortcut: Shortcut) {
+  shortcut.action();
+  closePalette();
+}
+
+function getCategoryLabel(category: Shortcut['category']) {
+  if (category === 'navigation') return 'Navigation';
+  if (category === 'action') return 'Actions';
+  return 'General';
+}
 </script>
 
 <svelte:window onkeydown={open ? handleKeydown : undefined} />

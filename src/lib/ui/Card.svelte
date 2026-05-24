@@ -1,6 +1,6 @@
 <script lang="ts">
-  export let title = '';
-  export let padding = true;
+export let title = '';
+export let padding = true;
 </script>
 
  <div class="card" class:no-padding={!padding}>

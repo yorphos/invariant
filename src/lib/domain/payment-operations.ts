@@ -17,7 +17,7 @@ export interface PaymentInput {
 export async function createPayment(
   paymentData: PaymentInput,
   allocations: Array<{ invoice_id: number; amount: number }>,
-  context: PolicyContext
+  context: PolicyContext,
 ) {
   try {
     // Validate payment amount is positive
@@ -32,33 +32,35 @@ export async function createPayment(
 
     // Get all open invoices for FIFO allocation
     let allOpenInvoices = await persistenceService.getOpenInvoices();
-    
+
     // If contact_id is specified, filter to that contact
     if (paymentData.contact_id) {
-      allOpenInvoices = allOpenInvoices.filter(inv => inv.contact_id === paymentData.contact_id);
+      allOpenInvoices = allOpenInvoices.filter((inv) => inv.contact_id === paymentData.contact_id);
     }
-    
+
     // Sort by issue_date for FIFO (oldest first)
-    allOpenInvoices.sort((a, b) => new Date(a.issue_date).getTime() - new Date(b.issue_date).getTime());
+    allOpenInvoices.sort(
+      (a, b) => new Date(a.issue_date).getTime() - new Date(b.issue_date).getTime(),
+    );
 
     // If no invoices selected, use FIFO across all open invoices
     let finalAllocations: Array<{ invoice_id: number; amount: number }>;
-    
+
     if (allocations.length === 0) {
       // Auto-allocate using FIFO
       finalAllocations = [];
       let remainingAmount = paymentData.amount;
-      
+
       for (const invoice of allOpenInvoices) {
         if (remainingAmount <= 0) break;
-        
+
         const outstanding = invoice.total_amount - invoice.paid_amount;
         const allocationAmount = Math.min(remainingAmount, outstanding);
-        
+
         if (allocationAmount > 0) {
           finalAllocations.push({
             invoice_id: invoice.id!,
-            amount: allocationAmount
+            amount: allocationAmount,
           });
           remainingAmount -= allocationAmount;
         }
@@ -67,21 +69,23 @@ export async function createPayment(
       // User selected specific invoices - apply FIFO to selected invoices
       finalAllocations = [];
       let remainingAmount = paymentData.amount;
-      
+
       // Get the selected invoice details and sort by date
-      const selectedInvoiceIds = allocations.map(a => a.invoice_id);
-      const selectedInvoices = allOpenInvoices.filter(inv => selectedInvoiceIds.includes(inv.id!));
-      
+      const selectedInvoiceIds = allocations.map((a) => a.invoice_id);
+      const selectedInvoices = allOpenInvoices.filter((inv) =>
+        selectedInvoiceIds.includes(inv.id!),
+      );
+
       for (const invoice of selectedInvoices) {
         if (remainingAmount <= 0) break;
-        
+
         const outstanding = invoice.total_amount - invoice.paid_amount;
         const allocationAmount = Math.min(remainingAmount, outstanding);
-        
+
         if (allocationAmount > 0) {
           finalAllocations.push({
             invoice_id: invoice.id!,
-            amount: allocationAmount
+            amount: allocationAmount,
           });
           remainingAmount -= allocationAmount;
         }
@@ -91,35 +95,37 @@ export async function createPayment(
     // Validate all allocations
     const invoices = await persistenceService.getInvoices();
     let totalAllocated = 0;
-    
+
     for (const allocation of finalAllocations) {
       // Validate allocation amount is positive
       if (allocation.amount <= 0) {
         throw new Error(`Allocation amount must be greater than 0`);
       }
-      
+
       // Validate invoice exists
-      const invoice = invoices.find(inv => inv.id === allocation.invoice_id);
+      const invoice = invoices.find((inv) => inv.id === allocation.invoice_id);
       if (!invoice) {
         throw new Error(`Invoice ID ${allocation.invoice_id} not found`);
       }
-      
+
       // Validate invoice won't be overpaid
       const newPaidAmount = invoice.paid_amount + allocation.amount;
-      if (newPaidAmount > invoice.total_amount + 0.01) { // Allow 1 cent rounding tolerance
+      if (newPaidAmount > invoice.total_amount + 0.01) {
+        // Allow 1 cent rounding tolerance
         throw new Error(
           `Allocation of $${allocation.amount.toFixed(2)} would overpay invoice ${invoice.invoice_number}. ` +
-          `Outstanding: $${(invoice.total_amount - invoice.paid_amount).toFixed(2)}`
+            `Outstanding: $${(invoice.total_amount - invoice.paid_amount).toFixed(2)}`,
         );
       }
-      
+
       totalAllocated += allocation.amount;
     }
-    
+
     // Validate payment isn't over-allocated
-    if (totalAllocated > paymentData.amount + 0.01) { // Allow 1 cent rounding tolerance
+    if (totalAllocated > paymentData.amount + 0.01) {
+      // Allow 1 cent rounding tolerance
       throw new Error(
-        `Cannot allocate $${totalAllocated.toFixed(2)} when payment is only $${paymentData.amount.toFixed(2)}`
+        `Cannot allocate $${totalAllocated.toFixed(2)} when payment is only $${paymentData.amount.toFixed(2)}`,
       );
     }
 
@@ -174,7 +180,7 @@ export async function createPayment(
         description: `Payment applied to ${finalAllocations.length} invoice(s)`,
       });
     }
-    
+
     // If there's unallocated amount, record as customer deposit
     const unallocatedAmount = paymentData.amount - allocatedAmount;
     if (unallocatedAmount > 0.01) {
@@ -194,7 +200,7 @@ export async function createPayment(
         reference: paymentData.payment_number,
         status: 'posted',
       },
-      journalLines
+      journalLines,
     );
 
     return {
@@ -206,25 +212,27 @@ export async function createPayment(
     };
   } catch (error) {
     logger.error('Payment creation error:', error);
-    
+
     // Provide more detailed error information
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {
       errorMessage = error.message;
       logger.error('Error stack:', error.stack);
-      
+
       // Check for specific SQLite errors
       if (errorMessage.includes('1811')) {
-        errorMessage = 'Database integrity error (1811). This may be caused by database corruption or trigger issues. Please try again.';
+        errorMessage =
+          'Database integrity error (1811). This may be caused by database corruption or trigger issues. Please try again.';
       } else if (errorMessage.includes('FOREIGN KEY')) {
         errorMessage = 'Foreign key constraint error. Please ensure all referenced data exists.';
       } else if (errorMessage.includes('UNIQUE')) {
         errorMessage = 'This payment number already exists. Please use a different number.';
       } else if (errorMessage.includes('balanced')) {
-        errorMessage = 'Journal entry is not balanced. This is an internal error - please report it.';
+        errorMessage =
+          'Journal entry is not balanced. This is an internal error - please report it.';
       }
     }
-    
+
     return {
       ok: false,
       warnings: [

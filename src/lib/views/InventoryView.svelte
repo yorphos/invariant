@@ -1,322 +1,336 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { getDatabase } from '../services/database';
-  import { 
-    createItem, 
-    recordPurchase, 
-    recordSale, 
-    recordAdjustment,
-    getInventoryBalance 
-  } from '../domain/inventory-operations';
-  import type { Item, Account, PolicyMode, InventoryMovement } from '../domain/types';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import Button from '../ui/Button.svelte';
-  import Input from '../ui/Input.svelte';
-  import Select from '../ui/Select.svelte';
-  import Card from '../ui/Card.svelte';
-  import Table from '../ui/Table.svelte';
+import { onMount } from 'svelte';
+import { getDatabase } from '../services/database';
+import {
+  createItem,
+  recordPurchase,
+  recordSale,
+  recordAdjustment,
+  getInventoryBalance,
+} from '../domain/inventory-operations';
+import type { Item, Account, PolicyMode, InventoryMovement } from '../domain/types';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import Button from '../ui/Button.svelte';
+import Input from '../ui/Input.svelte';
+import Select from '../ui/Select.svelte';
+import Card from '../ui/Card.svelte';
+import Table from '../ui/Table.svelte';
 
-  export let mode: PolicyMode;
+export let mode: PolicyMode;
 
-  let items: Item[] = [];
-  let accounts: Account[] = [];
-  let loading = true;
-  let view: 'list' | 'create-item' | 'record-purchase' | 'record-sale' | 'record-adjustment' = 'list';
-  let selectedItem: Item | null = null;
-  let showDetailModal = false;
-  let movements: InventoryMovement[] = [];
-  
-  // Item form fields
-  let formSku = '';
-  let formName = '';
-  let formDescription = '';
-  let formType: 'product' | 'service' | 'bundle' = 'product';
-  let formUnitOfMeasure = 'ea';
-  let formDefaultPrice: number | '' = '';
-  let formCost: number | '' = '';
-  let formInventoryAccountId: number | '' = '';
-  let formRevenueAccountId: number | '' = '';
-  let formCogsAccountId: number | '' = '';
+let items: Item[] = [];
+let accounts: Account[] = [];
+let loading = true;
+let view: 'list' | 'create-item' | 'record-purchase' | 'record-sale' | 'record-adjustment' = 'list';
+let selectedItem: Item | null = null;
+let showDetailModal = false;
+let movements: InventoryMovement[] = [];
 
-  // Purchase form fields
-  let purchaseItemId: number | '' = '';
-  let purchaseQuantity: number | '' = '';
-  let purchaseUnitCost: number | '' = '';
-  let purchaseDate = '';
-  let purchaseReference = '';
-  let purchaseNotes = '';
-  let purchaseCashAccountId: number | '' = '';
+// Item form fields
+let formSku = '';
+let formName = '';
+let formDescription = '';
+let formType: 'product' | 'service' | 'bundle' = 'product';
+let formUnitOfMeasure = 'ea';
+let formDefaultPrice: number | '' = '';
+let formCost: number | '' = '';
+let formInventoryAccountId: number | '' = '';
+let formRevenueAccountId: number | '' = '';
+let formCogsAccountId: number | '' = '';
 
-  // Sale form fields
-  let saleItemId: number | '' = '';
-  let saleQuantity: number | '' = '';
-  let saleDate = '';
-  let saleReference = '';
-  let saleNotes = '';
+// Purchase form fields
+let purchaseItemId: number | '' = '';
+let purchaseQuantity: number | '' = '';
+let purchaseUnitCost: number | '' = '';
+let purchaseDate = '';
+let purchaseReference = '';
+let purchaseNotes = '';
+let purchaseCashAccountId: number | '' = '';
 
-  // Adjustment form fields
-  let adjustmentItemId: number | '' = '';
-  let adjustmentQuantity: number | '' = '';
-  let adjustmentUnitCost: number | '' = '';
-  let adjustmentDate = '';
-  let adjustmentReference = '';
-  let adjustmentNotes = '';
-  let adjustmentAccountId: number | '' = '';
+// Sale form fields
+let saleItemId: number | '' = '';
+let saleQuantity: number | '' = '';
+let saleDate = '';
+let saleReference = '';
+let saleNotes = '';
 
-  // Inventory balances cache
-  let itemBalances = new Map<number, { quantity: number; value: number }>();
+// Adjustment form fields
+let adjustmentItemId: number | '' = '';
+let adjustmentQuantity: number | '' = '';
+let adjustmentUnitCost: number | '' = '';
+let adjustmentDate = '';
+let adjustmentReference = '';
+let adjustmentNotes = '';
+let adjustmentAccountId: number | '' = '';
 
-  onMount(async () => {
-    await loadData();
-  });
+// Inventory balances cache
+let itemBalances = new Map<number, { quantity: number; value: number }>();
 
-  async function loadData() {
-    loading = true;
-    try {
-      const db = await getDatabase();
-      
-      // Load items
-      items = await db.select<Item[]>(
-        'SELECT * FROM item WHERE is_active = 1 ORDER BY sku'
-      );
+onMount(async () => {
+  await loadData();
+});
 
-      // Load accounts
-      accounts = await db.select<Account[]>(
-        'SELECT * FROM account WHERE is_active = 1 ORDER BY code'
-      );
+async function loadData() {
+  loading = true;
+  try {
+    const db = await getDatabase();
 
-      // Set default dates
-      purchaseDate = new Date().toISOString().split('T')[0];
-      saleDate = new Date().toISOString().split('T')[0];
-      adjustmentDate = new Date().toISOString().split('T')[0];
+    // Load items
+    items = await db.select<Item[]>('SELECT * FROM item WHERE is_active = 1 ORDER BY sku');
 
-      // Load balances for all items
-      await loadItemBalances();
+    // Load accounts
+    accounts = await db.select<Account[]>(
+      'SELECT * FROM account WHERE is_active = 1 ORDER BY code',
+    );
 
-    } catch (e) {
-      logger.error('Failed to load data:', e);
-      toasts.error(`Error loading data: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    loading = false;
+    // Set default dates
+    purchaseDate = new Date().toISOString().split('T')[0];
+    saleDate = new Date().toISOString().split('T')[0];
+    adjustmentDate = new Date().toISOString().split('T')[0];
+
+    // Load balances for all items
+    await loadItemBalances();
+  } catch (e) {
+    logger.error('Failed to load data:', e);
+    toasts.error(`Error loading data: ${e instanceof Error ? e.message : String(e)}`);
   }
+  loading = false;
+}
 
-  async function loadItemBalances() {
-    const today = new Date().toISOString().split('T')[0];
-    itemBalances = new Map();
-    
-    for (const item of items) {
-      if (!item.id) continue;
-      try {
-        const balance = await getInventoryBalance(item.id, today);
-        itemBalances.set(item.id, {
-          quantity: balance.quantity_on_hand,
-          value: balance.total_cost
-        });
-      } catch (e) {
-        logger.error(`Failed to load balance for item ${item.id}:`, e);
-      }
-    }
-    
-    // Trigger reactivity
-    itemBalances = itemBalances;
-  }
+async function loadItemBalances() {
+  const today = new Date().toISOString().split('T')[0];
+  itemBalances = new Map();
 
-  async function handleCreateItem() {
+  for (const item of items) {
+    if (!item.id) continue;
     try {
-      if (!formSku || !formName) {
-        toasts.warning('SKU and Name are required');
-        return;
-      }
-
-      await createItem({
-        sku: formSku,
-        name: formName,
-        description: formDescription || undefined,
-        type: formType,
-        unit_of_measure: formUnitOfMeasure || undefined,
-        default_price: typeof formDefaultPrice === 'number' ? formDefaultPrice : undefined,
-        cost: typeof formCost === 'number' ? formCost : undefined,
-        inventory_account_id: typeof formInventoryAccountId === 'number' ? formInventoryAccountId : undefined,
-        revenue_account_id: typeof formRevenueAccountId === 'number' ? formRevenueAccountId : undefined,
-        cogs_account_id: typeof formCogsAccountId === 'number' ? formCogsAccountId : undefined
+      const balance = await getInventoryBalance(item.id, today);
+      itemBalances.set(item.id, {
+        quantity: balance.quantity_on_hand,
+        value: balance.total_cost,
       });
-
-      toasts.success('Item created successfully');
-      
-      // Reset form
-      formSku = '';
-      formName = '';
-      formDescription = '';
-      formType = 'product';
-      formUnitOfMeasure = 'ea';
-      formDefaultPrice = '';
-      formCost = '';
-      formInventoryAccountId = '';
-      formRevenueAccountId = '';
-      formCogsAccountId = '';
-
-      view = 'list';
-      await loadData();
-
     } catch (e) {
-      logger.error('Failed to create item:', e);
-      toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      logger.error(`Failed to load balance for item ${item.id}:`, e);
     }
   }
 
-  async function handleRecordPurchase() {
-    try {
-      if (typeof purchaseItemId !== 'number' || typeof purchaseQuantity !== 'number' || 
-          typeof purchaseUnitCost !== 'number' || typeof purchaseCashAccountId !== 'number') {
-        toasts.warning('Please fill in all required fields');
-        return;
-      }
+  // Trigger reactivity
+  itemBalances = itemBalances;
+}
 
-      const result = await recordPurchase({
+async function handleCreateItem() {
+  try {
+    if (!formSku || !formName) {
+      toasts.warning('SKU and Name are required');
+      return;
+    }
+
+    await createItem({
+      sku: formSku,
+      name: formName,
+      description: formDescription || undefined,
+      type: formType,
+      unit_of_measure: formUnitOfMeasure || undefined,
+      default_price: typeof formDefaultPrice === 'number' ? formDefaultPrice : undefined,
+      cost: typeof formCost === 'number' ? formCost : undefined,
+      inventory_account_id:
+        typeof formInventoryAccountId === 'number' ? formInventoryAccountId : undefined,
+      revenue_account_id:
+        typeof formRevenueAccountId === 'number' ? formRevenueAccountId : undefined,
+      cogs_account_id: typeof formCogsAccountId === 'number' ? formCogsAccountId : undefined,
+    });
+
+    toasts.success('Item created successfully');
+
+    // Reset form
+    formSku = '';
+    formName = '';
+    formDescription = '';
+    formType = 'product';
+    formUnitOfMeasure = 'ea';
+    formDefaultPrice = '';
+    formCost = '';
+    formInventoryAccountId = '';
+    formRevenueAccountId = '';
+    formCogsAccountId = '';
+
+    view = 'list';
+    await loadData();
+  } catch (e) {
+    logger.error('Failed to create item:', e);
+    toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+async function handleRecordPurchase() {
+  try {
+    if (
+      typeof purchaseItemId !== 'number' ||
+      typeof purchaseQuantity !== 'number' ||
+      typeof purchaseUnitCost !== 'number' ||
+      typeof purchaseCashAccountId !== 'number'
+    ) {
+      toasts.warning('Please fill in all required fields');
+      return;
+    }
+
+    const result = await recordPurchase(
+      {
         item_id: purchaseItemId,
         quantity: purchaseQuantity,
         unit_cost: purchaseUnitCost,
         purchase_date: purchaseDate,
         reference: purchaseReference || undefined,
         notes: purchaseNotes || undefined,
-        cash_account_id: purchaseCashAccountId
-      }, { mode });
+        cash_account_id: purchaseCashAccountId,
+      },
+      { mode },
+    );
 
-      if (result.ok) {
-        toasts.success(`Purchase recorded successfully. Journal Entry #${result.journal_entry_id}`);
-        
-        // Reset form
-        purchaseItemId = '';
-        purchaseQuantity = '';
-        purchaseUnitCost = '';
-        purchaseReference = '';
-        purchaseNotes = '';
-        purchaseDate = new Date().toISOString().split('T')[0];
+    if (result.ok) {
+      toasts.success(`Purchase recorded successfully. Journal Entry #${result.journal_entry_id}`);
 
-        view = 'list';
-        await loadData();
-      }
+      // Reset form
+      purchaseItemId = '';
+      purchaseQuantity = '';
+      purchaseUnitCost = '';
+      purchaseReference = '';
+      purchaseNotes = '';
+      purchaseDate = new Date().toISOString().split('T')[0];
 
-    } catch (e) {
-      logger.error('Failed to record purchase:', e);
-      toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      view = 'list';
+      await loadData();
     }
+  } catch (e) {
+    logger.error('Failed to record purchase:', e);
+    toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
 
-  async function handleRecordSale() {
-    try {
-      if (typeof saleItemId !== 'number' || typeof saleQuantity !== 'number') {
-        toasts.warning('Please fill in all required fields');
-        return;
-      }
+async function handleRecordSale() {
+  try {
+    if (typeof saleItemId !== 'number' || typeof saleQuantity !== 'number') {
+      toasts.warning('Please fill in all required fields');
+      return;
+    }
 
-      const result = await recordSale({
+    const result = await recordSale(
+      {
         item_id: saleItemId,
         quantity: saleQuantity,
         sale_date: saleDate,
         reference: saleReference || undefined,
-        notes: saleNotes || undefined
-      }, { mode });
+        notes: saleNotes || undefined,
+      },
+      { mode },
+    );
 
-      if (result.ok) {
-        const warningMsg = result.warnings.length > 0 
-          ? '\n\nWarnings:\n' + result.warnings.map(w => `- ${w.message}`).join('\n')
+    if (result.ok) {
+      const warningMsg =
+        result.warnings.length > 0
+          ? '\n\nWarnings:\n' + result.warnings.map((w) => `- ${w.message}`).join('\n')
           : '';
-        toasts.success(`Sale recorded successfully. COGS: $${result.cogs_amount?.toFixed(2)} Journal Entry #${result.journal_entry_id}${warningMsg}`);
-        
-        // Reset form
-        saleItemId = '';
-        saleQuantity = '';
-        saleReference = '';
-        saleNotes = '';
-        saleDate = new Date().toISOString().split('T')[0];
+      toasts.success(
+        `Sale recorded successfully. COGS: $${result.cogs_amount?.toFixed(2)} Journal Entry #${result.journal_entry_id}${warningMsg}`,
+      );
 
-        view = 'list';
-        await loadData();
-      }
+      // Reset form
+      saleItemId = '';
+      saleQuantity = '';
+      saleReference = '';
+      saleNotes = '';
+      saleDate = new Date().toISOString().split('T')[0];
 
-    } catch (e) {
-      logger.error('Failed to record sale:', e);
-      toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      view = 'list';
+      await loadData();
     }
+  } catch (e) {
+    logger.error('Failed to record sale:', e);
+    toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
 
-  async function handleRecordAdjustment() {
-    try {
-      if (typeof adjustmentItemId !== 'number' || typeof adjustmentQuantity !== 'number' ||
-          typeof adjustmentAccountId !== 'number') {
-        toasts.warning('Please fill in all required fields');
-        return;
-      }
+async function handleRecordAdjustment() {
+  try {
+    if (
+      typeof adjustmentItemId !== 'number' ||
+      typeof adjustmentQuantity !== 'number' ||
+      typeof adjustmentAccountId !== 'number'
+    ) {
+      toasts.warning('Please fill in all required fields');
+      return;
+    }
 
-      const result = await recordAdjustment({
+    const result = await recordAdjustment(
+      {
         item_id: adjustmentItemId,
         quantity: adjustmentQuantity,
         adjustment_date: adjustmentDate,
         unit_cost: typeof adjustmentUnitCost === 'number' ? adjustmentUnitCost : undefined,
         reference: adjustmentReference || undefined,
         notes: adjustmentNotes || undefined,
-        adjustment_account_id: adjustmentAccountId
-      }, { mode });
+        adjustment_account_id: adjustmentAccountId,
+      },
+      { mode },
+    );
 
-      if (result.ok) {
-        toasts.success(`Adjustment recorded successfully. Journal Entry #${result.journal_entry_id}`);
-        
-        // Reset form
-        adjustmentItemId = '';
-        adjustmentQuantity = '';
-        adjustmentUnitCost = '';
-        adjustmentReference = '';
-        adjustmentNotes = '';
-        adjustmentDate = new Date().toISOString().split('T')[0];
+    if (result.ok) {
+      toasts.success(`Adjustment recorded successfully. Journal Entry #${result.journal_entry_id}`);
 
-        view = 'list';
-        await loadData();
-      }
+      // Reset form
+      adjustmentItemId = '';
+      adjustmentQuantity = '';
+      adjustmentUnitCost = '';
+      adjustmentReference = '';
+      adjustmentNotes = '';
+      adjustmentDate = new Date().toISOString().split('T')[0];
 
-    } catch (e) {
-      logger.error('Failed to record adjustment:', e);
-      toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      view = 'list';
+      await loadData();
     }
+  } catch (e) {
+    logger.error('Failed to record adjustment:', e);
+    toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
 
-  async function viewItemDetail(item: Item) {
-    selectedItem = item;
-    showDetailModal = true;
+async function viewItemDetail(item: Item) {
+  selectedItem = item;
+  showDetailModal = true;
 
-    // Load movements for this item
-    try {
-      const db = await getDatabase();
-      movements = await db.select<InventoryMovement[]>(
-        `SELECT * FROM inventory_movement 
+  // Load movements for this item
+  try {
+    const db = await getDatabase();
+    movements = await db.select<InventoryMovement[]>(
+      `SELECT * FROM inventory_movement 
          WHERE item_id = ? 
          ORDER BY movement_date DESC, id DESC 
          LIMIT 100`,
-        [item.id]
-      );
-    } catch (e) {
-      logger.error('Failed to load movements:', e);
-      toasts.error('Failed to load item movements');
-    }
+      [item.id],
+    );
+  } catch (e) {
+    logger.error('Failed to load movements:', e);
+    toasts.error('Failed to load item movements');
   }
+}
 
-  function closeDetailModal() {
-    showDetailModal = false;
-    selectedItem = null;
-    movements = [];
-  }
+function closeDetailModal() {
+  showDetailModal = false;
+  selectedItem = null;
+  movements = [];
+}
 
-  function getAccountName(accountId: number | null | undefined): string {
-    if (!accountId) return 'N/A';
-    const account = accounts.find(a => a.id === accountId);
-    return account ? `${account.code} - ${account.name}` : `Account #${accountId}`;
-  }
+function getAccountName(accountId: number | null | undefined): string {
+  if (!accountId) return 'N/A';
+  const account = accounts.find((a) => a.id === accountId);
+  return account ? `${account.code} - ${account.name}` : `Account #${accountId}`;
+}
 
-  function getItemBalance(itemId: number | undefined): { quantity: number; value: number } {
-    if (!itemId) return { quantity: 0, value: 0 };
-    return itemBalances.get(itemId) || { quantity: 0, value: 0 };
-  }
+function getItemBalance(itemId: number | undefined): { quantity: number; value: number } {
+  if (!itemId) return { quantity: 0, value: 0 };
+  return itemBalances.get(itemId) || { quantity: 0, value: 0 };
+}
 </script>
 
 <div class="inventory-view">

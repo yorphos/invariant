@@ -1,9 +1,4 @@
-import type {
-  Payment,
-  Invoice,
-  Allocation,
-  AllocationMethod
-} from './types';
+import type { Payment, Invoice, Allocation, AllocationMethod } from './types';
 
 export interface AllocationCandidate {
   invoice: Invoice;
@@ -32,21 +27,16 @@ export class ARMatchingEngine {
   /**
    * Match a payment to invoices using multiple strategies
    */
-  async matchPayment(
-    payment: Payment,
-    openInvoices: Invoice[]
-  ): Promise<AllocationSuggestion> {
+  async matchPayment(payment: Payment, openInvoices: Invoice[]): Promise<AllocationSuggestion> {
     // Filter to customer's invoices if we know the customer
     let candidates = openInvoices;
     if (payment.contact_id) {
-      candidates = candidates.filter(inv => inv.contact_id === payment.contact_id);
+      candidates = candidates.filter((inv) => inv.contact_id === payment.contact_id);
     }
 
     // Filter to unpaid/partially paid invoices
-    candidates = candidates.filter(inv => 
-      inv.status !== 'paid' && 
-      inv.status !== 'void' &&
-      inv.paid_amount < inv.total_amount
+    candidates = candidates.filter(
+      (inv) => inv.status !== 'paid' && inv.status !== 'void' && inv.paid_amount < inv.total_amount,
     );
 
     // Try deterministic matching first
@@ -68,10 +58,7 @@ export class ARMatchingEngine {
   /**
    * Find exact match by reference or invoice number
    */
-  private findExactMatch(
-    payment: Payment,
-    candidates: Invoice[]
-  ): Invoice | null {
+  private findExactMatch(payment: Payment, candidates: Invoice[]): Invoice | null {
     if (!payment.reference) {
       return null;
     }
@@ -95,7 +82,7 @@ export class ARMatchingEngine {
   private findAmountMatch(
     payment: Payment,
     candidates: Invoice[],
-    tolerance: number = 0.02 // 2% tolerance
+    tolerance: number = 0.02, // 2% tolerance
   ): Invoice[] {
     const matches: Invoice[] = [];
     const remaining = payment.amount - payment.allocated_amount;
@@ -137,13 +124,10 @@ export class ARMatchingEngine {
   /**
    * Allocate payment using FIFO (oldest invoice first)
    */
-  private allocateFIFO(
-    payment: Payment,
-    candidates: Invoice[]
-  ): AllocationSuggestion {
+  private allocateFIFO(payment: Payment, candidates: Invoice[]): AllocationSuggestion {
     // Sort by issue date (oldest first)
-    const sorted = [...candidates].sort((a, b) => 
-      new Date(a.issue_date).getTime() - new Date(b.issue_date).getTime()
+    const sorted = [...candidates].sort(
+      (a, b) => new Date(a.issue_date).getTime() - new Date(b.issue_date).getTime(),
     );
 
     const allocations: AllocationSuggestion['allocations'] = [];
@@ -160,7 +144,7 @@ export class ARMatchingEngine {
         amount: allocateAmount,
         method: 'fifo',
         confidence: 0.7,
-        explanation: `FIFO allocation to oldest invoice (${invoice.issue_date})`
+        explanation: `FIFO allocation to oldest invoice (${invoice.issue_date})`,
       });
 
       remaining -= allocateAmount;
@@ -169,20 +153,17 @@ export class ARMatchingEngine {
     return {
       payment,
       allocations,
-      remainingAmount: remaining
+      remainingAmount: remaining,
     };
   }
 
   /**
    * Allocate payment using newest-first strategy
    */
-  allocateNewestFirst(
-    payment: Payment,
-    candidates: Invoice[]
-  ): AllocationSuggestion {
+  allocateNewestFirst(payment: Payment, candidates: Invoice[]): AllocationSuggestion {
     // Sort by issue date (newest first)
-    const sorted = [...candidates].sort((a, b) => 
-      new Date(b.issue_date).getTime() - new Date(a.issue_date).getTime()
+    const sorted = [...candidates].sort(
+      (a, b) => new Date(b.issue_date).getTime() - new Date(a.issue_date).getTime(),
     );
 
     const allocations: AllocationSuggestion['allocations'] = [];
@@ -199,7 +180,7 @@ export class ARMatchingEngine {
         amount: allocateAmount,
         method: 'fifo',
         confidence: 0.7,
-        explanation: `Newest-first allocation (${invoice.issue_date})`
+        explanation: `Newest-first allocation (${invoice.issue_date})`,
       });
 
       remaining -= allocateAmount;
@@ -208,7 +189,7 @@ export class ARMatchingEngine {
     return {
       payment,
       allocations,
-      remainingAmount: remaining
+      remainingAmount: remaining,
     };
   }
 
@@ -218,7 +199,7 @@ export class ARMatchingEngine {
   private createAllocation(
     payment: Payment,
     invoices: Invoice[],
-    method: AllocationMethod
+    method: AllocationMethod,
   ): AllocationSuggestion {
     const allocations: AllocationSuggestion['allocations'] = [];
     let remaining = payment.amount - payment.allocated_amount;
@@ -228,16 +209,17 @@ export class ARMatchingEngine {
       const allocateAmount = Math.min(remaining, outstanding);
 
       const confidence = method === 'exact' ? 0.99 : 0.85;
-      const explanation = method === 'exact'
-        ? `Exact match by reference: ${payment.reference}`
-        : `Amount match within tolerance`;
+      const explanation =
+        method === 'exact'
+          ? `Exact match by reference: ${payment.reference}`
+          : `Amount match within tolerance`;
 
       allocations.push({
         invoice,
         amount: allocateAmount,
         method,
         confidence,
-        explanation
+        explanation,
       });
 
       remaining -= allocateAmount;
@@ -247,7 +229,7 @@ export class ARMatchingEngine {
     return {
       payment,
       allocations,
-      remainingAmount: remaining
+      remainingAmount: remaining,
     };
   }
 }

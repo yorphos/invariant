@@ -1,9 +1,9 @@
 /**
  * Reports Service
- * 
+ *
  * Optimized report generation using database-level aggregation (GROUP BY)
  * instead of application-level loops (N+1 query pattern).
- * 
+ *
  * Performance improvement: 10x faster for large datasets by reducing
  * number of database queries from O(n) to O(1) per report.
  */
@@ -51,16 +51,18 @@ export interface TrialBalanceData {
  */
 export async function getBalanceSheetData(asOfDate: string): Promise<BalanceSheetData> {
   const db = await getDatabase();
-  
+
   // Single query with GROUP BY to get all account balances at once
-  const results = await db.select<Array<{
-    id: number;
-    code: string;
-    name: string;
-    type: string;
-    debit_total: number;
-    credit_total: number;
-  }>>(
+  const results = await db.select<
+    Array<{
+      id: number;
+      code: string;
+      name: string;
+      type: string;
+      debit_total: number;
+      credit_total: number;
+    }>
+  >(
     `SELECT 
       a.id,
       a.code,
@@ -76,11 +78,11 @@ export async function getBalanceSheetData(asOfDate: string): Promise<BalanceShee
       AND (je.id IS NULL OR (je.status = 'posted' AND DATE(je.entry_date) <= ?))
     GROUP BY a.id, a.code, a.name, a.type
     ORDER BY a.code`,
-    [asOfDate]
+    [asOfDate],
   );
-  
+
   // Transform results into AccountBalance objects
-  const accountBalances: AccountBalance[] = results.map(row => {
+  const accountBalances: AccountBalance[] = results.map((row) => {
     // Calculate balance based on account type
     let balance: number;
     if (row.type === 'asset') {
@@ -89,7 +91,7 @@ export async function getBalanceSheetData(asOfDate: string): Promise<BalanceShee
       // Liability and equity: credit increases balance
       balance = row.credit_total - row.debit_total;
     }
-    
+
     return {
       account_id: row.id,
       account_code: row.code,
@@ -100,20 +102,20 @@ export async function getBalanceSheetData(asOfDate: string): Promise<BalanceShee
       balance,
     };
   });
-  
+
   // Filter out accounts with near-zero balances (1 cent tolerance)
-  const filtered = accountBalances.filter(b => Math.abs(b.balance) > 0.01);
-  
+  const filtered = accountBalances.filter((b) => Math.abs(b.balance) > 0.01);
+
   // Separate by account type
-  const assets = filtered.filter(b => b.account_type === 'asset');
-  const liabilities = filtered.filter(b => b.account_type === 'liability');
-  const equity = filtered.filter(b => b.account_type === 'equity');
-  
+  const assets = filtered.filter((b) => b.account_type === 'asset');
+  const liabilities = filtered.filter((b) => b.account_type === 'liability');
+  const equity = filtered.filter((b) => b.account_type === 'equity');
+
   // Calculate totals
   const totalAssets = assets.reduce((sum, b) => sum + b.balance, 0);
   const totalLiabilities = liabilities.reduce((sum, b) => sum + b.balance, 0);
   const totalEquity = equity.reduce((sum, b) => sum + b.balance, 0);
-  
+
   return {
     assets,
     liabilities,
@@ -132,19 +134,21 @@ export async function getBalanceSheetData(asOfDate: string): Promise<BalanceShee
  */
 export async function getProfitAndLossData(
   startDate: string,
-  endDate: string
+  endDate: string,
 ): Promise<ProfitAndLossData> {
   const db = await getDatabase();
-  
+
   // Single query with GROUP BY and date range filter
-  const results = await db.select<Array<{
-    id: number;
-    code: string;
-    name: string;
-    type: string;
-    debit_total: number;
-    credit_total: number;
-  }>>(
+  const results = await db.select<
+    Array<{
+      id: number;
+      code: string;
+      name: string;
+      type: string;
+      debit_total: number;
+      credit_total: number;
+    }>
+  >(
     `SELECT 
       a.id,
       a.code,
@@ -164,11 +168,11 @@ export async function getProfitAndLossData(
       ))
     GROUP BY a.id, a.code, a.name, a.type
     ORDER BY a.code`,
-    [startDate, endDate]
+    [startDate, endDate],
   );
-  
+
   // Transform results into AccountBalance objects
-  const accountBalances: AccountBalance[] = results.map(row => {
+  const accountBalances: AccountBalance[] = results.map((row) => {
     // Calculate balance based on account type
     let balance: number;
     if (row.type === 'expense') {
@@ -177,7 +181,7 @@ export async function getProfitAndLossData(
       // Revenue: credit increases balance
       balance = row.credit_total - row.debit_total;
     }
-    
+
     return {
       account_id: row.id,
       account_code: row.code,
@@ -188,19 +192,19 @@ export async function getProfitAndLossData(
       balance,
     };
   });
-  
+
   // Filter out accounts with near-zero balances (1 cent tolerance)
-  const filtered = accountBalances.filter(b => Math.abs(b.balance) > 0.01);
-  
+  const filtered = accountBalances.filter((b) => Math.abs(b.balance) > 0.01);
+
   // Separate by account type
-  const revenue = filtered.filter(b => b.account_type === 'revenue');
-  const expenses = filtered.filter(b => b.account_type === 'expense');
-  
+  const revenue = filtered.filter((b) => b.account_type === 'revenue');
+  const expenses = filtered.filter((b) => b.account_type === 'expense');
+
   // Calculate totals
   const totalRevenue = revenue.reduce((sum, b) => sum + b.balance, 0);
   const totalExpenses = expenses.reduce((sum, b) => sum + b.balance, 0);
   const netIncome = totalRevenue - totalExpenses;
-  
+
   return {
     revenue,
     expenses,
@@ -217,16 +221,18 @@ export async function getProfitAndLossData(
  */
 export async function getTrialBalanceData(asOfDate: string): Promise<TrialBalanceData> {
   const db = await getDatabase();
-  
+
   // Single query with GROUP BY to get all account balances at once
-  const results = await db.select<Array<{
-    id: number;
-    code: string;
-    name: string;
-    type: string;
-    debit_total: number;
-    credit_total: number;
-  }>>(
+  const results = await db.select<
+    Array<{
+      id: number;
+      code: string;
+      name: string;
+      type: string;
+      debit_total: number;
+      credit_total: number;
+    }>
+  >(
     `SELECT 
       a.id,
       a.code,
@@ -241,11 +247,11 @@ export async function getTrialBalanceData(asOfDate: string): Promise<TrialBalanc
       AND (je.id IS NULL OR (je.status = 'posted' AND DATE(je.entry_date) <= ?))
     GROUP BY a.id, a.code, a.name, a.type
     ORDER BY a.code`,
-    [asOfDate]
+    [asOfDate],
   );
-  
+
   // Transform results into AccountBalance objects
-  const accountBalances: AccountBalance[] = results.map(row => {
+  const accountBalances: AccountBalance[] = results.map((row) => {
     // Calculate balance based on account type
     let balance: number;
     if (row.type === 'asset' || row.type === 'expense') {
@@ -254,7 +260,7 @@ export async function getTrialBalanceData(asOfDate: string): Promise<TrialBalanc
       // Liability, equity, revenue: credit increases balance
       balance = row.credit_total - row.debit_total;
     }
-    
+
     return {
       account_id: row.id,
       account_code: row.code,
@@ -265,19 +271,19 @@ export async function getTrialBalanceData(asOfDate: string): Promise<TrialBalanc
       balance,
     };
   });
-  
+
   // Filter out accounts with near-zero balances (1 cent tolerance)
-  const filtered = accountBalances.filter(b => Math.abs(b.balance) > 0.01);
-  
+  const filtered = accountBalances.filter((b) => Math.abs(b.balance) > 0.01);
+
   // Calculate totals for trial balance (sum of debits and credits)
   const totalDebits = filtered.reduce((sum, b) => {
     return sum + (b.debit_total > b.credit_total ? b.balance : 0);
   }, 0);
-  
+
   const totalCredits = filtered.reduce((sum, b) => {
     return sum + (b.credit_total > b.debit_total ? b.balance : 0);
   }, 0);
-  
+
   return {
     accounts: filtered,
     totalDebits,
@@ -305,20 +311,22 @@ export interface InventoryValuationData {
 /**
  * Get Inventory Valuation data using optimized grouped queries
  * Reduces from 2N queries to 2 queries total (where N = number of items)
- * 
+ *
  * @param asOfDate Date to calculate inventory as of (YYYY-MM-DD)
  * @returns Inventory valuation data with items and total value
  */
 export async function getInventoryValuationData(asOfDate: string): Promise<InventoryValuationData> {
   const db = await getDatabase();
-  
+
   // Query 1: Get all items with their net quantity on hand (single grouped query)
-  const quantityByItem = await db.select<Array<{
-    item_id: number;
-    sku: string;
-    name: string;
-    qty_on_hand: number;
-  }>>(
+  const quantityByItem = await db.select<
+    Array<{
+      item_id: number;
+      sku: string;
+      name: string;
+      qty_on_hand: number;
+    }>
+  >(
     `SELECT 
       i.id as item_id,
       i.sku,
@@ -331,20 +339,22 @@ export async function getInventoryValuationData(asOfDate: string): Promise<Inven
     GROUP BY i.id, i.sku, i.name
     HAVING qty_on_hand > 0
     ORDER BY i.sku`,
-    [asOfDate]
+    [asOfDate],
   );
-  
+
   // If no items with inventory, return early
   if (quantityByItem.length === 0) {
     return { items: [], totalValue: 0 };
   }
-  
+
   // Query 2: Get all purchase movements for cost calculation (single query)
-  const purchases = await db.select<Array<{
-    item_id: number;
-    quantity: number;
-    unit_cost: number;
-  }>>(
+  const purchases = await db.select<
+    Array<{
+      item_id: number;
+      quantity: number;
+      unit_cost: number;
+    }>
+  >(
     `SELECT 
       item_id,
       quantity,
@@ -354,9 +364,9 @@ export async function getInventoryValuationData(asOfDate: string): Promise<Inven
       AND quantity > 0
       AND DATE(movement_date) <= ?
     ORDER BY item_id, movement_date ASC`,
-    [asOfDate]
+    [asOfDate],
   );
-  
+
   // Build a map of item_id -> purchases for efficient lookup
   const purchasesByItem = new Map<number, Array<{ quantity: number; unit_cost: number }>>();
   for (const p of purchases) {
@@ -365,13 +375,13 @@ export async function getInventoryValuationData(asOfDate: string): Promise<Inven
     }
     purchasesByItem.get(p.item_id)!.push({ quantity: p.quantity, unit_cost: p.unit_cost });
   }
-  
+
   // Calculate average cost for each item
   const items: InventoryValuationLine[] = [];
-  
+
   for (const item of quantityByItem) {
     const itemPurchases = purchasesByItem.get(item.item_id) || [];
-    
+
     // Calculate weighted average cost
     let totalCost = 0;
     let totalQty = 0;
@@ -379,10 +389,10 @@ export async function getInventoryValuationData(asOfDate: string): Promise<Inven
       totalCost += p.quantity * p.unit_cost;
       totalQty += p.quantity;
     }
-    
+
     const avgCost = totalQty > 0 ? totalCost / totalQty : 0;
     const totalValue = item.qty_on_hand * avgCost;
-    
+
     items.push({
       item_id: item.item_id,
       sku: item.sku,
@@ -392,13 +402,13 @@ export async function getInventoryValuationData(asOfDate: string): Promise<Inven
       total_value: totalValue,
     });
   }
-  
+
   // Sort by total value descending
   items.sort((a, b) => b.total_value - a.total_value);
-  
+
   // Calculate total inventory value
   const totalValue = items.reduce((sum, item) => sum + item.total_value, 0);
-  
+
   return { items, totalValue };
 }
 
@@ -431,18 +441,15 @@ export interface CashFlowData {
 
 /**
  * Get Cash Flow Statement data
- * 
+ *
  * Uses P&L data for operating activities, balance sheet changes for
  * investing/financing activities, and cash account balances.
- * 
+ *
  * @param startDate Period start date (YYYY-MM-DD)
  * @param endDate Period end date (YYYY-MM-DD)
  * @returns Cash flow statement data
  */
-export async function getCashFlowData(
-  startDate: string,
-  endDate: string
-): Promise<CashFlowData> {
+export async function getCashFlowData(startDate: string, endDate: string): Promise<CashFlowData> {
   const db = await getDatabase();
 
   // 1. Get beginning cash balance (before startDate)
@@ -458,7 +465,7 @@ export async function getCashFlowData(
     LEFT JOIN journal_entry je ON je.id = jl.journal_entry_id
     WHERE a.is_active = 1 AND a.type = 'asset'
       AND (je.id IS NULL OR (je.status = 'posted' AND DATE(je.entry_date) < ?))`,
-    [startDate]
+    [startDate],
   );
   const startCashBalance = startCashResult[0]?.balance || 0;
 
@@ -475,19 +482,21 @@ export async function getCashFlowData(
     LEFT JOIN journal_entry je ON je.id = jl.journal_entry_id
     WHERE a.is_active = 1 AND a.type = 'asset'
       AND (je.id IS NULL OR (je.status = 'posted' AND DATE(je.entry_date) <= ?))`,
-    [endDate]
+    [endDate],
   );
   const endCashBalance = endCashResult[0]?.balance || 0;
 
   // 3. Get operating activities (revenue/expense accounts in period)
-  const operatingResults = await db.select<Array<{
-    id: number;
-    code: string;
-    name: string;
-    type: string;
-    debit_total: number;
-    credit_total: number;
-  }>>(
+  const operatingResults = await db.select<
+    Array<{
+      id: number;
+      code: string;
+      name: string;
+      type: string;
+      debit_total: number;
+      credit_total: number;
+    }>
+  >(
     `SELECT 
       a.id,
       a.code,
@@ -507,7 +516,7 @@ export async function getCashFlowData(
       ))
     GROUP BY a.id, a.code, a.name, a.type
     ORDER BY a.code`,
-    [startDate, endDate]
+    [startDate, endDate],
   );
 
   // Build operating activity lines
@@ -516,12 +525,12 @@ export async function getCashFlowData(
 
   // Revenue (cash inflow from operations)
   const revenueAccounts = operatingResults
-    .filter(r => r.type === 'revenue')
-    .map(r => {
+    .filter((r) => r.type === 'revenue')
+    .map((r) => {
       const amount = r.credit_total - r.debit_total; // credit-normal
       return { label: `${r.code} - ${r.name}`, amount, code: r.code };
     })
-    .filter(r => Math.abs(r.amount) > 0.01);
+    .filter((r) => Math.abs(r.amount) > 0.01);
 
   if (revenueAccounts.length > 0) {
     const totalRevenue = revenueAccounts.reduce((s, r) => s + r.amount, 0);
@@ -529,19 +538,19 @@ export async function getCashFlowData(
       category: 'operating',
       label: 'Revenue',
       amount: totalRevenue,
-      account_codes: revenueAccounts.map(r => r.code).join(', ')
+      account_codes: revenueAccounts.map((r) => r.code).join(', '),
     });
     totalOperating += totalRevenue;
   }
 
   // Expenses (cash outflow from operations)
   const expenseAccounts = operatingResults
-    .filter(r => r.type === 'expense')
-    .map(r => {
+    .filter((r) => r.type === 'expense')
+    .map((r) => {
       const amount = r.debit_total - r.credit_total; // debit-normal
       return { label: `${r.code} - ${r.name}`, amount, code: r.code };
     })
-    .filter(r => Math.abs(r.amount) > 0.01);
+    .filter((r) => Math.abs(r.amount) > 0.01);
 
   if (expenseAccounts.length > 0) {
     const totalExpenses = expenseAccounts.reduce((s, r) => s + r.amount, 0);
@@ -549,19 +558,21 @@ export async function getCashFlowData(
       category: 'operating',
       label: 'Operating Expenses',
       amount: -totalExpenses,
-      account_codes: expenseAccounts.map(r => r.code).join(', ')
+      account_codes: expenseAccounts.map((r) => r.code).join(', '),
     });
     totalOperating -= totalExpenses;
   }
 
   // 4. Get changes in working capital (A/R, A/P current asset/liability changes)
-  const workingCapitalResults = await db.select<Array<{
-    code: string;
-    name: string;
-    type: string;
-    start_balance: number;
-    end_balance: number;
-  }>>(
+  const workingCapitalResults = await db.select<
+    Array<{
+      code: string;
+      name: string;
+      type: string;
+      start_balance: number;
+      end_balance: number;
+    }>
+  >(
     `SELECT 
       a.code,
       a.name,
@@ -586,9 +597,8 @@ export async function getCashFlowData(
       )
       AND NOT (a.code LIKE '1%' AND (a.name LIKE '%cash%' OR a.name LIKE '%bank%' OR a.name LIKE '%checking%'))
     GROUP BY a.id, a.code, a.name, a.type
-    ORDER BY a.code`
-    ,
-    [startDate, endDate, endDate]
+    ORDER BY a.code`,
+    [startDate, endDate, endDate],
   );
 
   // Separate into A/R (asset) and A/P (liability) changes
@@ -623,7 +633,7 @@ export async function getCashFlowData(
       category: 'operating',
       label: 'Changes in Accounts Receivable',
       amount: -arChange, // Increase in A/R = cash outflow
-      account_codes: '11xx-12xx'
+      account_codes: '11xx-12xx',
     });
     totalOperating -= arChange;
   }
@@ -633,7 +643,7 @@ export async function getCashFlowData(
       category: 'operating',
       label: 'Changes in Accounts Payable',
       amount: apChange, // Increase in A/P = cash inflow
-      account_codes: '21xx-22xx'
+      account_codes: '21xx-22xx',
     });
     totalOperating += apChange;
   }
@@ -643,7 +653,7 @@ export async function getCashFlowData(
       category: 'operating',
       label: 'Changes in Other Current Assets',
       amount: -otherWcAssetChange,
-      account_codes: '13xx'
+      account_codes: '13xx',
     });
     totalOperating -= otherWcAssetChange;
   }
@@ -653,18 +663,20 @@ export async function getCashFlowData(
       category: 'operating',
       label: 'Changes in Other Current Liabilities',
       amount: otherWcLiabilityChange,
-      account_codes: '22xx'
+      account_codes: '22xx',
     });
     totalOperating += otherWcLiabilityChange;
   }
 
   // 5. Get investing activities (non-cash asset changes - property, equipment, etc.)
-  const investingResults = await db.select<Array<{
-    code: string;
-    name: string;
-    start_balance: number;
-    end_balance: number;
-  }>>(
+  const investingResults = await db.select<
+    Array<{
+      code: string;
+      name: string;
+      start_balance: number;
+      end_balance: number;
+    }>
+  >(
     `SELECT 
       a.code,
       a.name,
@@ -683,7 +695,7 @@ export async function getCashFlowData(
       AND NOT (a.name LIKE '%depreciation%' OR a.name LIKE '%amortization%')
     GROUP BY a.id, a.code, a.name
     ORDER BY a.code`,
-    [startDate, endDate, endDate]
+    [startDate, endDate, endDate],
   );
 
   const investingActivities: CashFlowLine[] = [];
@@ -696,20 +708,22 @@ export async function getCashFlowData(
         category: 'investing',
         label: `Purchase/Disposal of ${inv.code} - ${inv.name}`,
         amount: -change, // Increase in asset = cash outflow
-        account_codes: inv.code
+        account_codes: inv.code,
       });
       totalInvesting -= change;
     }
   }
 
   // 6. Get financing activities (liability/equity changes, excluding operating liabilities)
-  const financingResults = await db.select<Array<{
-    code: string;
-    name: string;
-    type: string;
-    start_balance: number;
-    end_balance: number;
-  }>>(
+  const financingResults = await db.select<
+    Array<{
+      code: string;
+      name: string;
+      type: string;
+      start_balance: number;
+      end_balance: number;
+    }>
+  >(
     `SELECT 
       a.code,
       a.name,
@@ -730,7 +744,7 @@ export async function getCashFlowData(
       AND NOT (a.code LIKE '21%' OR a.code LIKE '22%') -- exclude current liabilities
     GROUP BY a.id, a.code, a.name, a.type
     ORDER BY a.code`,
-    [startDate, endDate, endDate]
+    [startDate, endDate, endDate],
   );
 
   const financingActivities: CashFlowLine[] = [];
@@ -739,14 +753,15 @@ export async function getCashFlowData(
   for (const fin of financingResults) {
     const change = fin.end_balance - fin.start_balance;
     if (Math.abs(change) > 0.01) {
-      const label = fin.type === 'equity' 
-        ? `Changes in ${fin.code} - ${fin.name}`
-        : `Proceeds/Repayment of ${fin.code} - ${fin.name}`;
+      const label =
+        fin.type === 'equity'
+          ? `Changes in ${fin.code} - ${fin.name}`
+          : `Proceeds/Repayment of ${fin.code} - ${fin.name}`;
       financingActivities.push({
         category: 'financing',
         label,
         amount: change, // Increase in liability/equity = cash inflow
-        account_codes: fin.code
+        account_codes: fin.code,
       });
       totalFinancing += change;
     }
@@ -766,7 +781,7 @@ export async function getCashFlowData(
     startCashBalance,
     endCashBalance,
     startDate,
-    endDate
+    endDate,
   };
 }
 
@@ -797,10 +812,10 @@ export interface GeneralLedgerData {
 
 /**
  * Get General Ledger Detail data
- * 
+ *
  * Shows all journal entries ordered by date with running balance.
  * Supports filtering by account ID and date range.
- * 
+ *
  * @param startDate Period start date (YYYY-MM-DD)
  * @param endDate Period end date (YYYY-MM-DD)
  * @param accountId Optional account ID to filter by
@@ -809,7 +824,7 @@ export interface GeneralLedgerData {
 export async function getGeneralLedgerData(
   startDate: string,
   endDate: string,
-  accountId?: number
+  accountId?: number,
 ): Promise<GeneralLedgerData> {
   const db = await getDatabase();
 
@@ -820,7 +835,7 @@ export async function getGeneralLedgerData(
   if (accountId) {
     const accountResult = await db.select<Array<{ type: string; code: string }>>(
       `SELECT type, code FROM account WHERE id = ?`,
-      [accountId]
+      [accountId],
     );
     if (accountResult.length > 0) {
       accountType = accountResult[0].type;
@@ -838,15 +853,17 @@ export async function getGeneralLedgerData(
   }
 
   // Get the lines ordered by date, entry id, line id
-  const lines = await db.select<Array<{
-    entry_date: string;
-    journal_entry_id: number;
-    account_code: string;
-    account_name: string;
-    description: string;
-    debit_amount: number;
-    credit_amount: number;
-  }>>(
+  const lines = await db.select<
+    Array<{
+      entry_date: string;
+      journal_entry_id: number;
+      account_code: string;
+      account_name: string;
+      description: string;
+      debit_amount: number;
+      credit_amount: number;
+    }>
+  >(
     `SELECT 
       je.entry_date,
       je.id as journal_entry_id,
@@ -863,7 +880,7 @@ export async function getGeneralLedgerData(
       AND DATE(je.entry_date) <= ?
       ${accountFilter}
     ORDER BY je.entry_date ASC, je.id ASC, jl.id ASC`,
-    params
+    params,
   );
 
   // Get starting balance (before startDate) for running balance calculation
@@ -880,7 +897,7 @@ export async function getGeneralLedgerData(
     WHERE je.status = 'posted'
       AND DATE(je.entry_date) < ?
       ${accountFilter}`,
-    accountId ? [startDate, accountId] : [startDate]
+    accountId ? [startDate, accountId] : [startDate],
   );
   const startBalance = startBalanceResult[0]?.balance || 0;
   let runningBalance = startBalance;
@@ -914,7 +931,7 @@ export async function getGeneralLedgerData(
       description: line.description,
       debit_amount: line.debit_amount,
       credit_amount: line.credit_amount,
-      running_balance: runningBalance
+      running_balance: runningBalance,
     });
   }
 
@@ -925,6 +942,6 @@ export async function getGeneralLedgerData(
     totalDebits,
     totalCredits,
     startBalance,
-    endBalance
+    endBalance,
   };
 }

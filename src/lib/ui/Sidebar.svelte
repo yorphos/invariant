@@ -1,21 +1,38 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import type { PolicyMode } from '../domain/types';
+import { createEventDispatcher } from 'svelte';
+import type { PolicyMode } from '../domain/types';
 
-  type ViewName = 'dashboard' | 'accounts' | 'contacts' | 'invoices' | 'payments' | 'bills' | 'expenses' | 'reports' | 'reconciliation' | 'batch' | 'bank-import' | 'inventory' | 'payroll' | 'journal' | 'credit-notes' | 'budget' | 'settings';
+type ViewName =
+  | 'dashboard'
+  | 'accounts'
+  | 'contacts'
+  | 'invoices'
+  | 'payments'
+  | 'bills'
+  | 'expenses'
+  | 'reports'
+  | 'reconciliation'
+  | 'batch'
+  | 'bank-import'
+  | 'inventory'
+  | 'payroll'
+  | 'journal'
+  | 'credit-notes'
+  | 'budget'
+  | 'settings';
 
-  interface Props {
-    activeView: ViewName;
-    mode: PolicyMode;
-  }
+interface Props {
+  activeView: ViewName;
+  mode: PolicyMode;
+}
 
-  let { activeView, mode }: Props = $props();
+let { activeView, mode }: Props = $props();
 
-  const dispatch = createEventDispatcher<{ navigate: ViewName }>();
+const dispatch = createEventDispatcher<{ navigate: ViewName }>();
 
-  function setView(view: ViewName) {
-    dispatch('navigate', view);
-  }
+function setView(view: ViewName) {
+  dispatch('navigate', view);
+}
 </script>
 
 <aside class="sidebar">

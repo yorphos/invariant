@@ -102,7 +102,9 @@ describe('Database Integration - CRUD Operations', () => {
         VALUES (?, ?, ?, ?)
       `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user');
 
-      const event = db.prepare('SELECT * FROM transaction_event WHERE reference = ?').get('INV-001') as any;
+      const event = db
+        .prepare('SELECT * FROM transaction_event WHERE reference = ?')
+        .get('INV-001') as any;
 
       expect(event).toBeDefined();
       expect(event.event_type).toBe('invoice_created');
@@ -121,7 +123,9 @@ describe('Database Integration - CRUD Operations', () => {
         VALUES (?, ?, ?, ?)
       `).run('payment_received', 'Test Payment', 'PMT-001', 'test_user');
 
-      const events = db.prepare('SELECT * FROM transaction_event WHERE event_type = ?').all('invoice_created') as any[];
+      const events = db
+        .prepare('SELECT * FROM transaction_event WHERE event_type = ?')
+        .all('invoice_created') as any[];
 
       expect(events.length).toBe(1);
       expect(events[0].event_type).toBe('invoice_created');
@@ -130,17 +134,21 @@ describe('Database Integration - CRUD Operations', () => {
 
   describe('Journal Entry CRUD Operations', () => {
     it('should create a journal entry', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
       db.prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
       `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted');
 
-      const entry = db.prepare('SELECT * FROM journal_entry WHERE reference = ?').get('INV-001') as any;
+      const entry = db
+        .prepare('SELECT * FROM journal_entry WHERE reference = ?')
+        .get('INV-001') as any;
 
       expect(entry).toBeDefined();
       expect(entry.event_id).toBe(eventId);
@@ -149,15 +157,19 @@ describe('Database Integration - CRUD Operations', () => {
     });
 
     it('should update journal entry status', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
 
       db.prepare(`
         UPDATE journal_entry
@@ -175,25 +187,29 @@ describe('Database Integration - CRUD Operations', () => {
 
   describe('Journal Line CRUD Operations', () => {
     it('should create journal lines for a journal entry', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
 
       db.prepare(`
         INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
         VALUES (?, ?, ?, ?)
-      `).run(entryId, 1, 1000.00, 0.00);
+      `).run(entryId, 1, 1000.0, 0.0);
 
       db.prepare(`
         INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
         VALUES (?, ?, ?, ?)
-      `).run(entryId, 2, 0.00, 1000.00);
+      `).run(entryId, 2, 0.0, 1000.0);
 
       db.prepare(`
         UPDATE journal_entry
@@ -201,52 +217,62 @@ describe('Database Integration - CRUD Operations', () => {
         WHERE id = ?
       `).run('test_user', entryId);
 
-      const lines = db.prepare('SELECT * FROM journal_line WHERE journal_entry_id = ?').all(entryId) as any[];
+      const lines = db
+        .prepare('SELECT * FROM journal_line WHERE journal_entry_id = ?')
+        .all(entryId) as any[];
 
       expect(lines.length).toBe(2);
-      expect(lines[0].debit_amount).toBe(1000.00);
-      expect(lines[1].credit_amount).toBe(1000.00);
+      expect(lines[0].debit_amount).toBe(1000.0);
+      expect(lines[1].credit_amount).toBe(1000.0);
     });
 
     it('should enforce debit/credit constraint', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted').lastInsertRowid as number;
 
       expect(() => {
         db.prepare(`
           INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
           VALUES (?, ?, ?, ?)
-        `).run(entryId, 1, 1000.00, 1000.00);
+        `).run(entryId, 1, 1000.0, 1000.0);
       }).toThrow();
     });
 
     it('should prevent adding lines to posted journal entry', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
 
       db.prepare(`
         INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
         VALUES (?, ?, ?, ?)
-      `).run(entryId, 1, 1000.00, 0.00);
+      `).run(entryId, 1, 1000.0, 0.0);
 
       db.prepare(`
         INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
         VALUES (?, ?, ?, ?)
-      `).run(entryId, 2, 0.00, 1000.00);
+      `).run(entryId, 2, 0.0, 1000.0);
 
       db.prepare(`
         UPDATE journal_entry
@@ -258,26 +284,30 @@ describe('Database Integration - CRUD Operations', () => {
         db.prepare(`
           INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
           VALUES (?, ?, ?, ?)
-        `).run(entryId, 1, 100.00, 0.00);
+        `).run(entryId, 1, 100.0, 0.0);
       }).toThrow('Cannot add lines to posted journal entry');
     });
 
     it('should enforce debit/credit constraint', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted').lastInsertRowid as number;
 
       expect(() => {
         db.prepare(`
           INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
           VALUES (?, ?, ?, ?)
-        `).run(entryId, 1, 1000.00, 500.00);
+        `).run(entryId, 1, 1000.0, 500.0);
       }).toThrow();
     });
   });
@@ -293,44 +323,52 @@ describe('Database Integration - CRUD Operations', () => {
     });
 
     it('should enforce foreign key constraint on journal_line.account_id', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'posted').lastInsertRowid as number;
 
       expect(() => {
         db.prepare(`
           INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
           VALUES (?, ?, ?, ?)
-        `).run(entryId, 9999, 1000.00, 0.00);
+        `).run(entryId, 9999, 1000.0, 0.0);
       }).toThrow();
     });
 
     it('should cascade delete journal lines when journal entry is deleted', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
 
       db.prepare(`
         INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
         VALUES (?, ?, ?, ?)
-      `).run(entryId, 1, 1000.00, 0.00);
+      `).run(entryId, 1, 1000.0, 0.0);
 
       db.prepare(`
         INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
         VALUES (?, ?, ?, ?)
-      `).run(entryId, 2, 0.00, 1000.00);
+      `).run(entryId, 2, 0.0, 1000.0);
 
       db.prepare(`
         UPDATE journal_entry
@@ -338,36 +376,46 @@ describe('Database Integration - CRUD Operations', () => {
         WHERE id = ?
       `).run('test_user', entryId);
 
-      const linesBefore = db.prepare('SELECT * FROM journal_line WHERE journal_entry_id = ?').all(entryId) as any[];
+      const linesBefore = db
+        .prepare('SELECT * FROM journal_line WHERE journal_entry_id = ?')
+        .all(entryId) as any[];
       expect(linesBefore.length).toBe(2);
 
       expect(() => {
         db.prepare('DELETE FROM journal_entry WHERE id = ?').run(entryId);
       }).toThrow('Cannot delete posted journal entry');
 
-      const linesAfter = db.prepare('SELECT * FROM journal_line WHERE journal_entry_id = ?').all(entryId) as any[];
+      const linesAfter = db
+        .prepare('SELECT * FROM journal_line WHERE journal_entry_id = ?')
+        .all(entryId) as any[];
       expect(linesAfter.length).toBe(2);
     });
 
     it('should allow delete of draft journal entry', async () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
+      `)
+        .run('invoice_created', 'Test Invoice', 'INV-001', 'test_user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Invoice Entry', 'INV-001', 'draft').lastInsertRowid as number;
 
       db.prepare(`
         INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
         VALUES (?, ?, ?, ?)
-      `).run(entryId, 1, 1000.00, 0.00);
+      `).run(entryId, 1, 1000.0, 0.0);
 
       db.prepare('DELETE FROM journal_entry WHERE id = ?').run(entryId);
 
-      const lines = db.prepare('SELECT * FROM journal_line WHERE journal_entry_id = ?').all(entryId) as any[];
+      const lines = db
+        .prepare('SELECT * FROM journal_line WHERE journal_entry_id = ?')
+        .all(entryId) as any[];
 
       expect(lines.length).toBe(0);
     });

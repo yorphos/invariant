@@ -15,8 +15,8 @@ describe('Bank Import Service', () => {
       expect(result.transactions).toHaveLength(3);
       expect(result.startDate).toBe('2024-01-15');
       expect(result.endDate).toBe('2024-01-17');
-      expect(result.openingBalance).toBe(1000.00);
-      expect(result.closingBalance).toBe(1500.00);
+      expect(result.openingBalance).toBe(1000.0);
+      expect(result.closingBalance).toBe(1500.0);
     });
 
     it('should parse transactions with correct amounts and types', () => {
@@ -26,9 +26,9 @@ describe('Bank Import Service', () => {
 
       const result = parseCSVBankStatement(csv);
 
-      expect(result.transactions[0].amount).toBe(-100.00);
+      expect(result.transactions[0].amount).toBe(-100.0);
       expect(result.transactions[0].transaction_type).toBe('debit');
-      expect(result.transactions[1].amount).toBe(200.00);
+      expect(result.transactions[1].amount).toBe(200.0);
       expect(result.transactions[1].transaction_type).toBe('credit');
     });
 
@@ -72,7 +72,7 @@ describe('Bank Import Service', () => {
 2024-01-15,Something`;
 
       expect(() => parseCSVBankStatement(csv)).toThrow(
-        'CSV must have columns for: Date, Description, and Amount'
+        'CSV must have columns for: Date, Description, and Amount',
       );
     });
 
@@ -80,7 +80,7 @@ describe('Bank Import Service', () => {
       const csv = `Date,Description,Amount`;
 
       expect(() => parseCSVBankStatement(csv)).toThrow(
-        'CSV must have at least a header row and one data row'
+        'CSV must have at least a header row and one data row',
       );
     });
 
@@ -106,8 +106,8 @@ describe('Bank Import Service', () => {
         import_id: 1,
         transaction_date: '2024-01-15',
         description: 'AMAZON PURCHASE',
-        amount: -50.00,
-        match_status: 'unmatched'
+        amount: -50.0,
+        match_status: 'unmatched',
       };
 
       const rule: CategorizationRule = {
@@ -116,7 +116,7 @@ describe('Bank Import Service', () => {
         priority: 1,
         is_active: true,
         description_pattern: 'amazon',
-        times_applied: 0
+        times_applied: 0,
       };
 
       expect(matchesRule(txn, rule)).toBe(true);
@@ -129,8 +129,8 @@ describe('Bank Import Service', () => {
         transaction_date: '2024-01-15',
         description: 'Purchase',
         payee: 'STARBUCKS #1234',
-        amount: -5.00,
-        match_status: 'unmatched'
+        amount: -5.0,
+        match_status: 'unmatched',
       };
 
       const rule: CategorizationRule = {
@@ -139,7 +139,7 @@ describe('Bank Import Service', () => {
         priority: 1,
         is_active: true,
         payee_pattern: 'starbucks',
-        times_applied: 0
+        times_applied: 0,
       };
 
       expect(matchesRule(txn, rule)).toBe(true);
@@ -151,8 +151,8 @@ describe('Bank Import Service', () => {
         import_id: 1,
         transaction_date: '2024-01-15',
         description: 'Small purchase',
-        amount: -25.00,
-        match_status: 'unmatched'
+        amount: -25.0,
+        match_status: 'unmatched',
       };
 
       const rule: CategorizationRule = {
@@ -162,7 +162,7 @@ describe('Bank Import Service', () => {
         is_active: true,
         amount_min: 10,
         amount_max: 50,
-        times_applied: 0
+        times_applied: 0,
       };
 
       expect(matchesRule(txn, rule)).toBe(true);
@@ -174,8 +174,8 @@ describe('Bank Import Service', () => {
         import_id: 1,
         transaction_date: '2024-01-15',
         description: 'Large purchase',
-        amount: -500.00,
-        match_status: 'unmatched'
+        amount: -500.0,
+        match_status: 'unmatched',
       };
 
       const rule: CategorizationRule = {
@@ -185,7 +185,7 @@ describe('Bank Import Service', () => {
         is_active: true,
         amount_min: 10,
         amount_max: 50,
-        times_applied: 0
+        times_applied: 0,
       };
 
       expect(matchesRule(txn, rule)).toBe(false);
@@ -197,9 +197,9 @@ describe('Bank Import Service', () => {
         import_id: 1,
         transaction_date: '2024-01-15',
         description: 'Check payment',
-        amount: -100.00,
+        amount: -100.0,
         transaction_type: 'check',
-        match_status: 'unmatched'
+        match_status: 'unmatched',
       };
 
       const rule: CategorizationRule = {
@@ -208,7 +208,7 @@ describe('Bank Import Service', () => {
         priority: 1,
         is_active: true,
         transaction_type: 'check',
-        times_applied: 0
+        times_applied: 0,
       };
 
       expect(matchesRule(txn, rule)).toBe(true);
@@ -220,9 +220,9 @@ describe('Bank Import Service', () => {
         import_id: 1,
         transaction_date: '2024-01-15',
         description: 'Card payment',
-        amount: -100.00,
+        amount: -100.0,
         transaction_type: 'debit',
-        match_status: 'unmatched'
+        match_status: 'unmatched',
       };
 
       const rule: CategorizationRule = {
@@ -231,7 +231,7 @@ describe('Bank Import Service', () => {
         priority: 1,
         is_active: true,
         transaction_type: 'check',
-        times_applied: 0
+        times_applied: 0,
       };
 
       expect(matchesRule(txn, rule)).toBe(false);
@@ -243,9 +243,9 @@ describe('Bank Import Service', () => {
         import_id: 1,
         transaction_date: '2024-01-15',
         description: 'AMAZON PURCHASE',
-        amount: -35.00,
+        amount: -35.0,
         transaction_type: 'debit',
-        match_status: 'unmatched'
+        match_status: 'unmatched',
       };
 
       const rule: CategorizationRule = {
@@ -257,7 +257,7 @@ describe('Bank Import Service', () => {
         amount_min: 10,
         amount_max: 50,
         transaction_type: 'debit',
-        times_applied: 0
+        times_applied: 0,
       };
 
       expect(matchesRule(txn, rule)).toBe(true);
@@ -269,9 +269,9 @@ describe('Bank Import Service', () => {
         import_id: 1,
         transaction_date: '2024-01-15',
         description: 'AMAZON PURCHASE',
-        amount: -75.00, // Outside range
+        amount: -75.0, // Outside range
         transaction_type: 'debit',
-        match_status: 'unmatched'
+        match_status: 'unmatched',
       };
 
       const rule: CategorizationRule = {
@@ -283,7 +283,7 @@ describe('Bank Import Service', () => {
         amount_min: 10,
         amount_max: 50,
         transaction_type: 'debit',
-        times_applied: 0
+        times_applied: 0,
       };
 
       expect(matchesRule(txn, rule)).toBe(false);
@@ -330,36 +330,36 @@ function matchesRule(txn: BankStatementTransaction, rule: CategorizationRule): b
     const regex = new RegExp(rule.description_pattern, 'i');
     if (!regex.test(txn.description)) return false;
   }
-  
+
   // Check payee pattern
   if (rule.payee_pattern && txn.payee) {
     const regex = new RegExp(rule.payee_pattern, 'i');
     if (!regex.test(txn.payee)) return false;
   }
-  
+
   // Check amount range
   if (rule.amount_min !== undefined && rule.amount_min !== null) {
     if (Math.abs(txn.amount) < rule.amount_min) return false;
   }
-  
+
   if (rule.amount_max !== undefined && rule.amount_max !== null) {
     if (Math.abs(txn.amount) > rule.amount_max) return false;
   }
-  
+
   // Check transaction type
   if (rule.transaction_type && txn.transaction_type !== rule.transaction_type) {
     return false;
   }
-  
+
   return true;
 }
 
 function calculateStringSimilarity(str1: string, str2: string): number {
   const words1 = new Set(str1.split(/\s+/));
   const words2 = new Set(str2.split(/\s+/));
-  
-  const intersection = new Set([...words1].filter(w => words2.has(w)));
+
+  const intersection = new Set([...words1].filter((w) => words2.has(w)));
   const union = new Set([...words1, ...words2]);
-  
+
   return union.size > 0 ? intersection.size / union.size : 0;
 }

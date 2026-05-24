@@ -22,7 +22,7 @@ export async function assertPeriodOpen(entryDate: string): Promise<void> {
      WHERE fp.start_date <= ? AND fp.end_date >= ?
      AND fp.status = 'closed'
      LIMIT 1`,
-    [entryDate, entryDate]
+    [entryDate, entryDate],
   );
 
   if (periods.length > 0) {

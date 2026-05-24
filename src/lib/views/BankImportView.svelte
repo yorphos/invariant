@@ -1,373 +1,398 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { persistenceService } from '../services/persistence';
-  import { 
-    importCSVBankStatement,
-    parseCSVBankStatement,
-    checkDuplicateTransactions,
-    getAccountImports, 
-    getImportTransactions,
-    getCategorizationRules,
-    createCategorizationRule,
-    updateCategorizationRule,
-    deleteCategorizationRule,
-    type BankStatementImport,
-    type BankStatementTransaction,
-    type CategorizationRule
-  } from '../services/bank-import';
-  import type { Account, BankTransactionType } from '../domain/types';
-  import { confirmAction } from '../utils/confirm-action';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import Button from '../ui/Button.svelte';
-  import Input from '../ui/Input.svelte';
-  import Select from '../ui/Select.svelte';
-  import Card from '../ui/Card.svelte';
-  import Table from '../ui/Table.svelte';
-  import Modal from '../ui/Modal.svelte';
+import { onMount } from 'svelte';
+import { persistenceService } from '../services/persistence';
+import {
+  importCSVBankStatement,
+  parseCSVBankStatement,
+  checkDuplicateTransactions,
+  getAccountImports,
+  getImportTransactions,
+  getCategorizationRules,
+  createCategorizationRule,
+  updateCategorizationRule,
+  deleteCategorizationRule,
+  type BankStatementImport,
+  type BankStatementTransaction,
+  type CategorizationRule,
+} from '../services/bank-import';
+import type { Account, BankTransactionType } from '../domain/types';
+import { confirmAction } from '../utils/confirm-action';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import Button from '../ui/Button.svelte';
+import Input from '../ui/Input.svelte';
+import Select from '../ui/Select.svelte';
+import Card from '../ui/Card.svelte';
+import Table from '../ui/Table.svelte';
+import Modal from '../ui/Modal.svelte';
 
-  type ViewState = 'list' | 'import' | 'preview' | 'transactions' | 'rules';
+type ViewState = 'list' | 'import' | 'preview' | 'transactions' | 'rules';
 
-  let currentView: ViewState = 'list';
-  let loading = false;
-  let accounts: Account[] = [];
-  let bankAccounts: Account[] = [];
-  let imports: BankStatementImport[] = [];
-  let selectedImport: BankStatementImport | null = null;
-  let importTransactions: BankStatementTransaction[] = [];
-  let categorizationRules: CategorizationRule[] = [];
+let currentView: ViewState = 'list';
+let loading = false;
+let accounts: Account[] = [];
+let bankAccounts: Account[] = [];
+let imports: BankStatementImport[] = [];
+let selectedImport: BankStatementImport | null = null;
+let importTransactions: BankStatementTransaction[] = [];
+let categorizationRules: CategorizationRule[] = [];
 
-  // Import form state
-  let selectedAccountId = 0;
-  let csvFileText = '';
-  let importFileName = '';
-  let importing = false;
-  let importResult: { importId: number; transactionCount: number; autoMatchedCount: number } | null = null;
+// Import form state
+let selectedAccountId = 0;
+let csvFileText = '';
+let importFileName = '';
+let importing = false;
+let importResult: { importId: number; transactionCount: number; autoMatchedCount: number } | null =
+  null;
 
-  // Preview state
-  let parsedTransactions: Partial<BankStatementTransaction>[] = [];
-  let previewInfo: { startDate?: string; endDate?: string; openingBalance?: number; closingBalance?: number } | null = null;
-  let duplicateWarnings: Awaited<ReturnType<typeof checkDuplicateTransactions>> = [];
-  let checkingDuplicates = false;
+// Preview state
+let parsedTransactions: Partial<BankStatementTransaction>[] = [];
+let previewInfo: {
+  startDate?: string;
+  endDate?: string;
+  openingBalance?: number;
+  closingBalance?: number;
+} | null = null;
+let duplicateWarnings: Awaited<ReturnType<typeof checkDuplicateTransactions>> = [];
+let checkingDuplicates = false;
 
-  // Import progress state
-  let importProgress = '';
-  let importSummary: { imported: number; duplicatesSkipped: number; errors: number } | null = null;
+// Import progress state
+let importProgress = '';
+let importSummary: { imported: number; duplicatesSkipped: number; errors: number } | null = null;
 
-  // Rule form state
-  let showRuleModal = false;
-  let editingRule: CategorizationRule | null = null;
-  let ruleForm = {
-    rule_name: '',
-    priority: 0,
-    is_active: true,
-    description_pattern: '',
-    payee_pattern: '',
-    amount_min: undefined as number | undefined,
-    amount_max: undefined as number | undefined,
-    transaction_type: undefined as BankTransactionType | undefined,
-    assign_account_id: undefined as number | undefined,
-    assign_contact_id: undefined as number | undefined,
-    assign_category: '',
-    notes_template: ''
-  };
+// Rule form state
+let showRuleModal = false;
+let editingRule: CategorizationRule | null = null;
+let ruleForm = {
+  rule_name: '',
+  priority: 0,
+  is_active: true,
+  description_pattern: '',
+  payee_pattern: '',
+  amount_min: undefined as number | undefined,
+  amount_max: undefined as number | undefined,
+  transaction_type: undefined as BankTransactionType | undefined,
+  assign_account_id: undefined as number | undefined,
+  assign_contact_id: undefined as number | undefined,
+  assign_category: '',
+  notes_template: '',
+};
 
-  onMount(async () => {
-    await loadData();
-  });
+onMount(async () => {
+  await loadData();
+});
 
-  async function loadData() {
-    loading = true;
-    try {
-      accounts = await persistenceService.getAccounts();
-      bankAccounts = accounts.filter(a => a.type === 'asset' && a.is_active);
-      
-      if (bankAccounts.length > 0 && selectedAccountId === 0) {
-        selectedAccountId = bankAccounts[0].id!;
-        await loadImports();
-      }
-      
-      categorizationRules = await getCategorizationRules();
-    } catch (e) {
-      logger.error('Failed to load data:', e);
-      toasts.error('Failed to load data: ' + e);
-    }
-    loading = false;
-  }
+async function loadData() {
+  loading = true;
+  try {
+    accounts = await persistenceService.getAccounts();
+    bankAccounts = accounts.filter((a) => a.type === 'asset' && a.is_active);
 
-  async function loadImports() {
-    if (selectedAccountId === 0) return;
-    
-    loading = true;
-    try {
-      imports = await getAccountImports(selectedAccountId);
-    } catch (e) {
-      logger.error('Failed to load imports:', e);
-      toasts.error('Failed to load imports: ' + e);
-    }
-    loading = false;
-  }
-
-  function handleFileSelect(event: Event) {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    
-    if (!file) return;
-    
-    importFileName = file.name;
-    
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      csvFileText = e.target?.result as string;
-      
-      // Auto-parse CSV and show preview
-      if (csvFileText && selectedAccountId > 0) {
-        await showPreview();
-      }
-    };
-    reader.readAsText(file);
-  }
-
-  async function showPreview() {
-    if (selectedAccountId === 0) {
-      toasts.warning('Please select a bank account first');
-      return;
-    }
-    
-    if (!csvFileText) {
-      toasts.warning('Please select a CSV file');
-      return;
-    }
-    
-    try {
-      const result = parseCSVBankStatement(csvFileText);
-      parsedTransactions = result.transactions;
-      previewInfo = { startDate: result.startDate, endDate: result.endDate, openingBalance: result.openingBalance, closingBalance: result.closingBalance };
-      
-      // Check for duplicates
-      checkingDuplicates = true;
-      duplicateWarnings = await checkDuplicateTransactions(parsedTransactions, selectedAccountId);
-      checkingDuplicates = false;
-      
-      currentView = 'preview';
-    } catch (e) {
-      logger.error('Failed to parse CSV:', e);
-      toasts.error('Failed to parse CSV: ' + e);
-    }
-  }
-
-  async function handleConfirmImport() {
-    if (selectedAccountId === 0) {
-      toasts.warning('Please select a bank account');
-      return;
-    }
-    
-    if (parsedTransactions.length === 0) {
-      toasts.warning('No transactions to import');
-      return;
-    }
-    
-    importing = true;
-    importProgress = '';
-    importSummary = null;
-    
-    let imported = 0;
-    let duplicatesSkipped = 0;
-    let errors = 0;
-    
-    try {
-      const duplicateIndices = new Set(duplicateWarnings.map(d => d.transactionIndex));
-      
-      // Separate non-duplicate transactions
-      const newTransactions = parsedTransactions.filter((_, i) => !duplicateIndices.has(i));
-      duplicatesSkipped = parsedTransactions.length - newTransactions.length;
-      
-      if (newTransactions.length === 0) {
-        importSummary = { imported: 0, duplicatesSkipped, errors: 0 };
-        toasts.warning('All transactions appear to be duplicates. Nothing to import.');
-        importing = false;
-        return;
-      }
-      
-      // Show progress for batch import
-      importProgress = `Importing ${newTransactions.length} of ${parsedTransactions.length} transactions...`;
-      
-      const result = await importCSVBankStatement(
-        selectedAccountId,
-        importFileName,
-        csvFileText,
-        'bank-import-user'
-      );
-      
-      imported = result.transactionCount;
-      importResult = result;
+    if (bankAccounts.length > 0 && selectedAccountId === 0) {
+      selectedAccountId = bankAccounts[0].id!;
       await loadImports();
-      
-      importSummary = { imported, duplicatesSkipped, errors };
-      importProgress = '';
-      
-      toasts.success(
-        `Import complete: ${imported} imported` +
-        (duplicatesSkipped > 0 ? `, ${duplicatesSkipped} duplicates skipped` : '') +
-        (errors > 0 ? `, ${errors} errors` : '')
-      );
-      
-      // Reset form
-      parsedTransactions = [];
-      duplicateWarnings = [];
-      csvFileText = '';
-      importFileName = '';
-      importSummary = null;
-      currentView = 'list';
-    } catch (e) {
-      logger.error('Import failed:', e);
-      toasts.error('Import failed: ' + e);
-      importProgress = '';
     }
-    importing = false;
+
+    categorizationRules = await getCategorizationRules();
+  } catch (e) {
+    logger.error('Failed to load data:', e);
+    toasts.error('Failed to load data: ' + e);
+  }
+  loading = false;
+}
+
+async function loadImports() {
+  if (selectedAccountId === 0) return;
+
+  loading = true;
+  try {
+    imports = await getAccountImports(selectedAccountId);
+  } catch (e) {
+    logger.error('Failed to load imports:', e);
+    toasts.error('Failed to load imports: ' + e);
+  }
+  loading = false;
+}
+
+function handleFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+
+  if (!file) return;
+
+  importFileName = file.name;
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    csvFileText = e.target?.result as string;
+
+    // Auto-parse CSV and show preview
+    if (csvFileText && selectedAccountId > 0) {
+      await showPreview();
+    }
+  };
+  reader.readAsText(file);
+}
+
+async function showPreview() {
+  if (selectedAccountId === 0) {
+    toasts.warning('Please select a bank account first');
+    return;
   }
 
-  function handleCancelPreview() {
+  if (!csvFileText) {
+    toasts.warning('Please select a CSV file');
+    return;
+  }
+
+  try {
+    const result = parseCSVBankStatement(csvFileText);
+    parsedTransactions = result.transactions;
+    previewInfo = {
+      startDate: result.startDate,
+      endDate: result.endDate,
+      openingBalance: result.openingBalance,
+      closingBalance: result.closingBalance,
+    };
+
+    // Check for duplicates
+    checkingDuplicates = true;
+    duplicateWarnings = await checkDuplicateTransactions(parsedTransactions, selectedAccountId);
+    checkingDuplicates = false;
+
+    currentView = 'preview';
+  } catch (e) {
+    logger.error('Failed to parse CSV:', e);
+    toasts.error('Failed to parse CSV: ' + e);
+  }
+}
+
+async function handleConfirmImport() {
+  if (selectedAccountId === 0) {
+    toasts.warning('Please select a bank account');
+    return;
+  }
+
+  if (parsedTransactions.length === 0) {
+    toasts.warning('No transactions to import');
+    return;
+  }
+
+  importing = true;
+  importProgress = '';
+  importSummary = null;
+
+  let imported = 0;
+  let duplicatesSkipped = 0;
+  let errors = 0;
+
+  try {
+    const duplicateIndices = new Set(duplicateWarnings.map((d) => d.transactionIndex));
+
+    // Separate non-duplicate transactions
+    const newTransactions = parsedTransactions.filter((_, i) => !duplicateIndices.has(i));
+    duplicatesSkipped = parsedTransactions.length - newTransactions.length;
+
+    if (newTransactions.length === 0) {
+      importSummary = { imported: 0, duplicatesSkipped, errors: 0 };
+      toasts.warning('All transactions appear to be duplicates. Nothing to import.');
+      importing = false;
+      return;
+    }
+
+    // Show progress for batch import
+    importProgress = `Importing ${newTransactions.length} of ${parsedTransactions.length} transactions...`;
+
+    const result = await importCSVBankStatement(
+      selectedAccountId,
+      importFileName,
+      csvFileText,
+      'bank-import-user',
+    );
+
+    imported = result.transactionCount;
+    importResult = result;
+    await loadImports();
+
+    importSummary = { imported, duplicatesSkipped, errors };
+    importProgress = '';
+
+    toasts.success(
+      `Import complete: ${imported} imported` +
+        (duplicatesSkipped > 0 ? `, ${duplicatesSkipped} duplicates skipped` : '') +
+        (errors > 0 ? `, ${errors} errors` : ''),
+    );
+
+    // Reset form
     parsedTransactions = [];
     duplicateWarnings = [];
-    previewInfo = null;
     csvFileText = '';
     importFileName = '';
-    currentView = 'import';
+    importSummary = null;
+    currentView = 'list';
+  } catch (e) {
+    logger.error('Import failed:', e);
+    toasts.error('Import failed: ' + e);
+    importProgress = '';
+  }
+  importing = false;
+}
+
+function handleCancelPreview() {
+  parsedTransactions = [];
+  duplicateWarnings = [];
+  previewInfo = null;
+  csvFileText = '';
+  importFileName = '';
+  currentView = 'import';
+}
+
+async function viewImportTransactions(importRecord: BankStatementImport) {
+  selectedImport = importRecord;
+  loading = true;
+  try {
+    importTransactions = await getImportTransactions(importRecord.id!);
+    currentView = 'transactions';
+  } catch (e) {
+    logger.error('Failed to load transactions:', e);
+    toasts.error('Failed to load transactions: ' + e);
+  }
+  loading = false;
+}
+
+function openRuleModal(rule?: CategorizationRule) {
+  if (rule) {
+    editingRule = rule;
+    ruleForm = {
+      rule_name: rule.rule_name,
+      priority: rule.priority,
+      is_active: rule.is_active,
+      description_pattern: rule.description_pattern || '',
+      payee_pattern: rule.payee_pattern || '',
+      amount_min: rule.amount_min,
+      amount_max: rule.amount_max,
+      transaction_type: rule.transaction_type,
+      assign_account_id: rule.assign_account_id,
+      assign_contact_id: rule.assign_contact_id,
+      assign_category: rule.assign_category || '',
+      notes_template: rule.notes_template || '',
+    };
+  } else {
+    editingRule = null;
+    ruleForm = {
+      rule_name: '',
+      priority: 0,
+      is_active: true,
+      description_pattern: '',
+      payee_pattern: '',
+      amount_min: undefined,
+      amount_max: undefined,
+      transaction_type: undefined,
+      assign_account_id: undefined,
+      assign_contact_id: undefined,
+      assign_category: '',
+      notes_template: '',
+    };
+  }
+  showRuleModal = true;
+}
+
+async function saveRule() {
+  if (!ruleForm.rule_name) {
+    toasts.warning('Please provide a rule name');
+    return;
   }
 
-  async function viewImportTransactions(importRecord: BankStatementImport) {
-    selectedImport = importRecord;
-    loading = true;
-    try {
-      importTransactions = await getImportTransactions(importRecord.id!);
-      currentView = 'transactions';
-    } catch (e) {
-      logger.error('Failed to load transactions:', e);
-      toasts.error('Failed to load transactions: ' + e);
-    }
-    loading = false;
-  }
-
-  function openRuleModal(rule?: CategorizationRule) {
-    if (rule) {
-      editingRule = rule;
-      ruleForm = {
-        rule_name: rule.rule_name,
-        priority: rule.priority,
-        is_active: rule.is_active,
-        description_pattern: rule.description_pattern || '',
-        payee_pattern: rule.payee_pattern || '',
-        amount_min: rule.amount_min,
-        amount_max: rule.amount_max,
-        transaction_type: rule.transaction_type,
-        assign_account_id: rule.assign_account_id,
-        assign_contact_id: rule.assign_contact_id,
-        assign_category: rule.assign_category || '',
-        notes_template: rule.notes_template || ''
-      };
+  loading = true;
+  try {
+    if (editingRule) {
+      await updateCategorizationRule(editingRule.id!, ruleForm);
     } else {
-      editingRule = null;
-      ruleForm = {
-        rule_name: '',
-        priority: 0,
-        is_active: true,
-        description_pattern: '',
-        payee_pattern: '',
-        amount_min: undefined,
-        amount_max: undefined,
-        transaction_type: undefined,
-        assign_account_id: undefined,
-        assign_contact_id: undefined,
-        assign_category: '',
-        notes_template: ''
-      };
+      await createCategorizationRule(
+        ruleForm as Omit<CategorizationRule, 'id' | 'created_at' | 'updated_at' | 'times_applied'>,
+      );
     }
-    showRuleModal = true;
-  }
 
-  async function saveRule() {
-    if (!ruleForm.rule_name) {
-      toasts.warning('Please provide a rule name');
-      return;
-    }
-    
-    loading = true;
-    try {
-      if (editingRule) {
-        await updateCategorizationRule(editingRule.id!, ruleForm);
-      } else {
-        await createCategorizationRule(ruleForm as Omit<CategorizationRule, 'id' | 'created_at' | 'updated_at' | 'times_applied'>);
-      }
-      
-      categorizationRules = await getCategorizationRules();
-      showRuleModal = false;
-    } catch (e) {
-      logger.error('Failed to save rule:', e);
-      toasts.error('Failed to save rule: ' + e);
-    }
-    loading = false;
+    categorizationRules = await getCategorizationRules();
+    showRuleModal = false;
+  } catch (e) {
+    logger.error('Failed to save rule:', e);
+    toasts.error('Failed to save rule: ' + e);
   }
+  loading = false;
+}
 
-  async function deleteRule(ruleId: number) {
-    const confirmed = await confirmAction('Delete Rule', 'Are you sure you want to delete this rule?');
-    if (!confirmed) return;
-    
-    loading = true;
-    try {
-      await deleteCategorizationRule(ruleId);
-      categorizationRules = await getCategorizationRules();
-    } catch (e) {
-      logger.error('Failed to delete rule:', e);
-      toasts.error('Failed to delete rule: ' + e);
-    }
-    loading = false;
-  }
+async function deleteRule(ruleId: number) {
+  const confirmed = await confirmAction(
+    'Delete Rule',
+    'Are you sure you want to delete this rule?',
+  );
+  if (!confirmed) return;
 
-  function formatAmount(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+  loading = true;
+  try {
+    await deleteCategorizationRule(ruleId);
+    categorizationRules = await getCategorizationRules();
+  } catch (e) {
+    logger.error('Failed to delete rule:', e);
+    toasts.error('Failed to delete rule: ' + e);
   }
+  loading = false;
+}
 
-  function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString();
-  }
+function formatAmount(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount);
+}
 
-  function getStatusBadgeClass(status: string): string {
-    switch (status) {
-      case 'completed': return 'badge badge-success';
-      case 'failed': return 'badge badge-danger';
-      case 'processing': return 'badge badge-warning';
-      default: return 'badge badge-secondary';
-    }
-  }
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString();
+}
 
-  function getMatchStatusBadgeClass(status: string): string {
-    switch (status) {
-      case 'auto_matched': return 'badge badge-success';
-      case 'manual_matched': return 'badge badge-primary';
-      case 'imported': return 'badge badge-info';
-      case 'ignored': return 'badge badge-secondary';
-      default: return 'badge badge-warning';
-    }
+function getStatusBadgeClass(status: string): string {
+  switch (status) {
+    case 'completed':
+      return 'badge badge-success';
+    case 'failed':
+      return 'badge badge-danger';
+    case 'processing':
+      return 'badge badge-warning';
+    default:
+      return 'badge badge-secondary';
   }
+}
 
-  function handleAccountChange(e: Event) {
-    selectedAccountId = parseInt((e.target as HTMLSelectElement).value);
-    loadImports();
+function getMatchStatusBadgeClass(status: string): string {
+  switch (status) {
+    case 'auto_matched':
+      return 'badge badge-success';
+    case 'manual_matched':
+      return 'badge badge-primary';
+    case 'imported':
+      return 'badge badge-info';
+    case 'ignored':
+      return 'badge badge-secondary';
+    default:
+      return 'badge badge-warning';
   }
+}
 
-  function handleTransactionTypeChange(e: Event) {
-    const value = (e.target as HTMLSelectElement).value;
-    ruleForm.transaction_type = value ? value as BankTransactionType : undefined;
-  }
+function handleAccountChange(e: Event) {
+  selectedAccountId = parseInt((e.target as HTMLSelectElement).value);
+  loadImports();
+}
 
-  function handleAssignAccountChange(e: Event) {
-    const value = (e.target as HTMLSelectElement).value;
-    ruleForm.assign_account_id = value ? parseInt(value) : undefined;
-  }
+function handleTransactionTypeChange(e: Event) {
+  const value = (e.target as HTMLSelectElement).value;
+  ruleForm.transaction_type = value ? (value as BankTransactionType) : undefined;
+}
+
+function handleAssignAccountChange(e: Event) {
+  const value = (e.target as HTMLSelectElement).value;
+  ruleForm.assign_account_id = value ? parseInt(value) : undefined;
+}
 </script>
 
 <div class="bank-import-view">

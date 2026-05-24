@@ -1,132 +1,137 @@
 <script lang="ts">
-  type TableItem = Record<string, unknown>;
+type TableItem = Record<string, unknown>;
 
-  export let headers: string[] = [];
-  export let items: TableItem[] = [];
-  export let striped = true;
-  export let hoverable = true;
-  export let sortable = true;
-  export let filterText = '';
-  export let filterKeys: string[] = [];
-  export let sortKeys: Array<string | null> = [];
-  export let pageSize = 0;
-  export let currentPage = 1;
+export let headers: string[] = [];
+export let items: TableItem[] = [];
+export let striped = true;
+export let hoverable = true;
+export let sortable = true;
+export let filterText = '';
+export let filterKeys: string[] = [];
+export let sortKeys: Array<string | null> = [];
+export let pageSize = 0;
+export let currentPage = 1;
 
-  let sortColumn: string | null = null;
-  let sortDirection: 'asc' | 'desc' = 'asc';
+let sortColumn: string | null = null;
+let sortDirection: 'asc' | 'desc' = 'asc';
 
-  function getColumnKey(index: number): string | null {
-    const configuredKey = sortKeys[index];
+function getColumnKey(index: number): string | null {
+  const configuredKey = sortKeys[index];
 
-    if (configuredKey === null) {
-      return null;
-    }
-
-    if (configuredKey) {
-      return configuredKey;
-    }
-
-    const fallbackHeader = headers[index];
-    if (items.length > 0 && fallbackHeader in items[0]) {
-      return fallbackHeader;
-    }
-
+  if (configuredKey === null) {
     return null;
   }
 
-  function isSortableColumn(index: number): boolean {
-    return sortable && getColumnKey(index) !== null;
+  if (configuredKey) {
+    return configuredKey;
   }
 
-  function handleSort(columnIndex: number) {
-    const columnKey = getColumnKey(columnIndex);
+  const fallbackHeader = headers[index];
+  if (items.length > 0 && fallbackHeader in items[0]) {
+    return fallbackHeader;
+  }
 
-    if (!columnKey) {
-      return;
+  return null;
+}
+
+function isSortableColumn(index: number): boolean {
+  return sortable && getColumnKey(index) !== null;
+}
+
+function handleSort(columnIndex: number) {
+  const columnKey = getColumnKey(columnIndex);
+
+  if (!columnKey) {
+    return;
+  }
+
+  if (sortColumn === columnKey) {
+    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    return;
+  }
+
+  sortColumn = columnKey;
+  sortDirection = 'asc';
+}
+
+function getComparableValue(value: unknown): number | string {
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 1 : 0;
+  }
+
+  if (typeof value === 'string') {
+    const parsedDate = Date.parse(value);
+    if (!Number.isNaN(parsedDate) && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+      return parsedDate;
     }
 
-    if (sortColumn === columnKey) {
-      sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-      return;
-    }
-
-    sortColumn = columnKey;
-    sortDirection = 'asc';
+    return value.toLowerCase();
   }
 
-  function getComparableValue(value: unknown): number | string {
-    if (value instanceof Date) {
-      return value.getTime();
-    }
-
-    if (typeof value === 'number') {
-      return value;
-    }
-
-    if (typeof value === 'boolean') {
-      return value ? 1 : 0;
-    }
-
-    if (typeof value === 'string') {
-      const parsedDate = Date.parse(value);
-      if (!Number.isNaN(parsedDate) && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-        return parsedDate;
-      }
-
-      return value.toLowerCase();
-    }
-
-    if (value === null || value === undefined) {
-      return '';
-    }
-
-    return String(value).toLowerCase();
+  if (value === null || value === undefined) {
+    return '';
   }
 
-  function compareValues(a: unknown, b: unknown): number {
-    const aValue = getComparableValue(a);
-    const bValue = getComparableValue(b);
+  return String(value).toLowerCase();
+}
 
-    if (typeof aValue === 'number' && typeof bValue === 'number') {
-      return aValue - bValue;
-    }
+function compareValues(a: unknown, b: unknown): number {
+  const aValue = getComparableValue(a);
+  const bValue = getComparableValue(b);
 
-    return String(aValue).localeCompare(String(bValue), undefined, {
-      numeric: true,
-      sensitivity: 'base'
-    });
+  if (typeof aValue === 'number' && typeof bValue === 'number') {
+    return aValue - bValue;
   }
 
-  function getSortIndicator(index: number): 'asc' | 'desc' | null {
-    const columnKey = getColumnKey(index);
-    return columnKey && sortColumn === columnKey ? sortDirection : null;
-  }
+  return String(aValue).localeCompare(String(bValue), undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  });
+}
 
-  function changePage(nextPage: number) {
-    currentPage = Math.min(Math.max(nextPage, 1), totalPages);
-  }
+function getSortIndicator(index: number): 'asc' | 'desc' | null {
+  const columnKey = getColumnKey(index);
+  return columnKey && sortColumn === columnKey ? sortDirection : null;
+}
 
-  $: normalizedFilterText = filterText.trim().toLowerCase();
+function changePage(nextPage: number) {
+  currentPage = Math.min(Math.max(nextPage, 1), totalPages);
+}
 
-  $: processedItems = items;
+$: normalizedFilterText = filterText.trim().toLowerCase();
 
-  $: if (normalizedFilterText && filterKeys.length > 0) {
-    processedItems = items.filter((item) =>
-      filterKeys.some((key) => String(item[key] ?? '').toLowerCase().includes(normalizedFilterText))
-    );
-  }
+$: processedItems = items;
 
-  $: totalPages = pageSize > 0 ? Math.max(1, Math.ceil(processedItems.length / pageSize)) : 1;
+$: if (normalizedFilterText && filterKeys.length > 0) {
+  processedItems = items.filter((item) =>
+    filterKeys.some((key) =>
+      String(item[key] ?? '')
+        .toLowerCase()
+        .includes(normalizedFilterText),
+    ),
+  );
+}
 
-  $: if (currentPage < 1) {
-    currentPage = 1;
-  }
+$: totalPages = pageSize > 0 ? Math.max(1, Math.ceil(processedItems.length / pageSize)) : 1;
 
-  $: if (currentPage > totalPages) {
-    currentPage = totalPages;
-  }
+$: if (currentPage < 1) {
+  currentPage = 1;
+}
 
-  $: displayedItems = pageSize > 0
+$: if (currentPage > totalPages) {
+  currentPage = totalPages;
+}
+
+$: displayedItems =
+  pageSize > 0
     ? processedItems.slice((currentPage - 1) * pageSize, currentPage * pageSize)
     : processedItems;
 </script>

@@ -1,344 +1,359 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { getDatabase } from '../services/database';
-  import { 
-    tryGetSystemAccount
-  } from '../services/system-accounts';
-  import { 
-    createPayrollRun, 
-    approvePayrollRun, 
-    voidPayrollRun,
-    calculatePayroll,
-    type EmployeePayInput 
-  } from '../domain/payroll-operations';
-  import type { PayrollRun, PayrollLine, Account, PolicyMode } from '../domain/types';
-  import { confirmAction } from '../utils/confirm-action';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import Button from '../ui/Button.svelte';
-  import Input from '../ui/Input.svelte';
-  import Select from '../ui/Select.svelte';
-  import Card from '../ui/Card.svelte';
-  import Table from '../ui/Table.svelte';
+import { onMount } from 'svelte';
+import { getDatabase } from '../services/database';
+import { tryGetSystemAccount } from '../services/system-accounts';
+import {
+  createPayrollRun,
+  approvePayrollRun,
+  voidPayrollRun,
+  calculatePayroll,
+  type EmployeePayInput,
+} from '../domain/payroll-operations';
+import type { PayrollRun, PayrollLine, Account, PolicyMode } from '../domain/types';
+import { confirmAction } from '../utils/confirm-action';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import Button from '../ui/Button.svelte';
+import Input from '../ui/Input.svelte';
+import Select from '../ui/Select.svelte';
+import Card from '../ui/Card.svelte';
+import Table from '../ui/Table.svelte';
 
-  export let mode: PolicyMode;
+export let mode: PolicyMode;
 
-  let payrollRuns: PayrollRun[] = [];
-  let accounts: Account[] = [];
-  let loading = true;
-  let view: 'list' | 'create' = 'list';
-  let selectedRun: PayrollRun | null = null;
-  let showDetailModal = false;
-  let runLines: PayrollLine[] = [];
+let payrollRuns: PayrollRun[] = [];
+let accounts: Account[] = [];
+let loading = true;
+let view: 'list' | 'create' = 'list';
+let selectedRun: PayrollRun | null = null;
+let showDetailModal = false;
+let runLines: PayrollLine[] = [];
 
-  // Form fields
-  let formRunNumber = '';
-  let formPeriodStart = '';
-  let formPeriodEnd = '';
-  let formPayDate = '';
-  let formEmployees: Array<{
-    employee_name: string;
-    employee_id: string;
-    gross_pay: number | '';
-    other_deductions: number | '';
-  }> = [{ employee_name: '', employee_id: '', gross_pay: '', other_deductions: '' }];
+// Form fields
+let formRunNumber = '';
+let formPeriodStart = '';
+let formPeriodEnd = '';
+let formPayDate = '';
+let formEmployees: Array<{
+  employee_name: string;
+  employee_id: string;
+  gross_pay: number | '';
+  other_deductions: number | '';
+}> = [{ employee_name: '', employee_id: '', gross_pay: '', other_deductions: '' }];
 
-  // Approval accounts
-  let cashAccountId: number | '' = '';
-  let salaryExpenseAccountId: number | '' = '';
-  let cppPayableAccountId: number | '' = '';
-  let eiPayableAccountId: number | '' = '';
-  let taxPayableAccountId: number | '';
+// Approval accounts
+let cashAccountId: number | '' = '';
+let salaryExpenseAccountId: number | '' = '';
+let cppPayableAccountId: number | '' = '';
+let eiPayableAccountId: number | '' = '';
+let taxPayableAccountId: number | '';
 
-  // Calculated previews
-  let employeePreviews: Array<{
-    employee_name: string;
-    gross_pay: number;
-    cpp: number;
-    ei: number;
-    tax: number;
-    deductions: number;
-    net_pay: number;
-  }> = [];
+// Calculated previews
+let employeePreviews: Array<{
+  employee_name: string;
+  gross_pay: number;
+  cpp: number;
+  ei: number;
+  tax: number;
+  deductions: number;
+  net_pay: number;
+}> = [];
 
-  $: {
-    // Recalculate previews when form data changes
-    employeePreviews = formEmployees
-      .filter(e => e.employee_name && typeof e.gross_pay === 'number' && e.gross_pay > 0)
-      .map(e => {
-        const calc = calculatePayroll({
+$: {
+  // Recalculate previews when form data changes
+  employeePreviews = formEmployees
+    .filter((e) => e.employee_name && typeof e.gross_pay === 'number' && e.gross_pay > 0)
+    .map((e) => {
+      const calc = calculatePayroll(
+        {
           employee_name: e.employee_name,
           employee_id: e.employee_id || undefined,
           gross_pay: e.gross_pay as number,
           other_deductions: typeof e.other_deductions === 'number' ? e.other_deductions : 0,
-        }, 'biweekly');
-
-        return {
-          employee_name: e.employee_name,
-          gross_pay: calc.gross_pay,
-          cpp: calc.cpp_employee,
-          ei: calc.ei_employee,
-          tax: calc.income_tax,
-          deductions: calc.other_deductions,
-          net_pay: calc.net_pay,
-        };
-      });
-  }
-
-  $: totalGross = employeePreviews.reduce((sum, e) => sum + e.gross_pay, 0);
-  $: totalNet = employeePreviews.reduce((sum, e) => sum + e.net_pay, 0);
-  $: totalDeductions = totalGross - totalNet;
-
-  onMount(async () => {
-    await loadData();
-  });
-
-  async function loadData() {
-    loading = true;
-    try {
-      const db = await getDatabase();
-
-      // Load payroll runs
-      payrollRuns = await db.select<PayrollRun[]>(
-        'SELECT * FROM payroll_run ORDER BY period_end DESC, id DESC'
+        },
+        'biweekly',
       );
 
-      // Load accounts
-      accounts = await db.select<Account[]>(
-        'SELECT * FROM account WHERE is_active = 1 ORDER BY code'
-      );
+      return {
+        employee_name: e.employee_name,
+        gross_pay: calc.gross_pay,
+        cpp: calc.cpp_employee,
+        ei: calc.ei_employee,
+        tax: calc.income_tax,
+        deductions: calc.other_deductions,
+        net_pay: calc.net_pay,
+      };
+    });
+}
 
-      // Generate next run number
-      if (payrollRuns.length === 0) {
-        formRunNumber = 'PAY-0001';
-      } else {
-        const lastNum = Math.max(...payrollRuns.map(run => {
+$: totalGross = employeePreviews.reduce((sum, e) => sum + e.gross_pay, 0);
+$: totalNet = employeePreviews.reduce((sum, e) => sum + e.net_pay, 0);
+$: totalDeductions = totalGross - totalNet;
+
+onMount(async () => {
+  await loadData();
+});
+
+async function loadData() {
+  loading = true;
+  try {
+    const db = await getDatabase();
+
+    // Load payroll runs
+    payrollRuns = await db.select<PayrollRun[]>(
+      'SELECT * FROM payroll_run ORDER BY period_end DESC, id DESC',
+    );
+
+    // Load accounts
+    accounts = await db.select<Account[]>(
+      'SELECT * FROM account WHERE is_active = 1 ORDER BY code',
+    );
+
+    // Generate next run number
+    if (payrollRuns.length === 0) {
+      formRunNumber = 'PAY-0001';
+    } else {
+      const lastNum = Math.max(
+        ...payrollRuns.map((run) => {
           const match = run.run_number.match(/\d+$/);
           return match ? parseInt(match[0]) : 0;
-        }));
-        formRunNumber = `PAY-${String(lastNum + 1).padStart(4, '0')}`;
-      }
-
-      // Set default dates (current pay period - biweekly)
-      const today = new Date();
-      const dayOfWeek = today.getDay();
-      const daysToLastSunday = dayOfWeek;
-      const periodEnd = new Date(today);
-      periodEnd.setDate(today.getDate() - daysToLastSunday - 1); // Last Saturday
-      
-      const periodStart = new Date(periodEnd);
-      periodStart.setDate(periodEnd.getDate() - 13); // 14 days ago
-
-      const payDate = new Date(periodEnd);
-      payDate.setDate(periodEnd.getDate() + 5); // Pay on Thursday after period end
-
-      formPeriodStart = periodStart.toISOString().split('T')[0];
-      formPeriodEnd = periodEnd.toISOString().split('T')[0];
-      formPayDate = payDate.toISOString().split('T')[0];
-
-      // Load system accounts for payroll (use configured accounts, not name-based heuristics)
-      const cashAccount = await tryGetSystemAccount('cash_default');
-      if (cashAccount) cashAccountId = cashAccount.id!;
-
-      const salaryAccount = await tryGetSystemAccount('salary_expense');
-      if (salaryAccount) salaryExpenseAccountId = salaryAccount.id!;
-
-      const cppAccount = await tryGetSystemAccount('cpp_payable');
-      if (cppAccount) cppPayableAccountId = cppAccount.id!;
-
-      const eiAccount = await tryGetSystemAccount('ei_payable');
-      if (eiAccount) eiPayableAccountId = eiAccount.id!;
-
-      const taxAccount = await tryGetSystemAccount('tax_withholding_payable');
-      if (taxAccount) taxPayableAccountId = taxAccount.id!;
-
-    } catch (e) {
-      logger.error('Failed to load data:', e);
-      toasts.error(`Error loading data: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    loading = false;
-  }
-
-  function addEmployee() {
-    formEmployees = [...formEmployees, { employee_name: '', employee_id: '', gross_pay: '', other_deductions: '' }];
-  }
-
-  function removeEmployee(index: number) {
-    if (formEmployees.length > 1) {
-      formEmployees = formEmployees.filter((_, i) => i !== index);
-    }
-  }
-
-  async function handleCreatePayrollRun() {
-    try {
-      // Validation
-      if (formEmployees.length === 0 || !formEmployees.some(e => e.employee_name)) {
-        toasts.warning('Please add at least one employee');
-        return;
-      }
-
-      const employees: EmployeePayInput[] = formEmployees
-        .filter(e => e.employee_name && typeof e.gross_pay === 'number' && e.gross_pay > 0)
-        .map(e => ({
-          employee_name: e.employee_name,
-          employee_id: e.employee_id || undefined,
-          gross_pay: e.gross_pay as number,
-          other_deductions: typeof e.other_deductions === 'number' ? e.other_deductions : 0,
-        }));
-
-      if (employees.length === 0) {
-        toasts.warning('Please enter valid employee data (name and gross pay)');
-        return;
-      }
-
-      const result = await createPayrollRun(
-        {
-          run_number: formRunNumber,
-          period_start: formPeriodStart,
-          period_end: formPeriodEnd,
-          pay_date: formPayDate,
-        },
-        employees,
-        { mode }
+        }),
       );
-
-      toasts.success(`Payroll run created successfully! ID: ${result.payroll_run_id}\n\nStatus: Draft\nYou can now review and approve it.`);
-
-      // Reset form
-      formEmployees = [{ employee_name: '', employee_id: '', gross_pay: '', other_deductions: '' }];
-      view = 'list';
-      await loadData();
-
-    } catch (e) {
-      logger.error('Failed to create payroll run:', e);
-      toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      formRunNumber = `PAY-${String(lastNum + 1).padStart(4, '0')}`;
     }
+
+    // Set default dates (current pay period - biweekly)
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const daysToLastSunday = dayOfWeek;
+    const periodEnd = new Date(today);
+    periodEnd.setDate(today.getDate() - daysToLastSunday - 1); // Last Saturday
+
+    const periodStart = new Date(periodEnd);
+    periodStart.setDate(periodEnd.getDate() - 13); // 14 days ago
+
+    const payDate = new Date(periodEnd);
+    payDate.setDate(periodEnd.getDate() + 5); // Pay on Thursday after period end
+
+    formPeriodStart = periodStart.toISOString().split('T')[0];
+    formPeriodEnd = periodEnd.toISOString().split('T')[0];
+    formPayDate = payDate.toISOString().split('T')[0];
+
+    // Load system accounts for payroll (use configured accounts, not name-based heuristics)
+    const cashAccount = await tryGetSystemAccount('cash_default');
+    if (cashAccount) cashAccountId = cashAccount.id!;
+
+    const salaryAccount = await tryGetSystemAccount('salary_expense');
+    if (salaryAccount) salaryExpenseAccountId = salaryAccount.id!;
+
+    const cppAccount = await tryGetSystemAccount('cpp_payable');
+    if (cppAccount) cppPayableAccountId = cppAccount.id!;
+
+    const eiAccount = await tryGetSystemAccount('ei_payable');
+    if (eiAccount) eiPayableAccountId = eiAccount.id!;
+
+    const taxAccount = await tryGetSystemAccount('tax_withholding_payable');
+    if (taxAccount) taxPayableAccountId = taxAccount.id!;
+  } catch (e) {
+    logger.error('Failed to load data:', e);
+    toasts.error(`Error loading data: ${e instanceof Error ? e.message : String(e)}`);
   }
+  loading = false;
+}
 
-  async function viewRunDetail(run: PayrollRun) {
-    selectedRun = run;
-    showDetailModal = true;
+function addEmployee() {
+  formEmployees = [
+    ...formEmployees,
+    { employee_name: '', employee_id: '', gross_pay: '', other_deductions: '' },
+  ];
+}
 
-    // Load lines for this run
-    try {
-      const db = await getDatabase();
-      runLines = await db.select<PayrollLine[]>(
-        'SELECT * FROM payroll_line WHERE payroll_run_id = ? ORDER BY employee_name',
-        [run.id]
-      );
-    } catch (e) {
-      logger.error('Failed to load payroll lines:', e);
-      toasts.error('Failed to load payroll lines');
-    }
+function removeEmployee(index: number) {
+  if (formEmployees.length > 1) {
+    formEmployees = formEmployees.filter((_, i) => i !== index);
   }
+}
 
-  function closeDetailModal() {
-    showDetailModal = false;
-    selectedRun = null;
-    runLines = [];
-  }
-
-  async function handleApproveRun(run: PayrollRun) {
-    if (run.status !== 'draft') {
-      toasts.warning('Only draft payroll runs can be approved');
+async function handleCreatePayrollRun() {
+  try {
+    // Validation
+    if (formEmployees.length === 0 || !formEmployees.some((e) => e.employee_name)) {
+      toasts.warning('Please add at least one employee');
       return;
     }
 
-    // Validate accounts
-    if (typeof cashAccountId !== 'number' || typeof salaryExpenseAccountId !== 'number' ||
-        typeof cppPayableAccountId !== 'number' || typeof eiPayableAccountId !== 'number' ||
-        typeof taxPayableAccountId !== 'number') {
-      toasts.warning('Please select all required accounts before approving');
+    const employees: EmployeePayInput[] = formEmployees
+      .filter((e) => e.employee_name && typeof e.gross_pay === 'number' && e.gross_pay > 0)
+      .map((e) => ({
+        employee_name: e.employee_name,
+        employee_id: e.employee_id || undefined,
+        gross_pay: e.gross_pay as number,
+        other_deductions: typeof e.other_deductions === 'number' ? e.other_deductions : 0,
+      }));
+
+    if (employees.length === 0) {
+      toasts.warning('Please enter valid employee data (name and gross pay)');
       return;
     }
 
-    const confirmed = await confirmAction(
-      'Approve Payroll Run',
-      `Approve payroll run ${run.run_number}?\n\n` +
+    const result = await createPayrollRun(
+      {
+        run_number: formRunNumber,
+        period_start: formPeriodStart,
+        period_end: formPeriodEnd,
+        pay_date: formPayDate,
+      },
+      employees,
+      { mode },
+    );
+
+    toasts.success(
+      `Payroll run created successfully! ID: ${result.payroll_run_id}\n\nStatus: Draft\nYou can now review and approve it.`,
+    );
+
+    // Reset form
+    formEmployees = [{ employee_name: '', employee_id: '', gross_pay: '', other_deductions: '' }];
+    view = 'list';
+    await loadData();
+  } catch (e) {
+    logger.error('Failed to create payroll run:', e);
+    toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+async function viewRunDetail(run: PayrollRun) {
+  selectedRun = run;
+  showDetailModal = true;
+
+  // Load lines for this run
+  try {
+    const db = await getDatabase();
+    runLines = await db.select<PayrollLine[]>(
+      'SELECT * FROM payroll_line WHERE payroll_run_id = ? ORDER BY employee_name',
+      [run.id],
+    );
+  } catch (e) {
+    logger.error('Failed to load payroll lines:', e);
+    toasts.error('Failed to load payroll lines');
+  }
+}
+
+function closeDetailModal() {
+  showDetailModal = false;
+  selectedRun = null;
+  runLines = [];
+}
+
+async function handleApproveRun(run: PayrollRun) {
+  if (run.status !== 'draft') {
+    toasts.warning('Only draft payroll runs can be approved');
+    return;
+  }
+
+  // Validate accounts
+  if (
+    typeof cashAccountId !== 'number' ||
+    typeof salaryExpenseAccountId !== 'number' ||
+    typeof cppPayableAccountId !== 'number' ||
+    typeof eiPayableAccountId !== 'number' ||
+    typeof taxPayableAccountId !== 'number'
+  ) {
+    toasts.warning('Please select all required accounts before approving');
+    return;
+  }
+
+  const confirmed = await confirmAction(
+    'Approve Payroll Run',
+    `Approve payroll run ${run.run_number}?\n\n` +
       `This will:\n` +
       `- Create a journal entry\n` +
       `- Debit Salary Expense: ${formatCurrency(run.total_gross)}\n` +
       `- Credit Cash (Net Pay): ${formatCurrency(run.total_net)}\n` +
       `- Credit Payroll Liabilities: ${formatCurrency(run.total_deductions)}\n\n` +
-      `Continue?`
+      `Continue?`,
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const result = await approvePayrollRun(
+      run.id!,
+      cashAccountId,
+      salaryExpenseAccountId,
+      cppPayableAccountId,
+      eiPayableAccountId,
+      taxPayableAccountId,
+      { mode },
     );
 
-    if (!confirmed) return;
-
-    try {
-      const result = await approvePayrollRun(
-        run.id!,
-        cashAccountId,
-        salaryExpenseAccountId,
-        cppPayableAccountId,
-        eiPayableAccountId,
-        taxPayableAccountId,
-        { mode }
-      );
-
-      if (result.ok) {
-        toasts.success(`Payroll run approved! Journal Entry #${result.journal_entry_id}`);
-        closeDetailModal();
-        await loadData();
-      }
-    } catch (e) {
-      logger.error('Failed to approve payroll run:', e);
-      toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    if (result.ok) {
+      toasts.success(`Payroll run approved! Journal Entry #${result.journal_entry_id}`);
+      closeDetailModal();
+      await loadData();
     }
+  } catch (e) {
+    logger.error('Failed to approve payroll run:', e);
+    toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+async function handleVoidRun(run: PayrollRun) {
+  if (run.status === 'void') {
+    toasts.warning('Payroll run is already voided');
+    return;
   }
 
-  async function handleVoidRun(run: PayrollRun) {
-    if (run.status === 'void') {
-      toasts.warning('Payroll run is already voided');
-      return;
-    }
-
-    const confirmed = await confirmAction(
-      'Void Payroll Run',
-      `Void payroll run ${run.run_number}?\n\n` +
+  const confirmed = await confirmAction(
+    'Void Payroll Run',
+    `Void payroll run ${run.run_number}?\n\n` +
       `This action will mark the run as void.` +
       (run.status === 'approved' ? '\nA reversal journal entry will be created.' : '') +
-      `\n\nContinue?`
-    );
+      `\n\nContinue?`,
+  );
 
-    if (!confirmed) return;
+  if (!confirmed) return;
 
-    try {
-      const result = await voidPayrollRun(run.id!, { mode });
+  try {
+    const result = await voidPayrollRun(run.id!, { mode });
 
-      if (result.ok) {
-        toasts.success('Payroll run voided successfully');
-        closeDetailModal();
-        await loadData();
-      }
-    } catch (e) {
-      logger.error('Failed to void payroll run:', e);
-      toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    if (result.ok) {
+      toasts.success('Payroll run voided successfully');
+      closeDetailModal();
+      await loadData();
     }
+  } catch (e) {
+    logger.error('Failed to void payroll run:', e);
+    toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
 
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  }
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(amount);
+}
 
-  function getStatusClass(status: string): string {
-    switch (status) {
-      case 'draft': return 'status-draft';
-      case 'approved': return 'status-approved';
-      case 'paid': return 'status-paid';
-      case 'void': return 'status-void';
-      default: return '';
-    }
+function getStatusClass(status: string): string {
+  switch (status) {
+    case 'draft':
+      return 'status-draft';
+    case 'approved':
+      return 'status-approved';
+    case 'paid':
+      return 'status-paid';
+    case 'void':
+      return 'status-void';
+    default:
+      return '';
   }
+}
 
-  function getAccountName(accountId: number | null | undefined): string {
-    if (!accountId) return 'N/A';
-    const account = accounts.find(a => a.id === accountId);
-    return account ? `${account.code} - ${account.name}` : `Account #${accountId}`;
-  }
+function getAccountName(accountId: number | null | undefined): string {
+  if (!accountId) return 'N/A';
+  const account = accounts.find((a) => a.id === accountId);
+  return account ? `${account.code} - ${account.name}` : `Account #${accountId}`;
+}
 </script>
 
 <div class="payroll-view">

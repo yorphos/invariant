@@ -1,204 +1,208 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { persistenceService } from '../services/persistence';
-  import { createBill, voidBill } from '../domain/bill-operations';
-  import type { Bill, BillLine, Contact, Account, PolicyMode } from '../domain/types';
-  import { confirmAction } from '../utils/confirm-action';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import Button from '../ui/Button.svelte';
-  import Input from '../ui/Input.svelte';
-  import Select from '../ui/Select.svelte';
-  import Card from '../ui/Card.svelte';
-  import Table from '../ui/Table.svelte';
+import { onMount } from 'svelte';
+import { persistenceService } from '../services/persistence';
+import { createBill, voidBill } from '../domain/bill-operations';
+import type { Bill, BillLine, Contact, Account, PolicyMode } from '../domain/types';
+import { confirmAction } from '../utils/confirm-action';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import Button from '../ui/Button.svelte';
+import Input from '../ui/Input.svelte';
+import Select from '../ui/Select.svelte';
+import Card from '../ui/Card.svelte';
+import Table from '../ui/Table.svelte';
 
-  export let mode: PolicyMode;
+export let mode: PolicyMode;
 
-  let bills: Bill[] = [];
-  let vendors: Contact[] = [];
-  let expenseAccounts: Account[] = [];
-  let loading = true;
-  let view: 'list' | 'create' = 'list';
-  let selectedBill: Bill | null = null;
-  let showDetailModal = false;
+let bills: Bill[] = [];
+let vendors: Contact[] = [];
+let expenseAccounts: Account[] = [];
+let loading = true;
+let view: 'list' | 'create' = 'list';
+let selectedBill: Bill | null = null;
+let showDetailModal = false;
 
-  // Form fields
-  let formBillNumber = '';
-  let formVendorId: number | '' = '';
-  let formBillDate = '';
-  let formDueDate = '';
-  let formReference = '';
-  let formNotes = '';
-  let formLines: Array<{
-    description: string;
-    quantity: number;
-    unit_price: number;
-    account_id: number | '';
-  }> = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
+// Form fields
+let formBillNumber = '';
+let formVendorId: number | '' = '';
+let formBillDate = '';
+let formDueDate = '';
+let formReference = '';
+let formNotes = '';
+let formLines: Array<{
+  description: string;
+  quantity: number;
+  unit_price: number;
+  account_id: number | '';
+}> = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
 
-  $: subtotal = formLines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
-  $: taxAmount = subtotal * 0.13; // Simple 13% tax (HST)
-  $: total = subtotal + taxAmount;
+$: subtotal = formLines.reduce((sum, line) => sum + line.quantity * line.unit_price, 0);
+$: taxAmount = subtotal * 0.13; // Simple 13% tax (HST)
+$: total = subtotal + taxAmount;
 
-  onMount(async () => {
-    await loadData();
-  });
+onMount(async () => {
+  await loadData();
+});
 
-  async function loadData() {
-    loading = true;
-    try {
-      [bills, vendors, expenseAccounts] = await Promise.all([
-        persistenceService.getBills(),
-        persistenceService.getContacts('vendor'),
-        persistenceService.getAccountsByType('expense')
-      ]);
+async function loadData() {
+  loading = true;
+  try {
+    [bills, vendors, expenseAccounts] = await Promise.all([
+      persistenceService.getBills(),
+      persistenceService.getContacts('vendor'),
+      persistenceService.getAccountsByType('expense'),
+    ]);
 
-      // Generate next bill number
-      if (bills.length === 0) {
-        formBillNumber = 'BILL-0001';
-      } else {
-        const lastNum = Math.max(...bills.map(bill => {
+    // Generate next bill number
+    if (bills.length === 0) {
+      formBillNumber = 'BILL-0001';
+    } else {
+      const lastNum = Math.max(
+        ...bills.map((bill) => {
           const match = bill.bill_number.match(/\d+$/);
           return match ? parseInt(match[0]) : 0;
-        }));
-        formBillNumber = `BILL-${String(lastNum + 1).padStart(4, '0')}`;
-      }
-
-      // Set default dates
-      formBillDate = new Date().toISOString().split('T')[0];
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 30);
-      formDueDate = dueDate.toISOString().split('T')[0];
-
-    } catch (e) {
-      logger.error('Failed to load data:', e);
-      toasts.error('Failed to load bills');
-    }
-    loading = false;
-  }
-
-  function addLine() {
-    formLines = [...formLines, { description: '', quantity: 1, unit_price: 0, account_id: '' }];
-  }
-
-  function removeLine(index: number) {
-    if (formLines.length > 1) {
-      formLines = formLines.filter((_, i) => i !== index);
-    }
-  }
-
-  async function handleSubmit() {
-    try {
-      if (!formVendorId || typeof formVendorId !== 'number') {
-        toasts.warning('Please select a vendor');
-        return;
-      }
-
-      // Validate lines
-      for (const line of formLines) {
-        if (!line.description || typeof line.account_id !== 'number') {
-          toasts.warning('Please fill in all line items');
-          return;
-        }
-      }
-
-      // Map form lines to domain type
-      const lines: BillLine[] = formLines.map((line, index) => ({
-        line_number: index + 1,
-        description: line.description,
-        quantity: line.quantity,
-        unit_price: line.unit_price,
-        amount: line.quantity * line.unit_price,
-        account_id: Number(line.account_id),
-      }));
-
-      const result = await createBill(
-        {
-          bill_number: formBillNumber,
-          vendor_id: Number(formVendorId),
-          bill_date: formBillDate,
-          due_date: formDueDate,
-          reference: formReference || undefined,
-          notes: formNotes || undefined,
-        },
-        lines,
-        { mode }
+        }),
       );
-
-      if (!result.ok) {
-        toasts.error('Failed to create bill:\n' + result.warnings.map(w => w.message).join('\n'));
-        return;
-      }
-
-      // Show warnings if any
-      if (result.warnings.length > 0) {
-        toasts.warning(result.warnings.map(w => w.message).join('\n'));
-      }
-
-      await loadData();
-      view = 'list';
-      resetForm();
-    } catch (e) {
-      logger.error('Failed to create bill:', e);
-      toasts.error('Failed to create bill: ' + e);
-      toasts.error('Failed to create bill: ' + e);
+      formBillNumber = `BILL-${String(lastNum + 1).padStart(4, '0')}`;
     }
-  }
 
-  function resetForm() {
-    formVendorId = '';
-    formReference = '';
-    formNotes = '';
-    formLines = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
+    // Set default dates
+    formBillDate = new Date().toISOString().split('T')[0];
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30);
+    formDueDate = dueDate.toISOString().split('T')[0];
+  } catch (e) {
+    logger.error('Failed to load data:', e);
+    toasts.error('Failed to load bills');
   }
+  loading = false;
+}
 
-  function handleRowClick(bill: Bill) {
-    selectedBill = bill;
-    showDetailModal = true;
+function addLine() {
+  formLines = [...formLines, { description: '', quantity: 1, unit_price: 0, account_id: '' }];
+}
+
+function removeLine(index: number) {
+  if (formLines.length > 1) {
+    formLines = formLines.filter((_, i) => i !== index);
   }
+}
 
-  function closeDetailModal() {
-    showDetailModal = false;
-    selectedBill = null;
-  }
-
-  async function handleVoid(billId: number) {
-    const confirmed = await confirmAction('Void Bill', 'Are you sure you want to void this bill? This action creates a reversal entry and cannot be undone.');
-    if (!confirmed) {
+async function handleSubmit() {
+  try {
+    if (!formVendorId || typeof formVendorId !== 'number') {
+      toasts.warning('Please select a vendor');
       return;
     }
 
-    try {
-      const result = await voidBill(billId, 'User requested void', { mode });
-
-      if (!result.ok) {
-        toasts.error('Failed to void bill:\n' + result.warnings.map(w => w.message).join('\n'));
+    // Validate lines
+    for (const line of formLines) {
+      if (!line.description || typeof line.account_id !== 'number') {
+        toasts.warning('Please fill in all line items');
         return;
       }
-
-      if (result.warnings.length > 0) {
-        toasts.warning(result.warnings.map(w => w.message).join('\n'));
-      }
-
-      await loadData();
-      closeDetailModal();
-    } catch (e) {
-      logger.error('Failed to void bill:', e);
-      toasts.error('Failed to void bill: ' + e);
-      toasts.error('Failed to void bill: ' + e);
     }
+
+    // Map form lines to domain type
+    const lines: BillLine[] = formLines.map((line, index) => ({
+      line_number: index + 1,
+      description: line.description,
+      quantity: line.quantity,
+      unit_price: line.unit_price,
+      amount: line.quantity * line.unit_price,
+      account_id: Number(line.account_id),
+    }));
+
+    const result = await createBill(
+      {
+        bill_number: formBillNumber,
+        vendor_id: Number(formVendorId),
+        bill_date: formBillDate,
+        due_date: formDueDate,
+        reference: formReference || undefined,
+        notes: formNotes || undefined,
+      },
+      lines,
+      { mode },
+    );
+
+    if (!result.ok) {
+      toasts.error('Failed to create bill:\n' + result.warnings.map((w) => w.message).join('\n'));
+      return;
+    }
+
+    // Show warnings if any
+    if (result.warnings.length > 0) {
+      toasts.warning(result.warnings.map((w) => w.message).join('\n'));
+    }
+
+    await loadData();
+    view = 'list';
+    resetForm();
+  } catch (e) {
+    logger.error('Failed to create bill:', e);
+    toasts.error('Failed to create bill: ' + e);
+    toasts.error('Failed to create bill: ' + e);
+  }
+}
+
+function resetForm() {
+  formVendorId = '';
+  formReference = '';
+  formNotes = '';
+  formLines = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
+}
+
+function handleRowClick(bill: Bill) {
+  selectedBill = bill;
+  showDetailModal = true;
+}
+
+function closeDetailModal() {
+  showDetailModal = false;
+  selectedBill = null;
+}
+
+async function handleVoid(billId: number) {
+  const confirmed = await confirmAction(
+    'Void Bill',
+    'Are you sure you want to void this bill? This action creates a reversal entry and cannot be undone.',
+  );
+  if (!confirmed) {
+    return;
   }
 
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  }
+  try {
+    const result = await voidBill(billId, 'User requested void', { mode });
 
-  function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-CA');
+    if (!result.ok) {
+      toasts.error('Failed to void bill:\n' + result.warnings.map((w) => w.message).join('\n'));
+      return;
+    }
+
+    if (result.warnings.length > 0) {
+      toasts.warning(result.warnings.map((w) => w.message).join('\n'));
+    }
+
+    await loadData();
+    closeDetailModal();
+  } catch (e) {
+    logger.error('Failed to void bill:', e);
+    toasts.error('Failed to void bill: ' + e);
+    toasts.error('Failed to void bill: ' + e);
   }
+}
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(amount);
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-CA');
+}
 </script>
 
 <div class="bills-view">

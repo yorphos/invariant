@@ -1,15 +1,16 @@
 <script lang="ts">
-  export let value: string | number = '';
-  export let label = '';
-  export let options: { value: string | number; label: string }[] = [];
-  export let disabled = false;
-  export let required = false;
-  export let error = '';
-  export let placeholder = 'Select...';
-  export let onchange: ((e: Event & { currentTarget: HTMLSelectElement }) => void) | undefined = undefined;
+export let value: string | number = '';
+export let label = '';
+export let options: { value: string | number; label: string }[] = [];
+export let disabled = false;
+export let required = false;
+export let error = '';
+export let placeholder = 'Select...';
+export let onchange: ((e: Event & { currentTarget: HTMLSelectElement }) => void) | undefined =
+  undefined;
 
-  // Generate unique ID for label-select association
-  const id = `select-${Math.random().toString(36).substr(2, 9)}`;
+// Generate unique ID for label-select association
+const id = `select-${Math.random().toString(36).substr(2, 9)}`;
 </script>
 
 <div class="select-group">

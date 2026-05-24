@@ -5,7 +5,7 @@ import type {
   PostingResult,
   PolicyContext,
   ValidationWarning,
-  Account
+  Account,
 } from './types';
 
 /**
@@ -28,19 +28,21 @@ export class PostingEngine {
       warnings.push({
         level: 'error',
         message: `Journal entry is not balanced. Debits: ${totalDebits.toFixed(2)}, Credits: ${totalCredits.toFixed(2)}`,
-        requiresOverride: false
+        requiresOverride: false,
       });
     }
 
     // Check each line has exactly one side
     lines.forEach((line, idx) => {
-      if ((line.debit_amount > 0 && line.credit_amount > 0) ||
-          (line.debit_amount === 0 && line.credit_amount === 0)) {
+      if (
+        (line.debit_amount > 0 && line.credit_amount > 0) ||
+        (line.debit_amount === 0 && line.credit_amount === 0)
+      ) {
         warnings.push({
           level: 'error',
           message: `Line ${idx + 1} must have either debit or credit, not both or neither`,
           field: `line_${idx}`,
-          requiresOverride: false
+          requiresOverride: false,
         });
       }
     });
@@ -54,7 +56,7 @@ export class PostingEngine {
   validateAccountUsage(
     lines: JournalLine[],
     accounts: Map<number, Account>,
-    context: PolicyContext
+    context: PolicyContext,
   ): ValidationWarning[] {
     const warnings: ValidationWarning[] = [];
 
@@ -65,20 +67,22 @@ export class PostingEngine {
           warnings.push({
             level: 'error',
             message: `Account ${line.account_id} not found`,
-            requiresOverride: false
+            requiresOverride: false,
           });
           continue;
         }
 
         // In beginner mode, warn about unusual account usage
         // This is a simplified example - real logic would be more sophisticated
-        if (line.description?.toLowerCase().includes('office') && 
-            account.type === 'asset' && 
-            !account.name.toLowerCase().includes('office')) {
+        if (
+          line.description?.toLowerCase().includes('office') &&
+          account.type === 'asset' &&
+          !account.name.toLowerCase().includes('office')
+        ) {
           warnings.push({
             level: 'warning',
             message: `Posting office expense to ${account.name}. Consider using an expense account instead.`,
-            requiresOverride: true
+            requiresOverride: true,
           });
         }
       }
@@ -96,7 +100,7 @@ export class PostingEngine {
     expenseAccountId: number,
     paymentAccountId: number,
     date: string,
-    context: PolicyContext
+    context: PolicyContext,
   ): PostingResult {
     const warnings: ValidationWarning[] = [];
 
@@ -105,31 +109,31 @@ export class PostingEngine {
         account_id: expenseAccountId,
         debit_amount: amount,
         credit_amount: 0,
-        description: description
+        description: description,
       },
       {
         account_id: paymentAccountId,
         debit_amount: 0,
         credit_amount: amount,
-        description: description
-      }
+        description: description,
+      },
     ];
 
     const balanceWarnings = this.validateBalance(lines);
     warnings.push(...balanceWarnings);
 
-    if (warnings.some(w => w.level === 'error')) {
+    if (warnings.some((w) => w.level === 'error')) {
       return {
         ok: false,
         warnings,
-        postings: lines
+        postings: lines,
       };
     }
 
     return {
       ok: true,
       warnings,
-      postings: lines
+      postings: lines,
     };
   }
 
@@ -144,7 +148,7 @@ export class PostingEngine {
     taxPayableAccountId: number,
     arAccountId: number,
     date: string,
-    context: PolicyContext
+    context: PolicyContext,
   ): PostingResult {
     const warnings: ValidationWarning[] = [];
     const subtotal = totalAmount - taxAmount;
@@ -154,14 +158,14 @@ export class PostingEngine {
         account_id: arAccountId,
         debit_amount: totalAmount,
         credit_amount: 0,
-        description: `Invoice #${invoiceId}`
+        description: `Invoice #${invoiceId}`,
       },
       {
         account_id: revenueAccountId,
         debit_amount: 0,
         credit_amount: subtotal,
-        description: `Revenue - Invoice #${invoiceId}`
-      }
+        description: `Revenue - Invoice #${invoiceId}`,
+      },
     ];
 
     if (taxAmount > 0) {
@@ -169,25 +173,25 @@ export class PostingEngine {
         account_id: taxPayableAccountId,
         debit_amount: 0,
         credit_amount: taxAmount,
-        description: `Tax - Invoice #${invoiceId}`
+        description: `Tax - Invoice #${invoiceId}`,
       });
     }
 
     const balanceWarnings = this.validateBalance(lines);
     warnings.push(...balanceWarnings);
 
-    if (warnings.some(w => w.level === 'error')) {
+    if (warnings.some((w) => w.level === 'error')) {
       return {
         ok: false,
         warnings,
-        postings: lines
+        postings: lines,
       };
     }
 
     return {
       ok: true,
       warnings,
-      postings: lines
+      postings: lines,
     };
   }
 
@@ -200,7 +204,7 @@ export class PostingEngine {
     bankAccountId: number,
     arAccountId: number,
     date: string,
-    context: PolicyContext
+    context: PolicyContext,
   ): PostingResult {
     const warnings: ValidationWarning[] = [];
 
@@ -209,31 +213,31 @@ export class PostingEngine {
         account_id: bankAccountId,
         debit_amount: amount,
         credit_amount: 0,
-        description: `Payment received #${paymentId}`
+        description: `Payment received #${paymentId}`,
       },
       {
         account_id: arAccountId,
         debit_amount: 0,
         credit_amount: amount,
-        description: `Payment received #${paymentId}`
-      }
+        description: `Payment received #${paymentId}`,
+      },
     ];
 
     const balanceWarnings = this.validateBalance(lines);
     warnings.push(...balanceWarnings);
 
-    if (warnings.some(w => w.level === 'error')) {
+    if (warnings.some((w) => w.level === 'error')) {
       return {
         ok: false,
         warnings,
-        postings: lines
+        postings: lines,
       };
     }
 
     return {
       ok: true,
       warnings,
-      postings: lines
+      postings: lines,
     };
   }
 
@@ -244,33 +248,33 @@ export class PostingEngine {
     originalEntry: JournalEntry,
     originalLines: JournalLine[],
     reason: string,
-    date: string
+    date: string,
   ): PostingResult {
     const warnings: ValidationWarning[] = [];
 
     // Create reversed lines (flip debits and credits)
-    const lines: JournalLine[] = originalLines.map(line => ({
+    const lines: JournalLine[] = originalLines.map((line) => ({
       account_id: line.account_id,
       debit_amount: line.credit_amount,
       credit_amount: line.debit_amount,
-      description: `Reversal: ${line.description || originalEntry.description}`
+      description: `Reversal: ${line.description || originalEntry.description}`,
     }));
 
     const balanceWarnings = this.validateBalance(lines);
     warnings.push(...balanceWarnings);
 
-    if (warnings.some(w => w.level === 'error')) {
+    if (warnings.some((w) => w.level === 'error')) {
       return {
         ok: false,
         warnings,
-        postings: lines
+        postings: lines,
       };
     }
 
     return {
       ok: true,
       warnings,
-      postings: lines
+      postings: lines,
     };
   }
 }

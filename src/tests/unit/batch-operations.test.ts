@@ -4,7 +4,7 @@ import type { PaymentImportRow } from '../../lib/services/batch-operations';
 
 /**
  * Batch Operations Tests
- * 
+ *
  * Tests for batch invoice creation, CSV payment import, and bulk status changes
  */
 
@@ -17,18 +17,18 @@ PAY-0002,Beta Inc,2026-01-25,2500.50,check,CHK456,Another payment,INV-0002`;
     const rows = batchOperationsService.parsePaymentCSV(csv);
 
     expect(rows).toHaveLength(2);
-    
+
     expect(rows[0].paymentNumber).toBe('PAY-0001');
     expect(rows[0].customerName).toBe('Acme Corp');
     expect(rows[0].paymentDate).toBe('2026-01-24');
-    expect(rows[0].amount).toBe(1500.00);
+    expect(rows[0].amount).toBe(1500.0);
     expect(rows[0].paymentMethod).toBe('transfer');
     expect(rows[0].reference).toBe('REF123');
     expect(rows[0].notes).toBe('Test payment');
     expect(rows[0].invoiceNumbers).toBe('INV-0001');
-    
+
     expect(rows[1].paymentNumber).toBe('PAY-0002');
-    expect(rows[1].amount).toBe(2500.50);
+    expect(rows[1].amount).toBe(2500.5);
     expect(rows[1].paymentMethod).toBe('check');
   });
 
@@ -41,7 +41,7 @@ PAY-0002,2026-01-25,2500.00`;
 
     expect(rows).toHaveLength(2);
     expect(rows[0].paymentNumber).toBe('PAY-0001');
-    expect(rows[0].amount).toBe(1500.00);
+    expect(rows[0].amount).toBe(1500.0);
     expect(rows[0].paymentMethod).toBe('transfer'); // Default
   });
 
@@ -52,8 +52,8 @@ PAY-0002,2026-01-25,"$2,500.50"`;
 
     const rows = batchOperationsService.parsePaymentCSV(csv);
 
-    expect(rows[0].amount).toBe(1500.00);
-    expect(rows[1].amount).toBe(2500.50);
+    expect(rows[0].amount).toBe(1500.0);
+    expect(rows[1].amount).toBe(2500.5);
   });
 
   it('should correctly identify payment methods', () => {
@@ -109,19 +109,25 @@ PAY-0002,2026-01-25,2500.00
     const csv = `Customer Name,Date
 Acme Corp,2026-01-24`;
 
-    expect(() => batchOperationsService.parsePaymentCSV(csv)).toThrow('must have columns for: Payment Number, Date, and Amount');
+    expect(() => batchOperationsService.parsePaymentCSV(csv)).toThrow(
+      'must have columns for: Payment Number, Date, and Amount',
+    );
   });
 
   it('should throw error if CSV is empty', () => {
     const csv = '';
 
-    expect(() => batchOperationsService.parsePaymentCSV(csv)).toThrow('must have at least a header row and one data row');
+    expect(() => batchOperationsService.parsePaymentCSV(csv)).toThrow(
+      'must have at least a header row and one data row',
+    );
   });
 
   it('should throw error if CSV has only header', () => {
     const csv = 'Payment Number,Date,Amount';
 
-    expect(() => batchOperationsService.parsePaymentCSV(csv)).toThrow('must have at least a header row and one data row');
+    expect(() => batchOperationsService.parsePaymentCSV(csv)).toThrow(
+      'must have at least a header row and one data row',
+    );
   });
 
   it('should handle flexible column name matching', () => {
@@ -133,7 +139,7 @@ PAY-0001,Acme Corp,2026-01-24,1500.00,transfer`;
     expect(rows).toHaveLength(1);
     expect(rows[0].paymentNumber).toBe('PAY-0001');
     expect(rows[0].customerName).toBe('Acme Corp');
-    expect(rows[0].amount).toBe(1500.00);
+    expect(rows[0].amount).toBe(1500.0);
   });
 
   it('should handle invoice numbers column', () => {
@@ -153,7 +159,7 @@ PAY-0001,2026-01-24,1000000.00`;
 
     const rows = batchOperationsService.parsePaymentCSV(csv);
 
-    expect(rows[0].amount).toBe(1000000.00);
+    expect(rows[0].amount).toBe(1000000.0);
   });
 
   it('should handle very small amounts', () => {
@@ -199,8 +205,8 @@ describe('Batch Operations Validation', () => {
       paymentNumber: '',
       customerName: 'Acme Corp',
       paymentDate: '2026-01-24',
-      amount: 1500.00,
-      paymentMethod: 'transfer'
+      amount: 1500.0,
+      paymentMethod: 'transfer',
     };
 
     // In actual implementation, importPaymentsFromCSV would validate this
@@ -212,8 +218,8 @@ describe('Batch Operations Validation', () => {
       paymentNumber: 'PAY-0001',
       customerName: 'Acme Corp',
       paymentDate: '2026-01-24',
-      amount: -1500.00, // Negative amount
-      paymentMethod: 'transfer'
+      amount: -1500.0, // Negative amount
+      paymentMethod: 'transfer',
     };
 
     expect(row.amount).toBeLessThan(0);
@@ -225,7 +231,7 @@ describe('Batch Operations Validation', () => {
       customerName: 'Acme Corp',
       paymentDate: '2026-01-24',
       amount: 0, // Zero amount
-      paymentMethod: 'transfer'
+      paymentMethod: 'transfer',
     };
 
     expect(row.amount).toBe(0);
@@ -244,9 +250,9 @@ describe('Batch Operation Result Structure', () => {
           success: true,
           itemIndex: 0,
           itemDescription: 'Invoice INV-0001',
-          createdId: 1
-        }
-      ]
+          createdId: 1,
+        },
+      ],
     };
 
     expect(result.totalItems).toBe(5);
@@ -266,15 +272,15 @@ describe('Batch Operation Result Structure', () => {
           success: true,
           itemIndex: 0,
           itemDescription: 'Invoice INV-0001',
-          createdId: 1
+          createdId: 1,
         },
         {
           success: false,
           itemIndex: 1,
           itemDescription: 'Invoice INV-0002',
-          error: 'Invoice number already exists'
-        }
-      ]
+          error: 'Invoice number already exists',
+        },
+      ],
     };
 
     expect(result.totalItems).toBe(5);
@@ -289,11 +295,11 @@ describe('Batch Operation Result Structure', () => {
 describe('Payment Method Normalization', () => {
   it('should normalize various cash variations', () => {
     const variations = ['cash', 'Cash', 'CASH', 'cash payment'];
-    
-    variations.forEach(variation => {
+
+    variations.forEach((variation) => {
       const csv = `Payment Number,Date,Amount,Method
 PAY-0001,2026-01-24,100.00,${variation}`;
-      
+
       const rows = batchOperationsService.parsePaymentCSV(csv);
       expect(rows[0].paymentMethod).toBe('cash');
     });
@@ -301,23 +307,31 @@ PAY-0001,2026-01-24,100.00,${variation}`;
 
   it('should normalize various check variations', () => {
     const variations = ['check', 'Check', 'CHECK', 'cheque', 'Cheque', 'check payment'];
-    
-    variations.forEach(variation => {
+
+    variations.forEach((variation) => {
       const csv = `Payment Number,Date,Amount,Method
 PAY-0001,2026-01-24,100.00,${variation}`;
-      
+
       const rows = batchOperationsService.parsePaymentCSV(csv);
       expect(rows[0].paymentMethod).toBe('check');
     });
   });
 
   it('should normalize various transfer variations', () => {
-    const variations = ['transfer', 'Transfer', 'TRANSFER', 'bank transfer', 'wire transfer', 'EFT', 'eft'];
-    
-    variations.forEach(variation => {
+    const variations = [
+      'transfer',
+      'Transfer',
+      'TRANSFER',
+      'bank transfer',
+      'wire transfer',
+      'EFT',
+      'eft',
+    ];
+
+    variations.forEach((variation) => {
       const csv = `Payment Number,Date,Amount,Method
 PAY-0001,2026-01-24,100.00,${variation}`;
-      
+
       const rows = batchOperationsService.parsePaymentCSV(csv);
       expect(rows[0].paymentMethod).toBe('transfer');
     });
@@ -325,11 +339,11 @@ PAY-0001,2026-01-24,100.00,${variation}`;
 
   it('should normalize various card variations', () => {
     const variations = ['card', 'Card', 'credit card', 'Credit Card', 'debit card'];
-    
-    variations.forEach(variation => {
+
+    variations.forEach((variation) => {
       const csv = `Payment Number,Date,Amount,Method
 PAY-0001,2026-01-24,100.00,${variation}`;
-      
+
       const rows = batchOperationsService.parsePaymentCSV(csv);
       expect(rows[0].paymentMethod).toBe('card');
     });
@@ -338,7 +352,7 @@ PAY-0001,2026-01-24,100.00,${variation}`;
   it('should default unknown methods to "other"', () => {
     const csv = `Payment Number,Date,Amount,Method
 PAY-0001,2026-01-24,100.00,cryptocurrency`;
-    
+
     const rows = batchOperationsService.parsePaymentCSV(csv);
     expect(rows[0].paymentMethod).toBe('other');
   });
@@ -348,7 +362,7 @@ describe('Date Handling', () => {
   it('should handle ISO date format', () => {
     const csv = `Payment Number,Date,Amount
 PAY-0001,2026-01-24,1500.00`;
-    
+
     const rows = batchOperationsService.parsePaymentCSV(csv);
     expect(rows[0].paymentDate).toBe('2026-01-24');
   });
@@ -356,7 +370,7 @@ PAY-0001,2026-01-24,1500.00`;
   it('should preserve date string as provided', () => {
     const csv = `Payment Number,Date,Amount
 PAY-0001,01/24/2026,1500.00`;
-    
+
     const rows = batchOperationsService.parsePaymentCSV(csv);
     expect(rows[0].paymentDate).toBe('01/24/2026');
   });
@@ -366,7 +380,7 @@ describe('Multiple Invoices Allocation', () => {
   it('should handle comma-separated invoice numbers', () => {
     const csv = `Payment Number,Date,Amount,Invoice Numbers
 PAY-0001,2026-01-24,1500.00,INV-0001,INV-0002,INV-0003`;
-    
+
     const rows = batchOperationsService.parsePaymentCSV(csv);
     expect(rows[0].invoiceNumbers).toContain('INV-0001');
   });
@@ -374,7 +388,7 @@ PAY-0001,2026-01-24,1500.00,INV-0001,INV-0002,INV-0003`;
   it('should handle single invoice number', () => {
     const csv = `Payment Number,Date,Amount,Invoice Numbers
 PAY-0001,2026-01-24,1500.00,INV-0001`;
-    
+
     const rows = batchOperationsService.parsePaymentCSV(csv);
     expect(rows[0].invoiceNumbers).toBe('INV-0001');
   });
@@ -382,7 +396,7 @@ PAY-0001,2026-01-24,1500.00,INV-0001`;
   it('should handle empty invoice numbers', () => {
     const csv = `Payment Number,Date,Amount,Invoice Numbers
 PAY-0001,2026-01-24,1500.00,`;
-    
+
     const rows = batchOperationsService.parsePaymentCSV(csv);
     expect(rows[0].invoiceNumbers).toBe('');
   });

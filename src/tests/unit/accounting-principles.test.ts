@@ -36,7 +36,7 @@ describe('Double-Entry Bookkeeping Principles', () => {
 
   it('should allow 1 cent tolerance for rounding', () => {
     const journalLines = [
-      { account: 'A/R', debit: 100.00, credit: 0 },
+      { account: 'A/R', debit: 100.0, credit: 0 },
       { account: 'Revenue', debit: 0, credit: 99.99 }, // 1 cent off
     ];
 
@@ -51,8 +51,8 @@ describe('Double-Entry Bookkeeping Principles', () => {
 describe('Invoice Calculation Logic', () => {
   it('should calculate line amount from quantity and unit price', () => {
     const quantity = 10;
-    const unitPrice = 50.00;
-    const expectedAmount = 500.00;
+    const unitPrice = 50.0;
+    const expectedAmount = 500.0;
 
     const calculatedAmount = quantity * unitPrice;
 
@@ -112,8 +112,8 @@ describe('Payment Allocation Logic', () => {
         { id: 2, issueDate: '2026-01-10', amount: 100 },
       ];
 
-      const sorted = [...invoices].sort((a, b) => 
-        new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime()
+      const sorted = [...invoices].sort(
+        (a, b) => new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime(),
       );
 
       expect(sorted[0].id).toBe(1); // Oldest first
@@ -131,8 +131,8 @@ describe('Payment Allocation Logic', () => {
       let remainingPayment = paymentAmount;
       const allocations: Array<{ invoiceId: number; amount: number }> = [];
 
-      const sorted = [...invoices].sort((a, b) => 
-        new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime()
+      const sorted = [...invoices].sort(
+        (a, b) => new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime(),
       );
 
       for (const invoice of sorted) {
@@ -151,16 +151,16 @@ describe('Payment Allocation Logic', () => {
 
     it('should allocate across multiple invoices in FIFO order', () => {
       const invoices = [
-        { id: 1, issueDate: '2026-01-01', outstanding: 56.50 },
-        { id: 2, issueDate: '2026-01-10', outstanding: 56.50 },
+        { id: 1, issueDate: '2026-01-01', outstanding: 56.5 },
+        { id: 2, issueDate: '2026-01-10', outstanding: 56.5 },
       ];
 
       const paymentAmount = 113; // Enough for both
       let remainingPayment = paymentAmount;
       const allocations: Array<{ invoiceId: number; amount: number }> = [];
 
-      const sorted = [...invoices].sort((a, b) => 
-        new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime()
+      const sorted = [...invoices].sort(
+        (a, b) => new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime(),
       );
 
       for (const invoice of sorted) {
@@ -173,9 +173,9 @@ describe('Payment Allocation Logic', () => {
 
       expect(allocations).toHaveLength(2);
       expect(allocations[0].invoiceId).toBe(1);
-      expect(allocations[0].amount).toBe(56.50);
+      expect(allocations[0].amount).toBe(56.5);
       expect(allocations[1].invoiceId).toBe(2);
-      expect(allocations[1].amount).toBe(56.50);
+      expect(allocations[1].amount).toBe(56.5);
       expect(remainingPayment).toBe(0);
     });
   });
@@ -237,30 +237,24 @@ describe('Payment Allocation Logic', () => {
 describe('Account Balance Calculations', () => {
   it('should calculate asset account balance (debit - credit)', () => {
     const transactions = [
-      { debit: 1000, credit: 0 },    // +1000
-      { debit: 0, credit: 300 },     // -300
-      { debit: 500, credit: 0 },     // +500
+      { debit: 1000, credit: 0 }, // +1000
+      { debit: 0, credit: 300 }, // -300
+      { debit: 500, credit: 0 }, // +500
     ];
 
-    const balance = transactions.reduce(
-      (sum, t) => sum + t.debit - t.credit,
-      0
-    );
+    const balance = transactions.reduce((sum, t) => sum + t.debit - t.credit, 0);
 
     expect(balance).toBe(1200);
   });
 
   it('should calculate liability account balance (credit - debit)', () => {
     const transactions = [
-      { debit: 0, credit: 1000 },    // +1000 liability
-      { debit: 300, credit: 0 },     // -300 liability
+      { debit: 0, credit: 1000 }, // +1000 liability
+      { debit: 300, credit: 0 }, // -300 liability
     ];
 
     // For reporting, liabilities shown as negative of debit-credit
-    const balance = transactions.reduce(
-      (sum, t) => sum + t.debit - t.credit,
-      0
-    );
+    const balance = transactions.reduce((sum, t) => sum + t.debit - t.credit, 0);
 
     expect(balance).toBe(-700); // Negative = liability
   });
@@ -325,7 +319,7 @@ describe('Server-Side Validation Rules', () => {
 
 describe('Financial Accuracy', () => {
   it('should maintain precision to 2 decimal places', () => {
-    const amount1 = 10.50;
+    const amount1 = 10.5;
     const amount2 = 20.75;
     const sum = amount1 + amount2;
 
@@ -344,7 +338,7 @@ describe('Financial Accuracy', () => {
     const value = 100;
     const percentage = 0.13;
     const result = value * percentage;
-    
+
     expect(result).toBe(13);
   });
 });
@@ -353,105 +347,103 @@ describe('Invoice Void Operations', () => {
   it('should create reversal journal entries for voided invoice', () => {
     // Original invoice posting:
     // DR A/R 113.00, CR Revenue 100.00, CR Tax 13.00
-    
-    const originalARDebit = 113.00;
-    const originalRevenueCredit = 100.00;
-    const originalTaxCredit = 13.00;
-    
+
+    const originalARDebit = 113.0;
+    const originalRevenueCredit = 100.0;
+    const originalTaxCredit = 13.0;
+
     // Void should reverse all entries:
     // CR A/R 113.00, DR Revenue 100.00, DR Tax 13.00
-    
-    const voidARCredit = 113.00;
-    const voidRevenueDebit = 100.00;
-    const voidTaxDebit = 13.00;
-    
+
+    const voidARCredit = 113.0;
+    const voidRevenueDebit = 100.0;
+    const voidTaxDebit = 13.0;
+
     // After void, net effect should be zero
     const netAR = originalARDebit - voidARCredit;
     const netRevenue = voidRevenueDebit - originalRevenueCredit;
     const netTax = voidTaxDebit - originalTaxCredit;
-    
+
     expect(netAR).toBe(0);
     expect(netRevenue).toBe(0);
     expect(netTax).toBe(0);
   });
-  
+
   it('should prevent voiding an already voided invoice', () => {
     const invoiceStatus = 'void';
     const canVoid = invoiceStatus !== 'void';
-    
+
     expect(canVoid).toBe(false);
   });
-  
+
   it('should prevent voiding an invoice with payments', () => {
-    const paidAmount: number = 50.00;
+    const paidAmount: number = 50.0;
     const canVoid = paidAmount === 0;
-    
+
     expect(canVoid).toBe(false);
   });
-  
+
   it('should allow voiding an invoice with no payments', () => {
     const paidAmount: number = 0;
     const invoiceStatus: string = 'sent';
     const canVoid = paidAmount === 0 && invoiceStatus !== 'void';
-    
+
     expect(canVoid).toBe(true);
   });
-  
+
   it('should maintain double-entry balance in void transaction', () => {
     // Void transaction for invoice totaling $113.00
     const voidDebits = [
-      { account: 'Revenue', amount: 100.00 },
-      { account: 'Tax', amount: 13.00 }
+      { account: 'Revenue', amount: 100.0 },
+      { account: 'Tax', amount: 13.0 },
     ];
-    
-    const voidCredits = [
-      { account: 'A/R', amount: 113.00 }
-    ];
-    
+
+    const voidCredits = [{ account: 'A/R', amount: 113.0 }];
+
     const totalDebits = voidDebits.reduce((sum, line) => sum + line.amount, 0);
     const totalCredits = voidCredits.reduce((sum, line) => sum + line.amount, 0);
-    
+
     expect(Math.abs(totalDebits - totalCredits)).toBeLessThan(0.01);
   });
 });
 
 describe('Invoice Edit Operations', () => {
   it('should prevent editing invoices with payments', () => {
-    const paidAmount: number = 100.00;
+    const paidAmount: number = 100.0;
     const canEdit = paidAmount === 0;
-    
+
     expect(canEdit).toBe(false);
   });
-  
+
   it('should prevent editing voided invoices', () => {
     const status: string = 'void';
     const canEdit = status !== 'void';
-    
+
     expect(canEdit).toBe(false);
   });
-  
+
   it('should allow editing invoices with no payments', () => {
     const paidAmount: number = 0;
     const status: string = 'sent';
     const canEdit = paidAmount === 0 && status !== 'void';
-    
+
     expect(canEdit).toBe(true);
   });
-  
+
   it('should result in zero net effect after void and recreate', () => {
     // Original invoice: DR A/R 113, CR Revenue 100, CR Tax 13
     // Void: CR A/R 113, DR Revenue 100, DR Tax 13
     // New invoice (same amounts): DR A/R 113, CR Revenue 100, CR Tax 13
-    
+
     // Net effect on each account:
     const netAR = 113 - 113 + 113; // = 113 (new invoice balance)
     const netRevenue = -100 + 100 - 100; // = -100 (new revenue)
     const netTax = -13 + 13 - 13; // = -13 (new tax liability)
-    
+
     // Verify double-entry still balanced
     const totalDebits = 113; // New A/R debit
     const totalCredits = 100 + 13; // New Revenue + Tax credits
-    
+
     expect(Math.abs(totalDebits - totalCredits)).toBeLessThan(0.01);
     expect(netAR).toBe(113);
     expect(netRevenue).toBe(-100);

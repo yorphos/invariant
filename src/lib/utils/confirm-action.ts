@@ -29,8 +29,8 @@ export function confirmAction(title: string, message: string): Promise<boolean> 
         },
         onCancel: () => {
           void cleanup(false);
-        }
-      }
+        },
+      },
     });
   });
 }

@@ -33,14 +33,19 @@ async function initializeMigrations(): Promise<void> {
 async function runMigrations(): Promise<void> {
   const db = testDbInstance!;
 
-  const applied = db.prepare('SELECT id FROM _migrations ORDER BY id').all() as Array<{ id: string }>;
-  const appliedIds = new Set(applied.map(m => m.id));
+  const applied = db.prepare('SELECT id FROM _migrations ORDER BY id').all() as Array<{
+    id: string;
+  }>;
+  const appliedIds = new Set(applied.map((m) => m.id));
 
   for (const migration of allMigrations) {
     if (!appliedIds.has(migration.id)) {
       db.exec(migration.up);
 
-      db.prepare('INSERT INTO _migrations (id, name) VALUES (?, ?)').run(migration.id, migration.name);
+      db.prepare('INSERT INTO _migrations (id, name) VALUES (?, ?)').run(
+        migration.id,
+        migration.name,
+      );
     }
   }
 }

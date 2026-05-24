@@ -1,33 +1,33 @@
 <script lang="ts">
-  import Modal from './Modal.svelte';
-  import Button from './Button.svelte';
-  import type { UpdateMetadata, DownloadProgress } from '../services/updater';
+import Modal from './Modal.svelte';
+import Button from './Button.svelte';
+import type { UpdateMetadata, DownloadProgress } from '../services/updater';
 
-  interface Props {
-    open: boolean;
-    updateInfo: UpdateMetadata;
-    downloadProgress: DownloadProgress | null;
-    onInstall: () => void;
-    onSkip: () => void;
-    onRemindLater: () => void;
-  }
+interface Props {
+  open: boolean;
+  updateInfo: UpdateMetadata;
+  downloadProgress: DownloadProgress | null;
+  onInstall: () => void;
+  onSkip: () => void;
+  onRemindLater: () => void;
+}
 
-  let { open, updateInfo, downloadProgress, onInstall, onSkip, onRemindLater }: Props = $props();
+let { open, updateInfo, downloadProgress, onInstall, onSkip, onRemindLater }: Props = $props();
 
-  let isDownloading = $derived(downloadProgress !== null);
-  let progressPercent = $derived(
-    downloadProgress?.contentLength
-      ? Math.round((downloadProgress.downloaded / downloadProgress.contentLength) * 100)
-      : 0
-  );
+let isDownloading = $derived(downloadProgress !== null);
+let progressPercent = $derived(
+  downloadProgress?.contentLength
+    ? Math.round((downloadProgress.downloaded / downloadProgress.contentLength) * 100)
+    : 0,
+);
 
-  function formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 10) / 10 + ' ' + sizes[i];
-  }
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round((bytes / Math.pow(k, i)) * 10) / 10 + ' ' + sizes[i];
+}
 </script>
 
 <Modal open={open} title="Update Available" size="large" onclose={onRemindLater}>

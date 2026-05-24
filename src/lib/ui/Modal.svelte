@@ -1,20 +1,20 @@
 <script lang="ts">
-  export let open = false;
-  export let title = '';
-  export let size: 'small' | 'medium' | 'large' | 'xlarge' = 'medium';
-  export let onclose: () => void = () => {};
+export let open = false;
+export let title = '';
+export let size: 'small' | 'medium' | 'large' | 'xlarge' = 'medium';
+export let onclose: () => void = () => {};
 
-  function handleBackdropClick(e: MouseEvent) {
-    if (e.target === e.currentTarget) {
-      onclose();
-    }
+function handleBackdropClick(e: MouseEvent) {
+  if (e.target === e.currentTarget) {
+    onclose();
   }
+}
 
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      onclose();
-    }
+function handleKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    onclose();
   }
+}
 </script>
 
 <svelte:window onkeydown={open ? handleKeydown : undefined} />

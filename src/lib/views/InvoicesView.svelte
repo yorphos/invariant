@@ -1,309 +1,327 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { persistenceService } from '../services/persistence';
-  import { createInvoice, editInvoice } from '../domain/invoice-operations';
-  import type { Invoice, InvoiceLine, Contact, Account, PolicyMode, ValidationWarning } from '../domain/types';
-  import Button from '../ui/Button.svelte';
-  import Input from '../ui/Input.svelte';
-  import Select from '../ui/Select.svelte';
-  import Card from '../ui/Card.svelte';
-  import Modal from '../ui/Modal.svelte';
-  import Table from '../ui/Table.svelte';
-  import FileUpload from '../ui/FileUpload.svelte';
-  import InvoiceDetailModal from '../ui/InvoiceDetailModal.svelte';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import { confirmAction } from '../utils/confirm-action';
-  import { storeDocument, attachDocument, getEntityDocuments, deleteDocument } from '../services/document-storage';
-  import type { DocumentWithAttachment } from '../domain/types';
+import { onMount } from 'svelte';
+import { persistenceService } from '../services/persistence';
+import { createInvoice, editInvoice } from '../domain/invoice-operations';
+import type {
+  Invoice,
+  InvoiceLine,
+  Contact,
+  Account,
+  PolicyMode,
+  ValidationWarning,
+} from '../domain/types';
+import Button from '../ui/Button.svelte';
+import Input from '../ui/Input.svelte';
+import Select from '../ui/Select.svelte';
+import Card from '../ui/Card.svelte';
+import Modal from '../ui/Modal.svelte';
+import Table from '../ui/Table.svelte';
+import FileUpload from '../ui/FileUpload.svelte';
+import InvoiceDetailModal from '../ui/InvoiceDetailModal.svelte';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import { confirmAction } from '../utils/confirm-action';
+import {
+  storeDocument,
+  attachDocument,
+  getEntityDocuments,
+  deleteDocument,
+} from '../services/document-storage';
+import type { DocumentWithAttachment } from '../domain/types';
 
-  export let mode: PolicyMode;
+export let mode: PolicyMode;
 
-  let invoices: Invoice[] = [];
-  let contacts: Contact[] = [];
-  let revenueAccounts: Account[] = [];
-  let loading = true;
-  let showModal = false;
-  let view: 'list' | 'create' | 'edit' = 'list';
-  let selectedInvoice: Invoice | null = null;
-  let showDetailModal = false;
-  let editingInvoiceId: number | null = null;
+let invoices: Invoice[] = [];
+let contacts: Contact[] = [];
+let revenueAccounts: Account[] = [];
+let loading = true;
+let showModal = false;
+let view: 'list' | 'create' | 'edit' = 'list';
+let selectedInvoice: Invoice | null = null;
+let showDetailModal = false;
+let editingInvoiceId: number | null = null;
 
-  // Form fields
-  let formInvoiceNumber = '';
-  let formContactId: number | '' = '';
-  let formIssueDate = '';
-  let formDueDate = '';
-  let formNotes = '';
-  let taxRate = 0.13;
-  let formLines: Array<{
-    description: string;
-    quantity: number;
-    unit_price: number;
-    account_id: number | '';
-  }> = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
+// Form fields
+let formInvoiceNumber = '';
+let formContactId: number | '' = '';
+let formIssueDate = '';
+let formDueDate = '';
+let formNotes = '';
+let taxRate = 0.13;
+let formLines: Array<{
+  description: string;
+  quantity: number;
+  unit_price: number;
+  account_id: number | '';
+}> = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
 
-  let taxInclusivePricing = false;
-  let attachedFiles: File[] = [];
-  let existingDocuments: DocumentWithAttachment[] = [];
-  let uploadError = '';
+let taxInclusivePricing = false;
+let attachedFiles: File[] = [];
+let existingDocuments: DocumentWithAttachment[] = [];
+let uploadError = '';
 
-  $: subtotal = formLines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
-  $: taxAmount = taxInclusivePricing
-    ? subtotal - (subtotal / (1 + taxRate))
-    : subtotal * taxRate;
-  $: total = taxInclusivePricing ? subtotal : subtotal + taxAmount;
+$: subtotal = formLines.reduce((sum, line) => sum + line.quantity * line.unit_price, 0);
+$: taxAmount = taxInclusivePricing ? subtotal - subtotal / (1 + taxRate) : subtotal * taxRate;
+$: total = taxInclusivePricing ? subtotal : subtotal + taxAmount;
 
-  onMount(async () => {
-    await loadData();
-  });
+onMount(async () => {
+  await loadData();
+});
 
-  async function loadData() {
-    loading = true;
-    try {
-      [invoices, contacts, revenueAccounts] = await Promise.all([
-        persistenceService.getInvoices(),
-        persistenceService.getContacts(),
-        persistenceService.getAccountsByType('revenue')
-      ]);
+async function loadData() {
+  loading = true;
+  try {
+    [invoices, contacts, revenueAccounts] = await Promise.all([
+      persistenceService.getInvoices(),
+      persistenceService.getContacts(),
+      persistenceService.getAccountsByType('revenue'),
+    ]);
 
-      taxRate = 0.13;
+    taxRate = 0.13;
 
-      // Generate next invoice number
-      if (invoices.length === 0) {
-        formInvoiceNumber = 'INV-0001';
-      } else {
-        const lastNum = Math.max(...invoices.map(inv => {
+    // Generate next invoice number
+    if (invoices.length === 0) {
+      formInvoiceNumber = 'INV-0001';
+    } else {
+      const lastNum = Math.max(
+        ...invoices.map((inv) => {
           const match = inv.invoice_number.match(/\d+$/);
           return match ? parseInt(match[0]) : 0;
-        }));
-        formInvoiceNumber = `INV-${String(lastNum + 1).padStart(4, '0')}`;
-      }
-
-      // Set default dates
-      formIssueDate = new Date().toISOString().split('T')[0];
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 30);
-      formDueDate = dueDate.toISOString().split('T')[0];
-
-    } catch (e) {
-      logger.error('Failed to load data:', e);
-      toasts.error('Failed to load invoices');
+        }),
+      );
+      formInvoiceNumber = `INV-${String(lastNum + 1).padStart(4, '0')}`;
     }
-    loading = false;
-  }
 
-  function addLine() {
-    formLines = [...formLines, { description: '', quantity: 1, unit_price: 0, account_id: '' }];
+    // Set default dates
+    formIssueDate = new Date().toISOString().split('T')[0];
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30);
+    formDueDate = dueDate.toISOString().split('T')[0];
+  } catch (e) {
+    logger.error('Failed to load data:', e);
+    toasts.error('Failed to load invoices');
   }
+  loading = false;
+}
 
-  function removeLine(index: number) {
-    if (formLines.length > 1) {
-      formLines = formLines.filter((_, i) => i !== index);
+function addLine() {
+  formLines = [...formLines, { description: '', quantity: 1, unit_price: 0, account_id: '' }];
+}
+
+function removeLine(index: number) {
+  if (formLines.length > 1) {
+    formLines = formLines.filter((_, i) => i !== index);
+  }
+}
+
+async function handleSubmit() {
+  try {
+    if (!formContactId || typeof formContactId !== 'number') {
+      toasts.warning('Please select a customer');
+      return;
     }
-  }
 
-  async function handleSubmit() {
-    try {
-      if (!formContactId || typeof formContactId !== 'number') {
-        toasts.warning('Please select a customer');
+    // Validate lines
+    for (const line of formLines) {
+      if (!line.description || typeof line.account_id !== 'number') {
+        toasts.warning('Please fill in all line items');
         return;
       }
-
-      // Validate lines
-      for (const line of formLines) {
-        if (!line.description || typeof line.account_id !== 'number') {
-          toasts.warning('Please fill in all line items');
-          return;
-        }
-      }
-
-      // Map form lines to domain type
-      const lines: InvoiceLine[] = formLines.map((line, index) => ({
-        line_number: index + 1,
-        description: line.description,
-        quantity: line.quantity,
-        unit_price: line.unit_price,
-        amount: line.quantity * line.unit_price,
-        is_tax_inclusive: taxInclusivePricing,
-        account_id: Number(line.account_id),
-      }));
-
-      let result;
-      
-      if (editingInvoiceId) {
-        // Edit existing invoice (void and recreate)
-        result = await editInvoice(
-          editingInvoiceId,
-          {
-            invoice_number: formInvoiceNumber,
-            contact_id: Number(formContactId),
-            issue_date: formIssueDate,
-            due_date: formDueDate,
-            notes: formNotes || undefined,
-          },
-          lines,
-          { mode }
-        );
-      } else {
-        // Create new invoice
-        result = await createInvoice(
-          {
-            invoice_number: formInvoiceNumber,
-            contact_id: Number(formContactId),
-            issue_date: formIssueDate,
-            due_date: formDueDate,
-            notes: formNotes || undefined,
-          },
-          lines,
-          { mode }
-        );
-      }
-
-      if (!result.ok) {
-        toasts.error(`Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice:\n` + result.warnings.map((w: ValidationWarning) => w.message).join('\n'));
-        return;
-      }
-
-      // Show warnings if any (e.g., "invoice was voided and recreated")
-      if (result.warnings.length > 0) {
-        toasts.warning(result.warnings.map((w: ValidationWarning) => w.message).join('\n'));
-      }
-
-      // Handle file uploads if there are any
-      if (attachedFiles.length > 0 && result.ok && 'invoice_id' in result && result.invoice_id) {
-        try {
-          for (const file of attachedFiles) {
-            // Read file as ArrayBuffer
-            const arrayBuffer = await file.arrayBuffer();
-            const content = new Uint8Array(arrayBuffer);
-            
-            // Store document
-            const documentId = await storeDocument(
-              content,
-              file.name,
-              file.type || 'application/octet-stream',
-              'receipt'
-            );
-            
-            // Attach to invoice
-            await attachDocument(
-              documentId,
-              'invoice',
-              result.invoice_id,
-              'supporting'
-            );
-          }
-        } catch (e) {
-          logger.error('Failed to upload attachments:', e);
-          toasts.warning('Invoice created but failed to upload some attachments: ' + e);
-        }
-      }
-
-      await loadData();
-      view = 'list';
-      resetForm();
-    } catch (e) {
-      logger.error(`Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice:`, e);
-      toasts.error(`Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice: ` + e);
     }
-  }
 
-  function resetForm() {
-    editingInvoiceId = null;
-    formContactId = '';
-    formNotes = '';
-    formLines = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
-    taxInclusivePricing = false;
-    attachedFiles = [];
-    existingDocuments = [];
-    uploadError = '';
-  }
-
-  function handleFilesSelected(files: File[]) {
-    attachedFiles = files;
-    uploadError = '';
-  }
-
-  async function loadExistingDocuments(invoiceId: number) {
-    try {
-      existingDocuments = await getEntityDocuments('invoice', invoiceId);
-    } catch (e) {
-      logger.error('Failed to load documents:', e);
-      toasts.error('Failed to load invoice documents');
-    }
-  }
-
-  async function handleDeleteDocument(documentId: number) {
-    const confirmed = await confirmAction('Delete Document', 'Are you sure you want to delete this document?');
-    if (!confirmed) return;
-    
-    try {
-      await deleteDocument(documentId);
-      // Reload existing documents
-      if (editingInvoiceId) {
-        await loadExistingDocuments(editingInvoiceId);
-      }
-    } catch (e) {
-      toasts.error('Failed to delete document: ' + e);
-    }
-  }
-
-  function handleRowClick(invoice: Invoice) {
-    selectedInvoice = invoice;
-    showDetailModal = true;
-  }
-
-  function closeDetailModal() {
-    showDetailModal = false;
-    selectedInvoice = null;
-  }
-
-  async function handleEditFromDetail() {
-    if (!selectedInvoice) return;
-    
-    // Load invoice data into form
-    editingInvoiceId = selectedInvoice.id!;
-    formInvoiceNumber = selectedInvoice.invoice_number;
-    formContactId = selectedInvoice.contact_id;
-    formIssueDate = selectedInvoice.issue_date;
-    formDueDate = selectedInvoice.due_date;
-    formNotes = selectedInvoice.notes || '';
-    
-    // Load invoice lines
-    const lines = await persistenceService.getInvoiceLines(selectedInvoice.id!);
-    formLines = lines.map(line => ({
+    // Map form lines to domain type
+    const lines: InvoiceLine[] = formLines.map((line, index) => ({
+      line_number: index + 1,
       description: line.description,
       quantity: line.quantity,
       unit_price: line.unit_price,
-      account_id: line.account_id || '',
+      amount: line.quantity * line.unit_price,
+      is_tax_inclusive: taxInclusivePricing,
+      account_id: Number(line.account_id),
     }));
-    const firstLine = lines[0] as InvoiceLine & { is_tax_inclusive?: boolean } | undefined;
-    taxInclusivePricing = firstLine ? Boolean(firstLine.is_tax_inclusive) : false;
-    
-    // Load existing documents
-    await loadExistingDocuments(selectedInvoice.id!);
-    
-    showDetailModal = false;
-    view = 'edit';
-  }
 
-  async function handleVoidFromDetail() {
-    // Reload data after void
+    let result: {
+      ok: boolean;
+      invoice_id?: number;
+      journal_entry_id?: number;
+      event_id?: number;
+      warnings: ValidationWarning[];
+    };
+
+    if (editingInvoiceId) {
+      // Edit existing invoice (void and recreate)
+      result = await editInvoice(
+        editingInvoiceId,
+        {
+          invoice_number: formInvoiceNumber,
+          contact_id: Number(formContactId),
+          issue_date: formIssueDate,
+          due_date: formDueDate,
+          notes: formNotes || undefined,
+        },
+        lines,
+        { mode },
+      );
+    } else {
+      // Create new invoice
+      result = await createInvoice(
+        {
+          invoice_number: formInvoiceNumber,
+          contact_id: Number(formContactId),
+          issue_date: formIssueDate,
+          due_date: formDueDate,
+          notes: formNotes || undefined,
+        },
+        lines,
+        { mode },
+      );
+    }
+
+    if (!result.ok) {
+      toasts.error(
+        `Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice:\n` +
+          result.warnings.map((w: ValidationWarning) => w.message).join('\n'),
+      );
+      return;
+    }
+
+    // Show warnings if any (e.g., "invoice was voided and recreated")
+    if (result.warnings.length > 0) {
+      toasts.warning(result.warnings.map((w: ValidationWarning) => w.message).join('\n'));
+    }
+
+    // Handle file uploads if there are any
+    if (attachedFiles.length > 0 && result.ok && 'invoice_id' in result && result.invoice_id) {
+      try {
+        for (const file of attachedFiles) {
+          // Read file as ArrayBuffer
+          const arrayBuffer = await file.arrayBuffer();
+          const content = new Uint8Array(arrayBuffer);
+
+          // Store document
+          const documentId = await storeDocument(
+            content,
+            file.name,
+            file.type || 'application/octet-stream',
+            'receipt',
+          );
+
+          // Attach to invoice
+          await attachDocument(documentId, 'invoice', result.invoice_id, 'supporting');
+        }
+      } catch (e) {
+        logger.error('Failed to upload attachments:', e);
+        toasts.warning('Invoice created but failed to upload some attachments: ' + e);
+      }
+    }
+
     await loadData();
-    closeDetailModal();
+    view = 'list';
+    resetForm();
+  } catch (e) {
+    logger.error(`Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice:`, e);
+    toasts.error(`Failed to ${editingInvoiceId ? 'edit' : 'create'} invoice: ` + e);
   }
+}
 
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  }
+function resetForm() {
+  editingInvoiceId = null;
+  formContactId = '';
+  formNotes = '';
+  formLines = [{ description: '', quantity: 1, unit_price: 0, account_id: '' }];
+  taxInclusivePricing = false;
+  attachedFiles = [];
+  existingDocuments = [];
+  uploadError = '';
+}
 
-  function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-CA');
+function handleFilesSelected(files: File[]) {
+  attachedFiles = files;
+  uploadError = '';
+}
+
+async function loadExistingDocuments(invoiceId: number) {
+  try {
+    existingDocuments = await getEntityDocuments('invoice', invoiceId);
+  } catch (e) {
+    logger.error('Failed to load documents:', e);
+    toasts.error('Failed to load invoice documents');
   }
+}
+
+async function handleDeleteDocument(documentId: number) {
+  const confirmed = await confirmAction(
+    'Delete Document',
+    'Are you sure you want to delete this document?',
+  );
+  if (!confirmed) return;
+
+  try {
+    await deleteDocument(documentId);
+    // Reload existing documents
+    if (editingInvoiceId) {
+      await loadExistingDocuments(editingInvoiceId);
+    }
+  } catch (e) {
+    toasts.error('Failed to delete document: ' + e);
+  }
+}
+
+function handleRowClick(invoice: Invoice) {
+  selectedInvoice = invoice;
+  showDetailModal = true;
+}
+
+function closeDetailModal() {
+  showDetailModal = false;
+  selectedInvoice = null;
+}
+
+async function handleEditFromDetail() {
+  if (!selectedInvoice) return;
+
+  // Load invoice data into form
+  editingInvoiceId = selectedInvoice.id!;
+  formInvoiceNumber = selectedInvoice.invoice_number;
+  formContactId = selectedInvoice.contact_id;
+  formIssueDate = selectedInvoice.issue_date;
+  formDueDate = selectedInvoice.due_date;
+  formNotes = selectedInvoice.notes || '';
+
+  // Load invoice lines
+  const lines = await persistenceService.getInvoiceLines(selectedInvoice.id!);
+  formLines = lines.map((line) => ({
+    description: line.description,
+    quantity: line.quantity,
+    unit_price: line.unit_price,
+    account_id: line.account_id || '',
+  }));
+  const firstLine = lines[0] as (InvoiceLine & { is_tax_inclusive?: boolean }) | undefined;
+  taxInclusivePricing = firstLine ? Boolean(firstLine.is_tax_inclusive) : false;
+
+  // Load existing documents
+  await loadExistingDocuments(selectedInvoice.id!);
+
+  showDetailModal = false;
+  view = 'edit';
+}
+
+async function handleVoidFromDetail() {
+  // Reload data after void
+  await loadData();
+  closeDetailModal();
+}
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(amount);
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-CA');
+}
 </script>
 
 <div class="invoices-view">

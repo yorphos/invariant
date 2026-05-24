@@ -1,10 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { calculateCPP, calculateEI, calculateIncomeTax, calculatePayroll } from '../../lib/domain/payroll-operations';
+import {
+  calculateCPP,
+  calculateEI,
+  calculateIncomeTax,
+  calculatePayroll,
+} from '../../lib/domain/payroll-operations';
 import type { EmployeePayInput } from '../../lib/domain/payroll-operations';
 
 /**
  * Payroll Operations Tests
- * 
+ *
  * Tests for Canadian payroll calculations, CPP, EI, income tax, and payroll workflows
  */
 
@@ -80,7 +85,7 @@ describe('EI Calculation', () => {
     // Employee EI: $2000 × 0.0166 = $33.20
     // Employer EI: $33.20 × 1.4 = $46.48
 
-    expect(ei.employee).toBeCloseTo(33.20, 2);
+    expect(ei.employee).toBeCloseTo(33.2, 2);
     expect(ei.employer).toBeCloseTo(46.48, 2);
   });
 
@@ -116,7 +121,7 @@ describe('EI Calculation', () => {
     // Employee EI: $1000 × 0.0166 = $16.60
     // Employer EI: $16.60 × 1.4 = $23.24
 
-    expect(ei.employee).toBeCloseTo(16.60, 2);
+    expect(ei.employee).toBeCloseTo(16.6, 2);
     expect(ei.employer).toBeCloseTo(23.24, 2);
     expect(ei.employer).toBeCloseTo(ei.employee * 1.4, 2);
   });
@@ -196,7 +201,7 @@ describe('Complete Payroll Calculation', () => {
 
     expect(payroll.gross_pay).toBe(2500);
     expect(payroll.cpp_employee).toBeCloseTo(140.72, 1);
-    expect(payroll.ei_employee).toBeCloseTo(41.50, 1);
+    expect(payroll.ei_employee).toBeCloseTo(41.5, 1);
     expect(payroll.income_tax).toBeCloseTo(284.39, 1);
     expect(payroll.net_pay).toBeCloseTo(2033.39, 0);
   });
@@ -211,8 +216,12 @@ describe('Complete Payroll Calculation', () => {
     const payroll = calculatePayroll(employee, 'biweekly');
 
     // Net pay should be: gross - cpp - ei - tax - other
-    const expectedNet = payroll.gross_pay - payroll.cpp_employee - payroll.ei_employee - 
-                        payroll.income_tax - payroll.other_deductions;
+    const expectedNet =
+      payroll.gross_pay -
+      payroll.cpp_employee -
+      payroll.ei_employee -
+      payroll.income_tax -
+      payroll.other_deductions;
 
     expect(payroll.other_deductions).toBe(100);
     expect(payroll.net_pay).toBeCloseTo(expectedNet, 2);
@@ -286,7 +295,7 @@ describe('Complete Payroll Calculation', () => {
     expect(payroll.cpp_employee).toBeGreaterThan(0);
     expect(payroll.ei_employee).toBeGreaterThan(0);
     expect(payroll.income_tax).toBeGreaterThan(0);
-    
+
     // Net should be significantly less due to progressive tax
     const deductionRate = (payroll.gross_pay - payroll.net_pay) / payroll.gross_pay;
     expect(deductionRate).toBeGreaterThan(0.25); // At least 25% deductions for high income
@@ -333,9 +342,7 @@ describe('Payroll Validation', () => {
       ytd_ei_insurable: 30000,
     };
 
-    const isValid = 
-      employee.employee_name.trim().length > 0 &&
-      employee.gross_pay > 0;
+    const isValid = employee.employee_name.trim().length > 0 && employee.gross_pay > 0;
 
     expect(isValid).toBe(true);
   });
@@ -420,11 +427,8 @@ describe('Payroll Accounting Principles', () => {
 
     const payroll = calculatePayroll(employee, 'biweekly');
 
-    const totalDeductions = 
-      payroll.cpp_employee + 
-      payroll.ei_employee + 
-      payroll.income_tax + 
-      payroll.other_deductions;
+    const totalDeductions =
+      payroll.cpp_employee + payroll.ei_employee + payroll.income_tax + payroll.other_deductions;
 
     const expectedNet = payroll.gross_pay - totalDeductions;
 
@@ -519,7 +523,8 @@ describe('Double-Entry Verification - Payroll', () => {
     const totalEILiability = payroll.ei_employee + payroll.ei_employer;
 
     // Total payroll liabilities
-    const totalLiabilities = totalCPPLiability + totalEILiability + payroll.income_tax + payroll.other_deductions;
+    const totalLiabilities =
+      totalCPPLiability + totalEILiability + payroll.income_tax + payroll.other_deductions;
 
     // Employer cost - net pay should equal total liabilities
     const calculatedLiabilities = payroll.total_employer_cost - payroll.net_pay;

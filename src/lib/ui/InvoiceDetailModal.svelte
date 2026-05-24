@@ -1,155 +1,163 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { persistenceService } from '../services/persistence';
-  import { getDatabase } from '../services/database';
-  import { voidInvoice } from '../domain/invoice-operations';
-  import { generateInvoicePDF } from '../utils/pdf-generator';
-  import type { Invoice, InvoiceLine, Contact, Allocation, Payment, JournalEntry, JournalLine, Account, PolicyMode } from '../domain/types';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import Modal from './Modal.svelte';
-  import Button from './Button.svelte';
-  import Card from './Card.svelte';
-  import Table from './Table.svelte';
+import { onMount } from 'svelte';
+import { persistenceService } from '../services/persistence';
+import { getDatabase } from '../services/database';
+import { voidInvoice } from '../domain/invoice-operations';
+import { generateInvoicePDF } from '../utils/pdf-generator';
+import type {
+  Invoice,
+  InvoiceLine,
+  Contact,
+  Allocation,
+  Payment,
+  JournalEntry,
+  JournalLine,
+  Account,
+  PolicyMode,
+} from '../domain/types';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import Modal from './Modal.svelte';
+import Button from './Button.svelte';
+import Card from './Card.svelte';
+import Table from './Table.svelte';
 
-  export let invoice: Invoice;
-  export let onclose: () => void;
-  export let onEdit: (() => void) | null = null;
-  export let onVoid: (() => void) | null = null;
-  export let mode: PolicyMode;
+export let invoice: Invoice;
+export let onclose: () => void;
+export let onEdit: (() => void) | null = null;
+export let onVoid: (() => void) | null = null;
+export let mode: PolicyMode;
 
-  let loading = true;
-  let invoiceLines: InvoiceLine[] = [];
-  let contact: Contact | null = null;
-  let accounts: Account[] = [];
-  let allocations: Allocation[] = [];
-  let payments: Payment[] = [];
-  let journalEntry: JournalEntry | null = null;
-  let journalLines: JournalLine[] = [];
-  let showVoidConfirm = false;
-  let voidReason = '';
-  let voidLoading = false;
-  let pdfDownloading = false;
+let loading = true;
+let invoiceLines: InvoiceLine[] = [];
+let contact: Contact | null = null;
+let accounts: Account[] = [];
+let allocations: Allocation[] = [];
+let payments: Payment[] = [];
+let journalEntry: JournalEntry | null = null;
+let journalLines: JournalLine[] = [];
+let showVoidConfirm = false;
+let voidReason = '';
+let voidLoading = false;
+let pdfDownloading = false;
 
-  onMount(async () => {
-    await loadDetails();
-  });
+onMount(async () => {
+  await loadDetails();
+});
 
-  async function loadDetails() {
-    loading = true;
-    try {
-      [invoiceLines, accounts, allocations] = await Promise.all([
-        persistenceService.getInvoiceLines(invoice.id!),
-        persistenceService.getAccounts(),
-        persistenceService.getAllocations(undefined, invoice.id),
-      ]);
+async function loadDetails() {
+  loading = true;
+  try {
+    [invoiceLines, accounts, allocations] = await Promise.all([
+      persistenceService.getInvoiceLines(invoice.id!),
+      persistenceService.getAccounts(),
+      persistenceService.getAllocations(undefined, invoice.id),
+    ]);
 
-      // Get contact
-      const contacts = await persistenceService.getContacts();
-      contact = contacts.find(c => c.id === invoice.contact_id) || null;
+    // Get contact
+    const contacts = await persistenceService.getContacts();
+    contact = contacts.find((c) => c.id === invoice.contact_id) || null;
 
-      // Get payments for this invoice
-      if (allocations.length > 0) {
-        const allPayments = await persistenceService.getPayments();
-        payments = allPayments.filter(p => 
-          allocations.some(a => a.payment_id === p.id)
-        );
-      }
-
-      // Get journal entry if exists
-      if (invoice.event_id) {
-        const db = await getDatabase();
-        const entries = await db.select<JournalEntry[]>(
-          'SELECT * FROM journal_entry WHERE event_id = ?',
-          [invoice.event_id]
-        );
-        if (entries.length > 0) {
-          journalEntry = entries[0];
-          journalLines = await persistenceService.getJournalLines(journalEntry.id!);
-        }
-      }
-    } catch (e) {
-      logger.error('Failed to load invoice details:', e);
-      toasts.error('Failed to load invoice details');
+    // Get payments for this invoice
+    if (allocations.length > 0) {
+      const allPayments = await persistenceService.getPayments();
+      payments = allPayments.filter((p) => allocations.some((a) => a.payment_id === p.id));
     }
-    loading = false;
+
+    // Get journal entry if exists
+    if (invoice.event_id) {
+      const db = await getDatabase();
+      const entries = await db.select<JournalEntry[]>(
+        'SELECT * FROM journal_entry WHERE event_id = ?',
+        [invoice.event_id],
+      );
+      if (entries.length > 0) {
+        journalEntry = entries[0];
+        journalLines = await persistenceService.getJournalLines(journalEntry.id!);
+      }
+    }
+  } catch (e) {
+    logger.error('Failed to load invoice details:', e);
+    toasts.error('Failed to load invoice details');
+  }
+  loading = false;
+}
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(amount);
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-CA');
+}
+
+function getAccountName(accountId: number): string {
+  const account = accounts.find((a) => a.id === accountId);
+  return account ? `${account.code} - ${account.name}` : 'Unknown Account';
+}
+
+async function handleVoid() {
+  if (!voidReason.trim()) {
+    toasts.warning('Please provide a reason for voiding this invoice');
+    return;
   }
 
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  }
+  voidLoading = true;
+  try {
+    const result = await voidInvoice(invoice.id!, voidReason, { mode });
 
-  function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-CA');
-  }
-
-  function getAccountName(accountId: number): string {
-    const account = accounts.find(a => a.id === accountId);
-    return account ? `${account.code} - ${account.name}` : 'Unknown Account';
-  }
-
-  async function handleVoid() {
-    if (!voidReason.trim()) {
-      toasts.warning('Please provide a reason for voiding this invoice');
+    if (!result.ok) {
+      toasts.error('Failed to void invoice:\n' + result.warnings.map((w) => w.message).join('\n'));
       return;
     }
 
-    voidLoading = true;
-    try {
-      const result = await voidInvoice(invoice.id!, voidReason, { mode });
-      
-      if (!result.ok) {
-        toasts.error('Failed to void invoice:\n' + result.warnings.map(w => w.message).join('\n'));
-        return;
-      }
+    if (onVoid) onVoid();
+    onclose();
+  } catch (e) {
+    logger.error('Failed to void invoice:', e);
+    toasts.error('Failed to void invoice: ' + e);
+    toasts.error('Failed to void invoice: ' + e);
+  } finally {
+    voidLoading = false;
+  }
+}
 
-      if (onVoid) onVoid();
-      onclose();
-    } catch (e) {
-      logger.error('Failed to void invoice:', e);
-      toasts.error('Failed to void invoice: ' + e);
-      toasts.error('Failed to void invoice: ' + e);
-    } finally {
-      voidLoading = false;
-    }
+function handleEdit() {
+  if (onEdit) onEdit();
+}
+
+async function handleDownloadPDF() {
+  if (!contact) {
+    toasts.error('Cannot generate PDF: customer information not found');
+    return;
   }
 
-  function handleEdit() {
-    if (onEdit) onEdit();
+  pdfDownloading = true;
+  try {
+    // Default company info (in a real app, this would come from settings)
+    const companyInfo = {
+      name: 'Your Company Name',
+      address: '123 Main Street, City, Province, A1B 2C3',
+      phone: '(555) 123-4567',
+      email: 'info@yourcompany.com',
+      taxId: 'BN: 123456789RT0001',
+    };
+
+    const pdf = generateInvoicePDF(invoice, invoiceLines, contact, companyInfo);
+
+    // Download the PDF
+    pdf.save(`${invoice.invoice_number}.pdf`);
+  } catch (e) {
+    logger.error('Failed to generate PDF:', e);
+    toasts.error('Failed to generate PDF: ' + e);
+    toasts.error('Failed to generate PDF: ' + e);
+  } finally {
+    pdfDownloading = false;
   }
-
-  async function handleDownloadPDF() {
-    if (!contact) {
-      toasts.error('Cannot generate PDF: customer information not found');
-      return;
-    }
-
-    pdfDownloading = true;
-    try {
-      // Default company info (in a real app, this would come from settings)
-      const companyInfo = {
-        name: 'Your Company Name',
-        address: '123 Main Street, City, Province, A1B 2C3',
-        phone: '(555) 123-4567',
-        email: 'info@yourcompany.com',
-        taxId: 'BN: 123456789RT0001',
-      };
-
-      const pdf = generateInvoicePDF(invoice, invoiceLines, contact, companyInfo);
-      
-      // Download the PDF
-      pdf.save(`${invoice.invoice_number}.pdf`);
-    } catch (e) {
-      logger.error('Failed to generate PDF:', e);
-      toasts.error('Failed to generate PDF: ' + e);
-      toasts.error('Failed to generate PDF: ' + e);
-    } finally {
-      pdfDownloading = false;
-    }
-  }
+}
 </script>
 
 <Modal open={true} {onclose} size="large" title="Invoice Details">

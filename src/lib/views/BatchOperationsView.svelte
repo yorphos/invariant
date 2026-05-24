@@ -1,237 +1,237 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { persistenceService } from '../services/persistence';
-  import { batchOperationsService } from '../services/batch-operations';
-  import type { BatchOperationResult, PaymentImportRow } from '../services/batch-operations';
-  import type { Contact, Invoice, InvoiceLine, PolicyMode } from '../domain/types';
-  import { confirmAction } from '../utils/confirm-action';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import Button from '../ui/Button.svelte';
-  import Input from '../ui/Input.svelte';
-  import Select from '../ui/Select.svelte';
-  import Card from '../ui/Card.svelte';
-  import Table from '../ui/Table.svelte';
+import { onMount } from 'svelte';
+import { persistenceService } from '../services/persistence';
+import { batchOperationsService } from '../services/batch-operations';
+import type { BatchOperationResult, PaymentImportRow } from '../services/batch-operations';
+import type { Contact, Invoice, InvoiceLine, PolicyMode } from '../domain/types';
+import { confirmAction } from '../utils/confirm-action';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import Button from '../ui/Button.svelte';
+import Input from '../ui/Input.svelte';
+import Select from '../ui/Select.svelte';
+import Card from '../ui/Card.svelte';
+import Table from '../ui/Table.svelte';
 
-  export let mode: PolicyMode;
+export let mode: PolicyMode;
 
-  type OperationType = 'none' | 'batch-invoices' | 'import-payments' | 'bulk-status';
+type OperationType = 'none' | 'batch-invoices' | 'import-payments' | 'bulk-status';
 
-  let currentOperation: OperationType = 'none';
-  let loading = false;
-  let contacts: Contact[] = [];
-  let invoices: Invoice[] = [];
+let currentOperation: OperationType = 'none';
+let loading = false;
+let contacts: Contact[] = [];
+let invoices: Invoice[] = [];
 
-  // Batch Invoice Creation state
-  let selectedCustomers: number[] = [];
-  let batchInvoiceStartDate = '';
-  let batchInvoiceLineDescription = 'Monthly Service Fee';
-  let batchInvoiceLineAmount = 0;
-  let batchInvoiceStartNumber = 1000;
+// Batch Invoice Creation state
+let selectedCustomers: number[] = [];
+let batchInvoiceStartDate = '';
+let batchInvoiceLineDescription = 'Monthly Service Fee';
+let batchInvoiceLineAmount = 0;
+let batchInvoiceStartNumber = 1000;
 
-  // CSV Import state
-  let csvText = '';
-  let parsedPayments: PaymentImportRow[] = [];
-  let csvParseError = '';
+// CSV Import state
+let csvText = '';
+let parsedPayments: PaymentImportRow[] = [];
+let csvParseError = '';
 
-  // Bulk Status Change state
-  let selectedInvoiceIds: number[] = [];
-  let bulkStatusFilter: 'all' | 'draft' | 'sent' | 'paid' | 'partial' | 'overdue' = 'all';
-  let bulkNewStatus: 'draft' | 'sent' | 'void' = 'sent';
+// Bulk Status Change state
+let selectedInvoiceIds: number[] = [];
+let bulkStatusFilter: 'all' | 'draft' | 'sent' | 'paid' | 'partial' | 'overdue' = 'all';
+let bulkNewStatus: 'draft' | 'sent' | 'void' = 'sent';
 
-  // Operation Result state
-  let operationResult: BatchOperationResult | null = null;
-  let showResult = false;
+// Operation Result state
+let operationResult: BatchOperationResult | null = null;
+let showResult = false;
 
-  $: filteredInvoices = bulkStatusFilter === 'all'
-    ? invoices
-    : invoices.filter(inv => inv.status === bulkStatusFilter);
+$: filteredInvoices =
+  bulkStatusFilter === 'all' ? invoices : invoices.filter((inv) => inv.status === bulkStatusFilter);
 
-  onMount(async () => {
-    await loadData();
-    batchInvoiceStartDate = new Date().toISOString().split('T')[0];
-  });
+onMount(async () => {
+  await loadData();
+  batchInvoiceStartDate = new Date().toISOString().split('T')[0];
+});
 
-  async function loadData() {
-    loading = true;
-    try {
-      [contacts, invoices] = await Promise.all([
-        persistenceService.getContacts(),
-        persistenceService.getInvoices()
-      ]);
-    } catch (e) {
-      logger.error('Failed to load data:', e);
-      toasts.error('Failed to load data: ' + e);
-    }
-    loading = false;
+async function loadData() {
+  loading = true;
+  try {
+    [contacts, invoices] = await Promise.all([
+      persistenceService.getContacts(),
+      persistenceService.getInvoices(),
+    ]);
+  } catch (e) {
+    logger.error('Failed to load data:', e);
+    toasts.error('Failed to load data: ' + e);
+  }
+  loading = false;
+}
+
+// Batch Invoice Creation
+async function handleBatchInvoices() {
+  if (selectedCustomers.length === 0) {
+    toasts.warning('Please select at least one customer');
+    return;
   }
 
-  // Batch Invoice Creation
-  async function handleBatchInvoices() {
-    if (selectedCustomers.length === 0) {
-      toasts.warning('Please select at least one customer');
-      return;
-    }
+  if (!batchInvoiceLineDescription || batchInvoiceLineAmount <= 0) {
+    toasts.warning('Please provide a valid line item description and amount');
+    return;
+  }
 
-    if (!batchInvoiceLineDescription || batchInvoiceLineAmount <= 0) {
-      toasts.warning('Please provide a valid line item description and amount');
-      return;
-    }
+  loading = true;
+  try {
+    const batchInputs = selectedCustomers.map((contactId, index) => {
+      const invoiceNumber = `INV-${String(batchInvoiceStartNumber + index).padStart(4, '0')}`;
+      const contact = contacts.find((c) => c.id === contactId)!;
 
-    loading = true;
-    try {
-      const batchInputs = selectedCustomers.map((contactId, index) => {
-        const invoiceNumber = `INV-${String(batchInvoiceStartNumber + index).padStart(4, '0')}`;
-        const contact = contacts.find(c => c.id === contactId)!;
-
-        return {
-          invoiceData: {
-            invoice_number: invoiceNumber,
-            contact_id: contactId,
-            issue_date: batchInvoiceStartDate,
-            due_date: batchInvoiceStartDate, // Could add due date offset
-            notes: 'Batch generated invoice'
+      return {
+        invoiceData: {
+          invoice_number: invoiceNumber,
+          contact_id: contactId,
+          issue_date: batchInvoiceStartDate,
+          due_date: batchInvoiceStartDate, // Could add due date offset
+          notes: 'Batch generated invoice',
+        },
+        lines: [
+          {
+            line_number: 1,
+            description: batchInvoiceLineDescription,
+            quantity: 1,
+            unit_price: batchInvoiceLineAmount,
+            amount: batchInvoiceLineAmount,
+            account_id: 0, // Will be determined by policy engine
           },
-          lines: [
-            {
-              line_number: 1,
-              description: batchInvoiceLineDescription,
-              quantity: 1,
-              unit_price: batchInvoiceLineAmount,
-              amount: batchInvoiceLineAmount,
-              account_id: 0 // Will be determined by policy engine
-            }
-          ]
-        };
-      });
+        ],
+      };
+    });
 
-      operationResult = await batchOperationsService.batchCreateInvoices(batchInputs, { mode });
-      showResult = true;
-      
-      if (operationResult.successCount > 0) {
-        await loadData();
-        selectedCustomers = [];
-      }
-    } catch (e) {
-      toasts.error('Batch operation failed: ' + e);
+    operationResult = await batchOperationsService.batchCreateInvoices(batchInputs, { mode });
+    showResult = true;
+
+    if (operationResult.successCount > 0) {
+      await loadData();
+      selectedCustomers = [];
     }
-    loading = false;
+  } catch (e) {
+    toasts.error('Batch operation failed: ' + e);
+  }
+  loading = false;
+}
+
+// CSV Payment Import
+function handleCSVParse() {
+  try {
+    parsedPayments = batchOperationsService.parsePaymentCSV(csvText);
+    csvParseError = '';
+  } catch (e) {
+    csvParseError = e instanceof Error ? e.message : String(e);
+    parsedPayments = [];
+  }
+}
+
+async function handleImportPayments() {
+  if (parsedPayments.length === 0) {
+    toasts.warning('No payments to import. Please parse CSV first.');
+    return;
   }
 
-  // CSV Payment Import
-  function handleCSVParse() {
-    try {
-      parsedPayments = batchOperationsService.parsePaymentCSV(csvText);
-      csvParseError = '';
-    } catch (e) {
-      csvParseError = e instanceof Error ? e.message : String(e);
+  loading = true;
+  try {
+    operationResult = await batchOperationsService.importPaymentsFromCSV(parsedPayments, mode);
+    showResult = true;
+
+    if (operationResult.successCount > 0) {
+      await loadData();
+      csvText = '';
       parsedPayments = [];
     }
+  } catch (e) {
+    toasts.error('Import failed: ' + e);
+  }
+  loading = false;
+}
+
+// Bulk Status Changes
+function toggleInvoiceSelection(invoiceId: number) {
+  if (selectedInvoiceIds.includes(invoiceId)) {
+    selectedInvoiceIds = selectedInvoiceIds.filter((id) => id !== invoiceId);
+  } else {
+    selectedInvoiceIds = [...selectedInvoiceIds, invoiceId];
+  }
+}
+
+function selectAllInvoices() {
+  selectedInvoiceIds = filteredInvoices.map((inv) => inv.id!);
+}
+
+function clearSelection() {
+  selectedInvoiceIds = [];
+}
+
+async function handleBulkStatusChange() {
+  if (selectedInvoiceIds.length === 0) {
+    toasts.warning('Please select at least one invoice');
+    return;
   }
 
-  async function handleImportPayments() {
-    if (parsedPayments.length === 0) {
-      toasts.warning('No payments to import. Please parse CSV first.');
-      return;
-    }
-
-    loading = true;
-    try {
-      operationResult = await batchOperationsService.importPaymentsFromCSV(parsedPayments, mode);
-      showResult = true;
-      
-      if (operationResult.successCount > 0) {
-        await loadData();
-        csvText = '';
-        parsedPayments = [];
-      }
-    } catch (e) {
-      toasts.error('Import failed: ' + e);
-    }
-    loading = false;
-  }
-
-  // Bulk Status Changes
-  function toggleInvoiceSelection(invoiceId: number) {
-    if (selectedInvoiceIds.includes(invoiceId)) {
-      selectedInvoiceIds = selectedInvoiceIds.filter(id => id !== invoiceId);
-    } else {
-      selectedInvoiceIds = [...selectedInvoiceIds, invoiceId];
-    }
-  }
-
-  function selectAllInvoices() {
-    selectedInvoiceIds = filteredInvoices.map(inv => inv.id!);
-  }
-
-  function clearSelection() {
-    selectedInvoiceIds = [];
-  }
-
-  async function handleBulkStatusChange() {
-    if (selectedInvoiceIds.length === 0) {
-      toasts.warning('Please select at least one invoice');
-      return;
-    }
-
-    const title = bulkNewStatus === 'void' ? 'Void Invoices' : 'Change Invoice Status';
-    const confirmMsg = bulkNewStatus === 'void'
+  const title = bulkNewStatus === 'void' ? 'Void Invoices' : 'Change Invoice Status';
+  const confirmMsg =
+    bulkNewStatus === 'void'
       ? `Are you sure you want to VOID ${selectedInvoiceIds.length} invoices? This creates reversal entries.`
       : `Are you sure you want to change ${selectedInvoiceIds.length} invoices to "${bulkNewStatus}" status?`;
 
-    const confirmed = await confirmAction(title, confirmMsg);
-    if (!confirmed) {
-      return;
+  const confirmed = await confirmAction(title, confirmMsg);
+  if (!confirmed) {
+    return;
+  }
+
+  loading = true;
+  try {
+    operationResult = await batchOperationsService.bulkUpdateInvoiceStatus(
+      selectedInvoiceIds,
+      bulkNewStatus,
+      mode,
+    );
+    showResult = true;
+
+    if (operationResult.successCount > 0) {
+      await loadData();
+      selectedInvoiceIds = [];
     }
-
-    loading = true;
-    try {
-      operationResult = await batchOperationsService.bulkUpdateInvoiceStatus(
-        selectedInvoiceIds,
-        bulkNewStatus,
-        mode
-      );
-      showResult = true;
-      
-      if (operationResult.successCount > 0) {
-        await loadData();
-        selectedInvoiceIds = [];
-      }
-    } catch (e) {
-      toasts.error('Bulk status change failed: ' + e);
-    }
-    loading = false;
+  } catch (e) {
+    toasts.error('Bulk status change failed: ' + e);
   }
+  loading = false;
+}
 
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  }
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(amount);
+}
 
-  function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-CA');
-  }
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-CA');
+}
 
-  function closeResultModal() {
-    showResult = false;
-    operationResult = null;
-  }
+function closeResultModal() {
+  showResult = false;
+  operationResult = null;
+}
 
-  function downloadCSVTemplate() {
-    const template = `Payment Number,Customer Name,Date,Amount,Method,Reference,Notes,Invoice Numbers
+function downloadCSVTemplate() {
+  const template = `Payment Number,Customer Name,Date,Amount,Method,Reference,Notes,Invoice Numbers
 PAY-0001,Acme Corp,2026-01-24,1500.00,transfer,REF123,January payment,INV-0001
 PAY-0002,Beta Inc,2026-01-24,2500.00,check,CHK456,Payment for invoices,INV-0002;INV-0003`;
-    
-    const blob = new Blob([template], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'payment-import-template.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+
+  const blob = new Blob([template], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'payment-import-template.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
 </script>
 
 <div class="batch-operations-view">

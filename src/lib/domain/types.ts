@@ -459,7 +459,16 @@ export interface MultiCurrencyTransaction {
 // Bank Import Types
 export type BankFileFormat = 'csv' | 'qbo' | 'ofx';
 export type BankImportStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type BankTransactionType = 'debit' | 'credit' | 'check' | 'deposit' | 'fee' | 'interest' | 'withdrawal' | 'transfer' | 'other';
+export type BankTransactionType =
+  | 'debit'
+  | 'credit'
+  | 'check'
+  | 'deposit'
+  | 'fee'
+  | 'interest'
+  | 'withdrawal'
+  | 'transfer'
+  | 'other';
 export type MatchStatus = 'unmatched' | 'auto_matched' | 'manual_matched' | 'imported' | 'ignored';
 
 export interface BankStatementImport {
@@ -535,7 +544,15 @@ export interface RuleApplicationLog {
 
 // Document Storage Types
 export type DocumentType = 'receipt' | 'invoice' | 'bill' | 'contract' | 'statement' | 'other';
-export type EntityType = 'invoice' | 'payment' | 'expense' | 'bill' | 'vendor_payment' | 'journal_entry' | 'contact' | 'other';
+export type EntityType =
+  | 'invoice'
+  | 'payment'
+  | 'expense'
+  | 'bill'
+  | 'vendor_payment'
+  | 'journal_entry'
+  | 'contact'
+  | 'other';
 export type AttachmentType = 'primary' | 'supporting' | 'related';
 
 export interface Document {

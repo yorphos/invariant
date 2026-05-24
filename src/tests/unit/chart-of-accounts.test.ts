@@ -3,14 +3,14 @@ import type { Account, AccountType } from '../../lib/domain/types';
 
 /**
  * Chart of Accounts Tests
- * 
+ *
  * Tests for account management and validation rules
  */
 
 describe('Chart of Accounts - Account Structure', () => {
   it('should have valid account codes', () => {
     const validCodes = ['1000', '1010', '2000', '3000', '4000', '5000', '6100'];
-    
+
     for (const code of validCodes) {
       expect(code).toMatch(/^\d{4}$/);
     }
@@ -18,7 +18,7 @@ describe('Chart of Accounts - Account Structure', () => {
 
   it('should enforce account type validation', () => {
     const validTypes: AccountType[] = ['asset', 'liability', 'equity', 'revenue', 'expense'];
-    
+
     for (const type of validTypes) {
       expect(['asset', 'liability', 'equity', 'revenue', 'expense']).toContain(type);
     }
@@ -37,13 +37,23 @@ describe('Chart of Accounts - Account Structure', () => {
     for (const test of testAccounts) {
       const firstDigit = parseInt(test.code[0]);
       let expectedFirstDigit = 0;
-      
+
       switch (test.type) {
-        case 'asset': expectedFirstDigit = 1; break;
-        case 'liability': expectedFirstDigit = 2; break;
-        case 'equity': expectedFirstDigit = 3; break;
-        case 'revenue': expectedFirstDigit = 4; break;
-        case 'expense': expectedFirstDigit = 5; break; // or 5-9
+        case 'asset':
+          expectedFirstDigit = 1;
+          break;
+        case 'liability':
+          expectedFirstDigit = 2;
+          break;
+        case 'equity':
+          expectedFirstDigit = 3;
+          break;
+        case 'revenue':
+          expectedFirstDigit = 4;
+          break;
+        case 'expense':
+          expectedFirstDigit = 5;
+          break; // or 5-9
       }
 
       if (test.type === 'expense') {
@@ -64,7 +74,7 @@ describe('Chart of Accounts - Account Hierarchy', () => {
       name: 'Operating Expenses',
       type: 'expense',
       parent_id: null,
-      is_active: true
+      is_active: true,
     };
 
     const childAccount: Partial<Account> = {
@@ -73,12 +83,12 @@ describe('Chart of Accounts - Account Hierarchy', () => {
       name: 'Salaries & Wages',
       type: 'expense',
       parent_id: 1, // References parent
-      is_active: true
+      is_active: true,
     };
 
     // Child should reference parent
     expect(childAccount.parent_id).toBe(parentAccount.id);
-    
+
     // Both should have same type
     expect(childAccount.type).toBe(parentAccount.type);
   });
@@ -100,14 +110,14 @@ describe('Chart of Accounts - Account Status', () => {
       code: '1010',
       name: 'Checking Account',
       type: 'asset',
-      is_active: true
+      is_active: true,
     };
 
     const inactiveAccount: Partial<Account> = {
       code: '1030',
       name: 'Old Bank Account',
       type: 'asset',
-      is_active: false
+      is_active: false,
     };
 
     expect(activeAccount.is_active).toBe(true);
@@ -120,7 +130,7 @@ describe('Chart of Accounts - Account Status', () => {
       code: '1010',
       name: 'Checking Account',
       type: 'asset',
-      is_active: true
+      is_active: true,
     };
 
     const hasTransactions = true; // Simulated check
@@ -182,7 +192,7 @@ describe('Chart of Accounts - Standard Accounts', () => {
       { code: '2000', name: 'Accounts Payable', type: 'liability' },
       { code: '2150', name: 'Customer Deposits', type: 'liability' },
       { code: '2220', name: 'HST Payable', type: 'liability' },
-      { code: '3000', name: 'Owner\'s Equity', type: 'equity' },
+      { code: '3000', name: "Owner's Equity", type: 'equity' },
       { code: '4000', name: 'Sales Revenue', type: 'revenue' },
     ];
 
@@ -270,7 +280,7 @@ describe('Chart of Accounts - Account Validation', () => {
       { code: '1010', name: 'Duplicate' }, // Duplicate!
     ];
 
-    const codes = accounts.map(a => a.code);
+    const codes = accounts.map((a) => a.code);
     const uniqueCodes = new Set(codes);
 
     expect(uniqueCodes.size).toBeLessThan(codes.length); // Duplicates detected
@@ -286,7 +296,13 @@ describe('Chart of Accounts - Account Templates', () => {
   });
 
   it('should cover all account types in default template', () => {
-    const accountTypes = new Set<AccountType>(['asset', 'liability', 'equity', 'revenue', 'expense']);
+    const accountTypes = new Set<AccountType>([
+      'asset',
+      'liability',
+      'equity',
+      'revenue',
+      'expense',
+    ]);
 
     // All types should be present
     expect(accountTypes.has('asset')).toBe(true);

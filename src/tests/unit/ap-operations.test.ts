@@ -1,10 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import type { BillInput, VendorPaymentInput, BillPaymentAllocation } from '../../lib/domain/bill-operations';
+import type {
+  BillInput,
+  VendorPaymentInput,
+  BillPaymentAllocation,
+} from '../../lib/domain/bill-operations';
 import type { BillLine } from '../../lib/domain/types';
 
 /**
  * Accounts Payable Operations Tests
- * 
+ *
  * Tests for bill creation, validation, vendor payments, and A/P workflows
  */
 
@@ -30,8 +34,8 @@ describe('Bill Operations - Validation', () => {
       line_number: 1,
       description: 'Office Supplies',
       quantity: 1,
-      unit_price: -50.00,
-      amount: -50.00,
+      unit_price: -50.0,
+      amount: -50.0,
       account_id: 6500,
     };
 
@@ -72,16 +76,16 @@ describe('Bill Operations - Validation', () => {
         line_number: 1,
         description: 'Paper',
         quantity: 10,
-        unit_price: 5.00,
-        amount: 50.00,
+        unit_price: 5.0,
+        amount: 50.0,
         account_id: 6500,
       },
       {
         line_number: 2,
         description: 'Pens',
         quantity: 5,
-        unit_price: 2.00,
-        amount: 10.00,
+        unit_price: 2.0,
+        amount: 10.0,
         account_id: 6500,
       },
     ];
@@ -90,10 +94,8 @@ describe('Bill Operations - Validation', () => {
     const hasVendor = billData.vendor_id > 0;
     const hasDates = billData.bill_date.length > 0 && billData.due_date.length > 0;
     const hasTaxCode = !!billData.tax_code_id;
-    const allLinesValid = lines.every(l => 
-      l.description.trim().length > 0 && 
-      l.amount > 0 && 
-      l.account_id > 0
+    const allLinesValid = lines.every(
+      (l) => l.description.trim().length > 0 && l.amount > 0 && l.account_id > 0,
     );
 
     expect(hasValidBillNumber).toBe(true);
@@ -108,45 +110,41 @@ describe('Bill Calculation Logic', () => {
   it('should recalculate line amounts from quantity and unit price', () => {
     const line = {
       quantity: 10,
-      unit_price: 5.50,
+      unit_price: 5.5,
       amount: 0, // Client provided wrong amount
     };
 
     const recalculated = line.quantity * line.unit_price;
-    expect(recalculated).toBe(55.00);
+    expect(recalculated).toBe(55.0);
   });
 
   it('should calculate bill subtotal correctly', () => {
-    const lines = [
-      { amount: 100.00 },
-      { amount: 50.50 },
-      { amount: 25.75 },
-    ];
+    const lines = [{ amount: 100.0 }, { amount: 50.5 }, { amount: 25.75 }];
 
     const subtotal = lines.reduce((sum, line) => sum + line.amount, 0);
     expect(subtotal).toBe(176.25);
   });
 
   it('should calculate tax amount correctly', () => {
-    const subtotal = 100.00;
+    const subtotal = 100.0;
     const taxRate = 0.13; // 13% HST
     const taxAmount = subtotal * taxRate;
 
-    expect(taxAmount).toBe(13.00);
+    expect(taxAmount).toBe(13.0);
   });
 
   it('should calculate bill total correctly', () => {
-    const subtotal = 100.00;
-    const taxAmount = 13.00;
+    const subtotal = 100.0;
+    const taxAmount = 13.0;
     const total = subtotal + taxAmount;
 
-    expect(total).toBe(113.00);
+    expect(total).toBe(113.0);
   });
 
   it('should handle decimal precision in calculations', () => {
     const lines = [
       { quantity: 3, unit_price: 1.33, amount: 3.99 },
-      { quantity: 2, unit_price: 5.55, amount: 11.10 },
+      { quantity: 2, unit_price: 5.55, amount: 11.1 },
     ];
 
     const subtotal = lines.reduce((sum, line) => sum + line.amount, 0);
@@ -189,11 +187,25 @@ describe('Bill Validation Rules', () => {
 
   it('should require all line items to have expense accounts', () => {
     const lines: BillLine[] = [
-      { line_number: 1, description: 'Item 1', quantity: 1, unit_price: 10, amount: 10, account_id: 6500 },
-      { line_number: 2, description: 'Item 2', quantity: 1, unit_price: 20, amount: 20, account_id: 0 }, // Invalid!
+      {
+        line_number: 1,
+        description: 'Item 1',
+        quantity: 1,
+        unit_price: 10,
+        amount: 10,
+        account_id: 6500,
+      },
+      {
+        line_number: 2,
+        description: 'Item 2',
+        quantity: 1,
+        unit_price: 20,
+        amount: 20,
+        account_id: 0,
+      }, // Invalid!
     ];
 
-    const allHaveAccounts = lines.every(l => l.account_id > 0);
+    const allHaveAccounts = lines.every((l) => l.account_id > 0);
     expect(allHaveAccounts).toBe(false);
   });
 });
@@ -204,8 +216,8 @@ describe('Bill Void Operations', () => {
       id: 1,
       bill_number: 'BILL-001',
       status: 'partial',
-      paid_amount: 50.00,
-      total_amount: 100.00,
+      paid_amount: 50.0,
+      total_amount: 100.0,
     };
 
     const canVoid = bill.paid_amount === 0;
@@ -218,7 +230,7 @@ describe('Bill Void Operations', () => {
       bill_number: 'BILL-001',
       status: 'pending',
       paid_amount: 0,
-      total_amount: 100.00,
+      total_amount: 100.0,
     };
 
     const canVoid = bill.paid_amount === 0 && bill.status !== 'void';
@@ -231,7 +243,7 @@ describe('Bill Void Operations', () => {
       bill_number: 'BILL-001',
       status: 'void',
       paid_amount: 0,
-      total_amount: 100.00,
+      total_amount: 100.0,
     };
 
     const canVoid = bill.paid_amount === 0 && bill.status !== 'void';
@@ -257,7 +269,7 @@ describe('Vendor Payment Operations', () => {
       payment_number: 'VP-001',
       vendor_id: 1,
       payment_date: '2026-01-24',
-      amount: -100.00,
+      amount: -100.0,
     };
 
     const isValid = payment.amount > 0;
@@ -265,10 +277,10 @@ describe('Vendor Payment Operations', () => {
   });
 
   it('should reject allocations exceeding payment amount', () => {
-    const paymentAmount = 100.00;
+    const paymentAmount = 100.0;
     const allocations: BillPaymentAllocation[] = [
-      { bill_id: 1, amount: 60.00 },
-      { bill_id: 2, amount: 50.00 }, // Total = 110, exceeds payment!
+      { bill_id: 1, amount: 60.0 },
+      { bill_id: 2, amount: 50.0 }, // Total = 110, exceeds payment!
     ];
 
     const totalAllocated = allocations.reduce((sum, a) => sum + a.amount, 0);
@@ -278,10 +290,8 @@ describe('Vendor Payment Operations', () => {
   });
 
   it('should allow partial allocation of payment', () => {
-    const paymentAmount = 100.00;
-    const allocations: BillPaymentAllocation[] = [
-      { bill_id: 1, amount: 60.00 },
-    ];
+    const paymentAmount = 100.0;
+    const allocations: BillPaymentAllocation[] = [{ bill_id: 1, amount: 60.0 }];
 
     const totalAllocated = allocations.reduce((sum, a) => sum + a.amount, 0);
     const isValid = totalAllocated <= paymentAmount;
@@ -292,10 +302,10 @@ describe('Vendor Payment Operations', () => {
   });
 
   it('should allow full allocation of payment', () => {
-    const paymentAmount = 100.00;
+    const paymentAmount = 100.0;
     const allocations: BillPaymentAllocation[] = [
-      { bill_id: 1, amount: 60.00 },
-      { bill_id: 2, amount: 40.00 },
+      { bill_id: 1, amount: 60.0 },
+      { bill_id: 2, amount: 40.0 },
     ];
 
     const totalAllocated = allocations.reduce((sum, a) => sum + a.amount, 0);
@@ -308,12 +318,12 @@ describe('Vendor Payment Operations', () => {
 
   it('should prevent allocation exceeding bill amount due', () => {
     const bill = {
-      total_amount: 100.00,
-      paid_amount: 30.00,
+      total_amount: 100.0,
+      paid_amount: 30.0,
     };
 
     const amountDue = bill.total_amount - bill.paid_amount;
-    const allocation = 80.00;
+    const allocation = 80.0;
 
     const isValid = allocation <= amountDue + 0.01; // 1 cent tolerance
     expect(isValid).toBe(false);
@@ -321,12 +331,12 @@ describe('Vendor Payment Operations', () => {
 
   it('should allow allocation up to amount due', () => {
     const bill = {
-      total_amount: 100.00,
-      paid_amount: 30.00,
+      total_amount: 100.0,
+      paid_amount: 30.0,
     };
 
     const amountDue = bill.total_amount - bill.paid_amount;
-    const allocation = 70.00;
+    const allocation = 70.0;
 
     const isValid = allocation <= amountDue + 0.01; // 1 cent tolerance
     expect(isValid).toBe(true);
@@ -336,7 +346,7 @@ describe('Vendor Payment Operations', () => {
     const bill = {
       id: 1,
       status: 'void',
-      total_amount: 100.00,
+      total_amount: 100.0,
       paid_amount: 0,
     };
 
@@ -347,9 +357,9 @@ describe('Vendor Payment Operations', () => {
 
 describe('Bill Double-Entry Accounting', () => {
   it('should create correct journal entries for bill posting', () => {
-    const subtotal = 100.00;
-    const taxAmount = 13.00;
-    const totalAmount = 113.00;
+    const subtotal = 100.0;
+    const taxAmount = 13.0;
+    const totalAmount = 113.0;
 
     // Journal entries should be:
     // DR Expense Account: $100.00
@@ -366,11 +376,11 @@ describe('Bill Double-Entry Accounting', () => {
     const totalCredits = journalLines.reduce((sum, line) => sum + line.credit, 0);
 
     expect(totalDebits).toBe(totalCredits);
-    expect(totalDebits).toBe(113.00);
+    expect(totalDebits).toBe(113.0);
   });
 
   it('should create correct journal entries for vendor payment', () => {
-    const paymentAmount = 100.00;
+    const paymentAmount = 100.0;
 
     // Journal entries should be:
     // DR Accounts Payable: $100.00
@@ -385,13 +395,13 @@ describe('Bill Double-Entry Accounting', () => {
     const totalCredits = journalLines.reduce((sum, line) => sum + line.credit, 0);
 
     expect(totalDebits).toBe(totalCredits);
-    expect(totalDebits).toBe(100.00);
+    expect(totalDebits).toBe(100.0);
   });
 
   it('should create reversal entries for voided bill', () => {
-    const originalSubtotal = 100.00;
-    const originalTax = 13.00;
-    const originalTotal = 113.00;
+    const originalSubtotal = 100.0;
+    const originalTax = 13.0;
+    const originalTotal = 113.0;
 
     // Reversal entries should be opposite:
     // CR Expense Account: $100.00
@@ -408,14 +418,14 @@ describe('Bill Double-Entry Accounting', () => {
     const totalCredits = reversalLines.reduce((sum, line) => sum + line.credit, 0);
 
     expect(totalDebits).toBe(totalCredits);
-    expect(totalDebits).toBe(113.00);
+    expect(totalDebits).toBe(113.0);
   });
 });
 
 describe('Bill Status Management', () => {
   it('should set status to pending for new unpaid bill', () => {
     const bill = {
-      total_amount: 100.00,
+      total_amount: 100.0,
       paid_amount: 0,
     };
 
@@ -425,28 +435,32 @@ describe('Bill Status Management', () => {
 
   it('should set status to partial when partially paid', () => {
     const bill = {
-      total_amount: 100.00,
-      paid_amount: 50.00,
+      total_amount: 100.0,
+      paid_amount: 50.0,
     };
 
-    const status = 
-      bill.paid_amount === 0 ? 'pending' :
-      bill.paid_amount >= bill.total_amount - 0.01 ? 'paid' :
-      'partial';
+    const status =
+      bill.paid_amount === 0
+        ? 'pending'
+        : bill.paid_amount >= bill.total_amount - 0.01
+          ? 'paid'
+          : 'partial';
 
     expect(status).toBe('partial');
   });
 
   it('should set status to paid when fully paid', () => {
     const bill = {
-      total_amount: 100.00,
-      paid_amount: 100.00,
+      total_amount: 100.0,
+      paid_amount: 100.0,
     };
 
-    const status = 
-      bill.paid_amount === 0 ? 'pending' :
-      bill.paid_amount >= bill.total_amount - 0.01 ? 'paid' :
-      'partial';
+    const status =
+      bill.paid_amount === 0
+        ? 'pending'
+        : bill.paid_amount >= bill.total_amount - 0.01
+          ? 'paid'
+          : 'partial';
 
     expect(status).toBe('paid');
   });
@@ -455,7 +469,7 @@ describe('Bill Status Management', () => {
     const bill = {
       due_date: '2026-01-01',
       paid_amount: 0,
-      total_amount: 100.00,
+      total_amount: 100.0,
     };
 
     const today = new Date('2026-01-24');

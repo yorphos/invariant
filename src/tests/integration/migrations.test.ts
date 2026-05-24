@@ -14,10 +14,12 @@ describe('Integration - Database Migrations', () => {
   }
 
   function tableExists(tableName: string): boolean {
-    const result = db.prepare(`
+    const result = db
+      .prepare(`
       SELECT name FROM sqlite_master 
       WHERE type='table' AND name=?
-    `).get(tableName);
+    `)
+      .get(tableName);
     return result !== undefined;
   }
 
@@ -31,7 +33,7 @@ describe('Integration - Database Migrations', () => {
       const migrations = getAppliedMigrations();
 
       expect(migrations.length).toBeGreaterThan(0);
-      expect(migrations.every(m => m.id && m.name && m.applied_at)).toBe(true);
+      expect(migrations.every((m) => m.id && m.name && m.applied_at)).toBe(true);
     });
 
     it('should have exactly 18 migrations applied', () => {
@@ -53,10 +55,12 @@ describe('Integration - Database Migrations', () => {
     it('should prevent reapplying the same migration', async () => {
       const migrationsBefore = getAppliedMigrations();
 
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('test', 'Test', 'TEST', 'user').lastInsertRowid as number;
+      `)
+        .run('test', 'Test', 'TEST', 'user').lastInsertRowid as number;
 
       const migrationsAfter = getAppliedMigrations();
 
@@ -67,7 +71,7 @@ describe('Integration - Database Migrations', () => {
   describe('Migration 001: Core Ledger Schema', () => {
     it('should have applied migration 001', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '001')).toBe(true);
+      expect(migrations.some((m) => m.id === '001')).toBe(true);
     });
 
     it('should create settings table', () => {
@@ -109,16 +113,16 @@ describe('Integration - Database Migrations', () => {
       const settings = db.prepare('SELECT * FROM settings').all() as any[];
 
       expect(settings.length).toBeGreaterThanOrEqual(3);
-      expect(settings.some(s => s.key === 'mode')).toBe(true);
-      expect(settings.some(s => s.key === 'locale')).toBe(true);
-      expect(settings.some(s => s.key === 'fiscal_year_start')).toBe(true);
+      expect(settings.some((s) => s.key === 'mode')).toBe(true);
+      expect(settings.some((s) => s.key === 'locale')).toBe(true);
+      expect(settings.some((s) => s.key === 'fiscal_year_start')).toBe(true);
     });
   });
 
   describe('Migration 002: Contacts AR/AP', () => {
     it('should have applied migration 002', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '002')).toBe(true);
+      expect(migrations.some((m) => m.id === '002')).toBe(true);
     });
 
     it('should create contact table', () => {
@@ -145,7 +149,7 @@ describe('Integration - Database Migrations', () => {
   describe('Migration 003: Inventory Payroll Tax', () => {
     it('should have applied migration 003', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '003')).toBe(true);
+      expect(migrations.some((m) => m.id === '003')).toBe(true);
     });
 
     it('should create tax_jurisdiction table', () => {
@@ -188,35 +192,35 @@ describe('Integration - Database Migrations', () => {
   describe('Migration 004: Integrity Triggers', () => {
     it('should have applied migration 004', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '004')).toBe(true);
+      expect(migrations.some((m) => m.id === '004')).toBe(true);
     });
   });
 
   describe('Migration 005: Allocation Constraints', () => {
     it('should have applied migration 005', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '005')).toBe(true);
+      expect(migrations.some((m) => m.id === '005')).toBe(true);
     });
   });
 
   describe('Migration 006: Tax Code Integration', () => {
     it('should have applied migration 006', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '006')).toBe(true);
+      expect(migrations.some((m) => m.id === '006')).toBe(true);
     });
   });
 
   describe('Migration 007: System Accounts Config', () => {
     it('should have applied migration 007', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '007')).toBe(true);
+      expect(migrations.some((m) => m.id === '007')).toBe(true);
     });
   });
 
   describe('Migration 008: Fiscal Periods', () => {
     it('should have applied migration 008', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '008')).toBe(true);
+      expect(migrations.some((m) => m.id === '008')).toBe(true);
     });
 
     it('should create fiscal_period table', () => {
@@ -227,14 +231,16 @@ describe('Integration - Database Migrations', () => {
   describe('Migration 009: Bank Reconciliation', () => {
     it('should have applied migration 009', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '009')).toBe(true);
+      expect(migrations.some((m) => m.id === '009')).toBe(true);
     });
 
     it('should have all required tables', () => {
-      const tables = db.prepare(`
+      const tables = db
+        .prepare(`
         SELECT name FROM sqlite_master 
         WHERE type='table' AND name NOT LIKE 'sqlite_%'
-      `).all() as any[];
+      `)
+        .all() as any[];
 
       const coreTables = [
         'account',
@@ -250,8 +256,8 @@ describe('Integration - Database Migrations', () => {
         'allocation',
       ];
 
-      coreTables.forEach(table => {
-        expect(tables.some(t => t.name === table)).toBe(true);
+      coreTables.forEach((table) => {
+        expect(tables.some((t) => t.name === table)).toBe(true);
       });
     });
   });
@@ -259,14 +265,14 @@ describe('Integration - Database Migrations', () => {
   describe('Migration 010: Vendor Bills', () => {
     it('should have applied migration 010', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '010')).toBe(true);
+      expect(migrations.some((m) => m.id === '010')).toBe(true);
     });
   });
 
   describe('Migration 011: Multi Currency', () => {
     it('should have applied migration 011', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '011')).toBe(true);
+      expect(migrations.some((m) => m.id === '011')).toBe(true);
     });
 
     it('should create currency table', () => {
@@ -281,28 +287,28 @@ describe('Integration - Database Migrations', () => {
   describe('Migration 012: Closed Period Enforcement', () => {
     it('should have applied migration 012', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '012')).toBe(true);
+      expect(migrations.some((m) => m.id === '012')).toBe(true);
     });
   });
 
   describe('Migration 013: Invoice Line Tax Inclusive', () => {
     it('should have applied migration 013', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '013')).toBe(true);
+      expect(migrations.some((m) => m.id === '013')).toBe(true);
     });
   });
 
   describe('Migration 014: Invoice Total Triggers', () => {
     it('should have applied migration 014', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '014')).toBe(true);
+      expect(migrations.some((m) => m.id === '014')).toBe(true);
     });
   });
 
   describe('Migration 015: Bank Import', () => {
     it('should have applied migration 015', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '015')).toBe(true);
+      expect(migrations.some((m) => m.id === '015')).toBe(true);
     });
 
     it('should create bank_statement_import table', () => {
@@ -325,7 +331,7 @@ describe('Integration - Database Migrations', () => {
   describe('Migration 016: Document Attachments', () => {
     it('should have applied migration 016', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '016')).toBe(true);
+      expect(migrations.some((m) => m.id === '016')).toBe(true);
     });
 
     it('should create document table', () => {
@@ -336,7 +342,7 @@ describe('Integration - Database Migrations', () => {
   describe('Migration 017: Update Channel', () => {
     it('should have applied migration 017', () => {
       const migrations = getAppliedMigrations();
-      expect(migrations.some(m => m.id === '017')).toBe(true);
+      expect(migrations.some((m) => m.id === '017')).toBe(true);
     });
   });
 
@@ -356,21 +362,25 @@ describe('Integration - Database Migrations', () => {
     });
 
     it('should enforce foreign key on journal_line.journal_entry_id', () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('test', 'Test', 'REF', 'user').lastInsertRowid as number;
+      `)
+        .run('test', 'Test', 'REF', 'user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Test', 'REF', 'posted').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Test', 'REF', 'posted').lastInsertRowid as number;
 
       expect(() => {
         db.prepare(`
           INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
           VALUES (?, ?, ?, ?)
-        `).run(99999, 1, 100.00, 0.00);
+        `).run(99999, 1, 100.0, 0.0);
       }).toThrow();
     });
   });
@@ -395,21 +405,25 @@ describe('Integration - Database Migrations', () => {
     });
 
     it('should maintain journal line debit/credit constraint', () => {
-      const eventId = db.prepare(`
+      const eventId = db
+        .prepare(`
         INSERT INTO transaction_event (event_type, description, reference, created_by)
         VALUES (?, ?, ?, ?)
-      `).run('test', 'Test', 'REF', 'user').lastInsertRowid as number;
+      `)
+        .run('test', 'Test', 'REF', 'user').lastInsertRowid as number;
 
-      const entryId = db.prepare(`
+      const entryId = db
+        .prepare(`
         INSERT INTO journal_entry (event_id, entry_date, description, reference, status)
         VALUES (?, ?, ?, ?, ?)
-      `).run(eventId, '2026-01-25', 'Test', 'REF', 'posted').lastInsertRowid as number;
+      `)
+        .run(eventId, '2026-01-25', 'Test', 'REF', 'posted').lastInsertRowid as number;
 
       expect(() => {
         db.prepare(`
           INSERT INTO journal_line (journal_entry_id, account_id, debit_amount, credit_amount)
           VALUES (?, ?, ?, ?)
-        `).run(entryId, 1, 100.00, 100.00);
+        `).run(entryId, 1, 100.0, 100.0);
       }).toThrow();
     });
   });
@@ -418,15 +432,17 @@ describe('Integration - Database Migrations', () => {
     it('should have correct default accounts seeded', () => {
       const accounts = db.prepare('SELECT * FROM account').all() as any[];
       expect(accounts.length).toBeGreaterThanOrEqual(13);
-      expect(accounts.some(a => a.code === '1000')).toBe(true);
-      expect(accounts.some(a => a.code === '1100')).toBe(true);
+      expect(accounts.some((a) => a.code === '1000')).toBe(true);
+      expect(accounts.some((a) => a.code === '1100')).toBe(true);
     });
 
     it('should have all required tables', () => {
-      const tables = db.prepare(`
+      const tables = db
+        .prepare(`
         SELECT name FROM sqlite_master 
         WHERE type='table' AND name NOT LIKE 'sqlite_%'
-      `).all() as any[];
+      `)
+        .all() as any[];
 
       const requiredTables = [
         'account',
@@ -440,19 +456,21 @@ describe('Integration - Database Migrations', () => {
         'vendor_payment',
         'bank_reconciliation',
         'bank_statement_import',
-        'bank_statement_transaction'
+        'bank_statement_transaction',
       ];
 
-      requiredTables.forEach(table => {
-        expect(tables.some(t => t.name === table)).toBe(true);
+      requiredTables.forEach((table) => {
+        expect(tables.some((t) => t.name === table)).toBe(true);
       });
     });
 
     it('should have indexes created', () => {
-      const indexes = db.prepare(`
+      const indexes = db
+        .prepare(`
         SELECT name FROM sqlite_master 
         WHERE type='index'
-      `).all() as any[];
+      `)
+        .all() as any[];
 
       expect(indexes.length).toBeGreaterThan(0);
     });
@@ -502,7 +520,9 @@ describe('Integration - Database Migrations', () => {
 
       for (const migration of allMigrations) {
         db2.exec(migration.up);
-        db2.prepare('INSERT OR IGNORE INTO _migrations (id, name) VALUES (?, ?)').run(migration.id, migration.name);
+        db2
+          .prepare('INSERT OR IGNORE INTO _migrations (id, name) VALUES (?, ?)')
+          .run(migration.id, migration.name);
       }
 
       const migrations = db2.prepare('SELECT * FROM _migrations').all() as any[];

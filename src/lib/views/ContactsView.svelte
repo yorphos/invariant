@@ -1,138 +1,138 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { persistenceService } from '../services/persistence';
-  import type { Contact } from '../domain/types';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import Button from '../ui/Button.svelte';
-  import Input from '../ui/Input.svelte';
-  import Select from '../ui/Select.svelte';
-  import Card from '../ui/Card.svelte';
-  import Modal from '../ui/Modal.svelte';
-  import Table from '../ui/Table.svelte';
+import { onMount } from 'svelte';
+import { persistenceService } from '../services/persistence';
+import type { Contact } from '../domain/types';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import Button from '../ui/Button.svelte';
+import Input from '../ui/Input.svelte';
+import Select from '../ui/Select.svelte';
+import Card from '../ui/Card.svelte';
+import Modal from '../ui/Modal.svelte';
+import Table from '../ui/Table.svelte';
 
-  let contacts: Contact[] = [];
-  let loading = true;
-  let showModal = false;
-  let editingContact: Contact | null = null;
+let contacts: Contact[] = [];
+let loading = true;
+let showModal = false;
+let editingContact: Contact | null = null;
 
-  // Form fields
-  let formType: 'customer' | 'vendor' | 'both' = 'customer';
-  let formName = '';
-  let formEmail = '';
-  let formPhone = '';
-  let formAddress = '';
-  let formTaxId = '';
-  
-  // Dynamic type options based on existing transactions
-  let availableTypeOptions: Array<{ value: string; label: string }> = [
+// Form fields
+let formType: 'customer' | 'vendor' | 'both' = 'customer';
+let formName = '';
+let formEmail = '';
+let formPhone = '';
+let formAddress = '';
+let formTaxId = '';
+
+// Dynamic type options based on existing transactions
+let availableTypeOptions: Array<{ value: string; label: string }> = [
+  { value: 'customer', label: 'Customer' },
+  { value: 'vendor', label: 'Vendor' },
+  { value: 'both', label: 'Both' },
+];
+
+onMount(async () => {
+  await loadContacts();
+});
+
+async function loadContacts() {
+  loading = true;
+  try {
+    contacts = await persistenceService.getContacts();
+  } catch (e) {
+    logger.error('Failed to load contacts:', e);
+    toasts.error('Failed to load contacts');
+  }
+  loading = false;
+}
+
+function openCreateModal() {
+  editingContact = null;
+  formType = 'customer';
+  formName = '';
+  formEmail = '';
+  formPhone = '';
+  formAddress = '';
+  formTaxId = '';
+  // For new contacts, all options are available
+  availableTypeOptions = [
     { value: 'customer', label: 'Customer' },
     { value: 'vendor', label: 'Vendor' },
-    { value: 'both', label: 'Both' }
+    { value: 'both', label: 'Both' },
   ];
+  showModal = true;
+}
 
-  onMount(async () => {
-    await loadContacts();
-  });
+async function openEditModal(contact: Contact) {
+  editingContact = contact;
+  formType = contact.type;
+  formName = contact.name;
+  formEmail = contact.email || '';
+  formPhone = contact.phone || '';
+  formAddress = contact.address || '';
+  formTaxId = contact.tax_id || '';
 
-  async function loadContacts() {
-    loading = true;
+  // Load available type options based on transactions
+  if (contact.id !== undefined) {
     try {
-      contacts = await persistenceService.getContacts();
+      const availableTypes = await persistenceService.getAvailableContactTypes(contact.id);
+      availableTypeOptions = availableTypes.map((type: 'customer' | 'vendor' | 'both') => ({
+        value: type,
+        label: type.charAt(0).toUpperCase() + type.slice(1),
+      }));
+
+      // Ensure current type is selected even if not in available options (shouldn't happen, but safety)
+      if (!availableTypes.includes(contact.type)) {
+        formType = 'both'; // Default to 'both' which is always available
+      }
     } catch (e) {
-      logger.error('Failed to load contacts:', e);
-      toasts.error('Failed to load contacts');
-    }
-    loading = false;
-  }
-
-  function openCreateModal() {
-    editingContact = null;
-    formType = 'customer';
-    formName = '';
-    formEmail = '';
-    formPhone = '';
-    formAddress = '';
-    formTaxId = '';
-    // For new contacts, all options are available
-    availableTypeOptions = [
-      { value: 'customer', label: 'Customer' },
-      { value: 'vendor', label: 'Vendor' },
-      { value: 'both', label: 'Both' }
-    ];
-    showModal = true;
-  }
-
-  async function openEditModal(contact: Contact) {
-    editingContact = contact;
-    formType = contact.type;
-    formName = contact.name;
-    formEmail = contact.email || '';
-    formPhone = contact.phone || '';
-    formAddress = contact.address || '';
-    formTaxId = contact.tax_id || '';
-    
-    // Load available type options based on transactions
-    if (contact.id !== undefined) {
-      try {
-        const availableTypes = await persistenceService.getAvailableContactTypes(contact.id);
-        availableTypeOptions = availableTypes.map((type: 'customer' | 'vendor' | 'both') => ({
-          value: type,
-          label: type.charAt(0).toUpperCase() + type.slice(1)
-        }));
-        
-        // Ensure current type is selected even if not in available options (shouldn't happen, but safety)
-        if (!availableTypes.includes(contact.type)) {
-          formType = 'both'; // Default to 'both' which is always available
-        }
-      } catch (e) {
-        logger.error('Failed to load available contact types:', e);
+      logger.error('Failed to load available contact types:', e);
       toasts.error('Failed to load contact type options');
-        // Fallback to all options
-        availableTypeOptions = [
-          { value: 'customer', label: 'Customer' },
-          { value: 'vendor', label: 'Vendor' },
-          { value: 'both', label: 'Both' }
-        ];
-      }
-    }
-    
-    showModal = true;
-  }
-
-  function closeModal() {
-    showModal = false;
-    editingContact = null;
-  }
-
-  async function handleSubmit() {
-    try {
-      const contactData = {
-        type: formType,
-        name: formName,
-        email: formEmail || undefined,
-        phone: formPhone || undefined,
-        address: formAddress || undefined,
-        tax_id: formTaxId || undefined,
-        is_active: true,
-      };
-
-      if (editingContact && editingContact.id !== undefined) {
-        // Update existing contact
-        await persistenceService.updateContact(editingContact.id, contactData);
-      } else {
-        // Create new contact
-        await persistenceService.createContact(contactData);
-      }
-      
-      await loadContacts();
-      closeModal();
-    } catch (e) {
-      logger.error('Failed to save contact:', e);
-      toasts.error('Failed to save contact: ' + e);
-      toasts.error('Failed to save contact: ' + e);
+      // Fallback to all options
+      availableTypeOptions = [
+        { value: 'customer', label: 'Customer' },
+        { value: 'vendor', label: 'Vendor' },
+        { value: 'both', label: 'Both' },
+      ];
     }
   }
+
+  showModal = true;
+}
+
+function closeModal() {
+  showModal = false;
+  editingContact = null;
+}
+
+async function handleSubmit() {
+  try {
+    const contactData = {
+      type: formType,
+      name: formName,
+      email: formEmail || undefined,
+      phone: formPhone || undefined,
+      address: formAddress || undefined,
+      tax_id: formTaxId || undefined,
+      is_active: true,
+    };
+
+    if (editingContact && editingContact.id !== undefined) {
+      // Update existing contact
+      await persistenceService.updateContact(editingContact.id, contactData);
+    } else {
+      // Create new contact
+      await persistenceService.createContact(contactData);
+    }
+
+    await loadContacts();
+    closeModal();
+  } catch (e) {
+    logger.error('Failed to save contact:', e);
+    toasts.error('Failed to save contact: ' + e);
+    toasts.error('Failed to save contact: ' + e);
+  }
+}
 </script>
 
 <div class="contacts-view">

@@ -1,271 +1,277 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { persistenceService } from '../services/persistence';
-  import { postingEngine } from '../domain/posting-engine';
-  import type { PolicyMode, Account, JournalEntry, JournalLine } from '../domain/types';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import Button from '../ui/Button.svelte';
-  import Card from '../ui/Card.svelte';
-  import Input from '../ui/Input.svelte';
-  import Select from '../ui/Select.svelte';
-  import Table from '../ui/Table.svelte';
-  import Modal from '../ui/Modal.svelte';
+import { onMount } from 'svelte';
+import { persistenceService } from '../services/persistence';
+import { postingEngine } from '../domain/posting-engine';
+import type { PolicyMode, Account, JournalEntry, JournalLine } from '../domain/types';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import Button from '../ui/Button.svelte';
+import Card from '../ui/Card.svelte';
+import Input from '../ui/Input.svelte';
+import Select from '../ui/Select.svelte';
+import Table from '../ui/Table.svelte';
+import Modal from '../ui/Modal.svelte';
 
-  export let mode: PolicyMode;
+export let mode: PolicyMode;
 
-  // View state
-  let view: 'list' | 'create' = 'list';
-  let loading = true;
-  let submitting = false;
+// View state
+let view: 'list' | 'create' = 'list';
+let loading = true;
+let submitting = false;
 
-  // Data
-  let journalEntries: (JournalEntry & { lines?: JournalLine[] })[] = [];
-  let accounts: Account[] = [];
+// Data
+let journalEntries: (JournalEntry & { lines?: JournalLine[] })[] = [];
+let accounts: Account[] = [];
 
-  // Form state
-  let formDate = new Date().toISOString().split('T')[0];
-  let formDescription = '';
-  let formReference = '';
-  let formLines: {
-    account_id: number | '';
-    debit_amount: number;
-    credit_amount: number;
-    description: string;
-  }[] = [
+// Form state
+let formDate = new Date().toISOString().split('T')[0];
+let formDescription = '';
+let formReference = '';
+let formLines: {
+  account_id: number | '';
+  debit_amount: number;
+  credit_amount: number;
+  description: string;
+}[] = [
+  { account_id: '', debit_amount: 0, credit_amount: 0, description: '' },
+  { account_id: '', debit_amount: 0, credit_amount: 0, description: '' },
+];
+
+// Detail modal
+let showDetailModal = false;
+let selectedEntry: (JournalEntry & { lines?: JournalLine[] }) | null = null;
+
+// Validation
+let validationErrors: string[] = [];
+
+// Reactive calculations
+$: totalDebits = formLines.reduce((sum, line) => sum + (line.debit_amount || 0), 0);
+$: totalCredits = formLines.reduce((sum, line) => sum + (line.credit_amount || 0), 0);
+$: isBalanced = Math.abs(totalDebits - totalCredits) <= 0.01;
+$: difference = totalDebits - totalCredits;
+
+// Account options for dropdown
+$: accountOptions = accounts
+  .filter((a) => a.is_active)
+  .map((a) => ({
+    value: a.id!,
+    label: `${a.code} - ${a.name}`,
+  }))
+  .sort((a, b) => a.label.localeCompare(b.label));
+
+onMount(async () => {
+  await loadData();
+});
+
+async function loadData() {
+  loading = true;
+  try {
+    // Use optimized query that fetches entries and lines in 2 queries instead of N+1
+    const [entriesWithLines, accountsResult] = await Promise.all([
+      persistenceService.getJournalEntriesWithLines(50),
+      persistenceService.getAccounts(),
+    ]);
+
+    journalEntries = entriesWithLines;
+    accounts = accountsResult;
+  } catch (e) {
+    logger.error('Failed to load journal entries:', e);
+    toasts.error('Failed to load journal entries');
+  }
+  loading = false;
+}
+
+function addLine() {
+  formLines = [
+    ...formLines,
     { account_id: '', debit_amount: 0, credit_amount: 0, description: '' },
-    { account_id: '', debit_amount: 0, credit_amount: 0, description: '' }
   ];
+}
 
-  // Detail modal
-  let showDetailModal = false;
-  let selectedEntry: (JournalEntry & { lines?: JournalLine[] }) | null = null;
+function removeLine(index: number) {
+  if (formLines.length > 2) {
+    formLines = formLines.filter((_, i) => i !== index);
+  }
+}
 
-  // Validation
-  let validationErrors: string[] = [];
+function handleDebitChange(index: number, value: number) {
+  // If debit is entered, clear credit
+  if (value > 0) {
+    formLines[index].credit_amount = 0;
+  }
+  formLines[index].debit_amount = value;
+  formLines = [...formLines]; // Trigger reactivity
+}
 
-  // Reactive calculations
-  $: totalDebits = formLines.reduce((sum, line) => sum + (line.debit_amount || 0), 0);
-  $: totalCredits = formLines.reduce((sum, line) => sum + (line.credit_amount || 0), 0);
-  $: isBalanced = Math.abs(totalDebits - totalCredits) <= 0.01;
-  $: difference = totalDebits - totalCredits;
+function handleCreditChange(index: number, value: number) {
+  // If credit is entered, clear debit
+  if (value > 0) {
+    formLines[index].debit_amount = 0;
+  }
+  formLines[index].credit_amount = value;
+  formLines = [...formLines]; // Trigger reactivity
+}
 
-  // Account options for dropdown
-  $: accountOptions = accounts
-    .filter(a => a.is_active)
-    .map(a => ({
-      value: a.id!,
-      label: `${a.code} - ${a.name}`
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+function validateForm(): boolean {
+  validationErrors = [];
 
-  onMount(async () => {
-    await loadData();
-  });
-
-  async function loadData() {
-    loading = true;
-    try {
-      // Use optimized query that fetches entries and lines in 2 queries instead of N+1
-      const [entriesWithLines, accountsResult] = await Promise.all([
-        persistenceService.getJournalEntriesWithLines(50),
-        persistenceService.getAccounts()
-      ]);
-      
-      journalEntries = entriesWithLines;
-      accounts = accountsResult;
-    } catch (e) {
-      logger.error('Failed to load journal entries:', e);
-      toasts.error('Failed to load journal entries');
-    }
-    loading = false;
+  if (!formDate) {
+    validationErrors.push('Date is required');
   }
 
-  function addLine() {
-    formLines = [
-      ...formLines,
-      { account_id: '', debit_amount: 0, credit_amount: 0, description: '' }
-    ];
+  if (!formDescription.trim()) {
+    validationErrors.push('Description is required');
   }
 
-  function removeLine(index: number) {
-    if (formLines.length > 2) {
-      formLines = formLines.filter((_, i) => i !== index);
+  // Check lines
+  const validLines = formLines.filter(
+    (line) => line.account_id && (line.debit_amount > 0 || line.credit_amount > 0),
+  );
+
+  if (validLines.length < 2) {
+    validationErrors.push('At least two lines with amounts are required');
+  }
+
+  // Check for missing accounts
+  for (let i = 0; i < formLines.length; i++) {
+    const line = formLines[i];
+    if ((line.debit_amount > 0 || line.credit_amount > 0) && !line.account_id) {
+      validationErrors.push(`Line ${i + 1}: Account is required`);
     }
   }
 
-  function handleDebitChange(index: number, value: number) {
-    // If debit is entered, clear credit
-    if (value > 0) {
-      formLines[index].credit_amount = 0;
-    }
-    formLines[index].debit_amount = value;
-    formLines = [...formLines]; // Trigger reactivity
-  }
-
-  function handleCreditChange(index: number, value: number) {
-    // If credit is entered, clear debit
-    if (value > 0) {
-      formLines[index].debit_amount = 0;
-    }
-    formLines[index].credit_amount = value;
-    formLines = [...formLines]; // Trigger reactivity
-  }
-
-  function validateForm(): boolean {
-    validationErrors = [];
-
-    if (!formDate) {
-      validationErrors.push('Date is required');
-    }
-
-    if (!formDescription.trim()) {
-      validationErrors.push('Description is required');
-    }
-
-    // Check lines
-    const validLines = formLines.filter(
-      line => line.account_id && (line.debit_amount > 0 || line.credit_amount > 0)
+  // Check balance
+  if (!isBalanced) {
+    validationErrors.push(
+      `Entry is not balanced. Difference: ${formatCurrency(Math.abs(difference))}`,
     );
+  }
 
-    if (validLines.length < 2) {
-      validationErrors.push('At least two lines with amounts are required');
+  // Use posting engine validation
+  const linesToValidate: JournalLine[] = formLines
+    .filter((line) => line.account_id && (line.debit_amount > 0 || line.credit_amount > 0))
+    .map((line) => ({
+      account_id: line.account_id as number,
+      debit_amount: line.debit_amount || 0,
+      credit_amount: line.credit_amount || 0,
+      description: line.description,
+    }));
+
+  const balanceWarnings = postingEngine.validateBalance(linesToValidate);
+  for (const warning of balanceWarnings) {
+    if (warning.level === 'error' && !validationErrors.includes(warning.message)) {
+      validationErrors.push(warning.message);
     }
+  }
 
-    // Check for missing accounts
-    for (let i = 0; i < formLines.length; i++) {
-      const line = formLines[i];
-      if ((line.debit_amount > 0 || line.credit_amount > 0) && !line.account_id) {
-        validationErrors.push(`Line ${i + 1}: Account is required`);
-      }
-    }
+  return validationErrors.length === 0;
+}
 
-    // Check balance
-    if (!isBalanced) {
-      validationErrors.push(`Entry is not balanced. Difference: ${formatCurrency(Math.abs(difference))}`);
-    }
+async function handleSubmit() {
+  if (!validateForm()) {
+    return;
+  }
 
-    // Use posting engine validation
-    const linesToValidate: JournalLine[] = formLines
-      .filter(line => line.account_id && (line.debit_amount > 0 || line.credit_amount > 0))
-      .map(line => ({
+  submitting = true;
+
+  try {
+    // Create transaction event for audit trail
+    const eventId = await persistenceService.createTransactionEvent({
+      event_type: 'manual_journal_entry',
+      description: formDescription,
+      reference: formReference || undefined,
+      created_by: 'user',
+    });
+
+    // Prepare journal lines
+    const linesToCreate: Omit<JournalLine, 'id' | 'journal_entry_id'>[] = formLines
+      .filter((line) => line.account_id && (line.debit_amount > 0 || line.credit_amount > 0))
+      .map((line) => ({
         account_id: line.account_id as number,
         debit_amount: line.debit_amount || 0,
         credit_amount: line.credit_amount || 0,
-        description: line.description
+        description: line.description || formDescription,
       }));
 
-    const balanceWarnings = postingEngine.validateBalance(linesToValidate);
-    for (const warning of balanceWarnings) {
-      if (warning.level === 'error' && !validationErrors.includes(warning.message)) {
-        validationErrors.push(warning.message);
-      }
-    }
-
-    return validationErrors.length === 0;
-  }
-
-  async function handleSubmit() {
-    if (!validateForm()) {
-      return;
-    }
-
-    submitting = true;
-
-    try {
-      // Create transaction event for audit trail
-      const eventId = await persistenceService.createTransactionEvent({
-        event_type: 'manual_journal_entry',
+    // Create journal entry with lines
+    await persistenceService.createJournalEntry(
+      {
+        event_id: eventId,
+        entry_date: formDate,
         description: formDescription,
         reference: formReference || undefined,
-        created_by: 'user'
-      });
+        status: 'posted',
+      },
+      linesToCreate,
+    );
 
-      // Prepare journal lines
-      const linesToCreate: Omit<JournalLine, 'id' | 'journal_entry_id'>[] = formLines
-        .filter(line => line.account_id && (line.debit_amount > 0 || line.credit_amount > 0))
-        .map(line => ({
-          account_id: line.account_id as number,
-          debit_amount: line.debit_amount || 0,
-          credit_amount: line.credit_amount || 0,
-          description: line.description || formDescription
-        }));
-
-      // Create journal entry with lines
-      await persistenceService.createJournalEntry(
-        {
-          event_id: eventId,
-          entry_date: formDate,
-          description: formDescription,
-          reference: formReference || undefined,
-          status: 'posted'
-        },
-        linesToCreate
-      );
-
-      // Success - reload and reset
-      await loadData();
-      resetForm();
-      view = 'list';
-    } catch (e) {
-      logger.error('Failed to create journal entry:', e);
-      toasts.error('Failed to create journal entry: ' + e);
-      validationErrors = [`Failed to create journal entry: ${e}`];
-    }
-
-    submitting = false;
-  }
-
-  function resetForm() {
-    formDate = new Date().toISOString().split('T')[0];
-    formDescription = '';
-    formReference = '';
-    formLines = [
-      { account_id: '', debit_amount: 0, credit_amount: 0, description: '' },
-      { account_id: '', debit_amount: 0, credit_amount: 0, description: '' }
-    ];
-    validationErrors = [];
-  }
-
-  function handleCancel() {
+    // Success - reload and reset
+    await loadData();
     resetForm();
     view = 'list';
+  } catch (e) {
+    logger.error('Failed to create journal entry:', e);
+    toasts.error('Failed to create journal entry: ' + e);
+    validationErrors = [`Failed to create journal entry: ${e}`];
   }
 
-  async function viewEntryDetails(entry: JournalEntry & { lines?: JournalLine[] }) {
-    selectedEntry = entry;
-    showDetailModal = true;
-  }
+  submitting = false;
+}
 
-  function closeDetailModal() {
-    showDetailModal = false;
-    selectedEntry = null;
-  }
+function resetForm() {
+  formDate = new Date().toISOString().split('T')[0];
+  formDescription = '';
+  formReference = '';
+  formLines = [
+    { account_id: '', debit_amount: 0, credit_amount: 0, description: '' },
+    { account_id: '', debit_amount: 0, credit_amount: 0, description: '' },
+  ];
+  validationErrors = [];
+}
 
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  }
+function handleCancel() {
+  resetForm();
+  view = 'list';
+}
 
-  function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-CA');
-  }
+async function viewEntryDetails(entry: JournalEntry & { lines?: JournalLine[] }) {
+  selectedEntry = entry;
+  showDetailModal = true;
+}
 
-  function getAccountName(accountId: number): string {
-    const account = accounts.find(a => a.id === accountId);
-    return account ? `${account.code} - ${account.name}` : `Account #${accountId}`;
-  }
+function closeDetailModal() {
+  showDetailModal = false;
+  selectedEntry = null;
+}
 
-  function getStatusBadgeClass(status: string): string {
-    switch (status) {
-      case 'posted': return 'status-posted';
-      case 'draft': return 'status-draft';
-      case 'void': return 'status-void';
-      default: return '';
-    }
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(amount);
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-CA');
+}
+
+function getAccountName(accountId: number): string {
+  const account = accounts.find((a) => a.id === accountId);
+  return account ? `${account.code} - ${account.name}` : `Account #${accountId}`;
+}
+
+function getStatusBadgeClass(status: string): string {
+  switch (status) {
+    case 'posted':
+      return 'status-posted';
+    case 'draft':
+      return 'status-draft';
+    case 'void':
+      return 'status-void';
+    default:
+      return '';
   }
+}
 </script>
 
 <div class="journal-entry-view">

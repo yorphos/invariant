@@ -1,199 +1,218 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { getDatabase } from '../services/database';
-  import { getBalanceSheetData, getProfitAndLossData, getTrialBalanceData, getInventoryValuationData, getCashFlowData, getGeneralLedgerData } from '../services/reports';
-import { getBudgets, getBudgetVsActual, type BudgetRecord, type BudgetVsActualData } from '../services/budget';
-  import type { AccountBalance, InventoryValuationLine, CashFlowData, GeneralLedgerLine } from '../services/reports';
-  import type { Account } from '../domain/types';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import Card from '../ui/Card.svelte';
-  import Input from '../ui/Input.svelte';
-  import Select from '../ui/Select.svelte';
-  import Table from '../ui/Table.svelte';
-  import Button from '../ui/Button.svelte';
-  import { toCSV, downloadCSV, formatCurrencyForCSV } from '../utils/csv-export';
-  import type { CSVRow } from '../utils/csv-export';
+import { onMount } from 'svelte';
+import { getDatabase } from '../services/database';
+import {
+  getBalanceSheetData,
+  getProfitAndLossData,
+  getTrialBalanceData,
+  getInventoryValuationData,
+  getCashFlowData,
+  getGeneralLedgerData,
+} from '../services/reports';
+import {
+  getBudgets,
+  getBudgetVsActual,
+  type BudgetRecord,
+  type BudgetVsActualData,
+} from '../services/budget';
+import type {
+  AccountBalance,
+  InventoryValuationLine,
+  CashFlowData,
+  GeneralLedgerLine,
+} from '../services/reports';
+import type { Account } from '../domain/types';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import Card from '../ui/Card.svelte';
+import Input from '../ui/Input.svelte';
+import Select from '../ui/Select.svelte';
+import Table from '../ui/Table.svelte';
+import Button from '../ui/Button.svelte';
+import { toCSV, downloadCSV, formatCurrencyForCSV } from '../utils/csv-export';
+import type { CSVRow } from '../utils/csv-export';
 
-  let loading = false;
-  
-  // Balance Sheet & Trial Balance use single "as of" date (point in time)
-  let asOfDate = '';
-  
-  // Income Statement uses date range (period)
-  let incomeStartDate = '';
-  let incomeEndDate = '';
+let loading = false;
 
-  // Separate balances for different report types
-  let balanceSheetBalances: AccountBalance[] = [];
-  let incomeStatementBalances: AccountBalance[] = [];
-  let trialBalances: AccountBalance[] = [];
-  
-  // Integrity check
-  interface IntegrityCheck {
-    subledgerTotal: number;
-    glBalance: number;
-    difference: number;
-    isBalanced: boolean;
-  }
-  let arIntegrityCheck: IntegrityCheck | null = null;
-  
-  // A/R Aging
-  interface AgingBucket {
-    customer_name: string;
-    current: number;
-    days_1_30: number;
-    days_31_60: number;
-    days_61_90: number;
-    days_over_90: number;
-    total: number;
-  }
-  let arAging: AgingBucket[] = [];
-  
-  // Budget vs Actual
-  let budgetsList: BudgetRecord[] = [];
-  let selectedBudgetId: number | '' = '';
-  let bvaStartDate = '';
-  let bvaEndDate = '';
-  let budgetVsActualData: BudgetVsActualData | null = null;
+// Balance Sheet & Trial Balance use single "as of" date (point in time)
+let asOfDate = '';
 
-  // Report type selector: 'all' shows all reports, otherwise specific report
-  let reportType: 'all' | 'cash-flow' | 'general-ledger' | 'budget-vs-actual' = 'all';
-  
-  // Cash Flow
-  let cashFlowData: CashFlowData | null = null;
-  let cfStartDate = '';
-  let cfEndDate = '';
-  
-  // General Ledger
-  let generalLedgerLines: GeneralLedgerLine[] = [];
-  let glStartDate = '';
-  let glEndDate = '';
-  let glAccountId: number | undefined = undefined;
-  let glAccounts: Account[] = [];
-  let glTotalDebits = 0;
-  let glTotalCredits = 0;
-  let glStartBalance = 0;
-  let glEndBalance = 0;
-  
-  // A/P Aging
-  interface APAgingBucket {
-    vendor_name: string;
-    current: number;
-    days_1_30: number;
-    days_31_60: number;
-    days_61_90: number;
-    days_over_90: number;
-    total: number;
-  }
-  let apAging: APAgingBucket[] = [];
-  
-  onMount(async () => {
-    // Set default dates
-    const today = new Date();
-    asOfDate = today.toISOString().split('T')[0];
-    
-    // Default to current month for income statement
-    incomeStartDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-    incomeEndDate = today.toISOString().split('T')[0];
-    
-    // Default to current month for cash flow and GL
-    cfStartDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-    cfEndDate = today.toISOString().split('T')[0];
-    glStartDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0]; // YTD
-    glEndDate = today.toISOString().split('T')[0];
-    
-    // Load accounts for GL filter
-    try {
-      const db = await getDatabase();
-      glAccounts = await db.select<Account[]>('SELECT * FROM account WHERE is_active = 1 ORDER BY code');
-    } catch (e) {
-      logger.error('Failed to load accounts:', e);
-      toasts.error('Failed to load accounts for reports');
-    }
+// Income Statement uses date range (period)
+let incomeStartDate = '';
+let incomeEndDate = '';
 
-    // Set default dates for budget vs actual
-    bvaStartDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0]; // YTD
-    bvaEndDate = today.toISOString().split('T')[0];
+// Separate balances for different report types
+let balanceSheetBalances: AccountBalance[] = [];
+let incomeStatementBalances: AccountBalance[] = [];
+let trialBalances: AccountBalance[] = [];
 
-    await loadAllReports();
-    await loadBudgetsList();
-  });
+// Integrity check
+interface IntegrityCheck {
+  subledgerTotal: number;
+  glBalance: number;
+  difference: number;
+  isBalanced: boolean;
+}
+let arIntegrityCheck: IntegrityCheck | null = null;
 
-  async function loadAllReports() {
-    await Promise.all([
-      loadBalanceSheet(),
-      loadIncomeStatement(),
-      loadTrialBalance(),
-      loadARIntegrityCheck(),
-      loadARAging(),
-      loadAPAging()
-    ]);
-  }
+// A/R Aging
+interface AgingBucket {
+  customer_name: string;
+  current: number;
+  days_1_30: number;
+  days_31_60: number;
+  days_61_90: number;
+  days_over_90: number;
+  total: number;
+}
+let arAging: AgingBucket[] = [];
 
-  async function loadBalanceSheet() {
-    loading = true;
-    try {
-      // Use optimized service layer with grouped aggregate query
-      const data = await getBalanceSheetData(asOfDate);
-      balanceSheetBalances = [...data.assets, ...data.liabilities, ...data.equity];
-    } catch (e) {
-      logger.error('Failed to load balance sheet:', e);
-      toasts.error('Failed to load balance sheet: ' + e);
-    }
-    loading = false;
+// Budget vs Actual
+let budgetsList: BudgetRecord[] = [];
+let selectedBudgetId: number | '' = '';
+let bvaStartDate = '';
+let bvaEndDate = '';
+let budgetVsActualData: BudgetVsActualData | null = null;
+
+// Report type selector: 'all' shows all reports, otherwise specific report
+let reportType: 'all' | 'cash-flow' | 'general-ledger' | 'budget-vs-actual' = 'all';
+
+// Cash Flow
+let cashFlowData: CashFlowData | null = null;
+let cfStartDate = '';
+let cfEndDate = '';
+
+// General Ledger
+let generalLedgerLines: GeneralLedgerLine[] = [];
+let glStartDate = '';
+let glEndDate = '';
+let glAccountId: number | undefined = undefined;
+let glAccounts: Account[] = [];
+let glTotalDebits = 0;
+let glTotalCredits = 0;
+let glStartBalance = 0;
+let glEndBalance = 0;
+
+// A/P Aging
+interface APAgingBucket {
+  vendor_name: string;
+  current: number;
+  days_1_30: number;
+  days_31_60: number;
+  days_61_90: number;
+  days_over_90: number;
+  total: number;
+}
+let apAging: APAgingBucket[] = [];
+
+onMount(async () => {
+  // Set default dates
+  const today = new Date();
+  asOfDate = today.toISOString().split('T')[0];
+
+  // Default to current month for income statement
+  incomeStartDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  incomeEndDate = today.toISOString().split('T')[0];
+
+  // Default to current month for cash flow and GL
+  cfStartDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  cfEndDate = today.toISOString().split('T')[0];
+  glStartDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0]; // YTD
+  glEndDate = today.toISOString().split('T')[0];
+
+  // Load accounts for GL filter
+  try {
+    const db = await getDatabase();
+    glAccounts = await db.select<Account[]>(
+      'SELECT * FROM account WHERE is_active = 1 ORDER BY code',
+    );
+  } catch (e) {
+    logger.error('Failed to load accounts:', e);
+    toasts.error('Failed to load accounts for reports');
   }
 
-  async function loadIncomeStatement() {
-    loading = true;
-    try {
-      // Use optimized service layer with grouped aggregate query
-      const data = await getProfitAndLossData(incomeStartDate, incomeEndDate);
-      incomeStatementBalances = [...data.revenue, ...data.expenses];
-    } catch (e) {
-      logger.error('Failed to load income statement:', e);
-      toasts.error('Failed to load income statement: ' + e);
-    }
-    loading = false;
-  }
+  // Set default dates for budget vs actual
+  bvaStartDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0]; // YTD
+  bvaEndDate = today.toISOString().split('T')[0];
 
-  async function loadTrialBalance() {
-    loading = true;
-    try {
-      // Use optimized service layer with grouped aggregate query
-      const data = await getTrialBalanceData(asOfDate);
-      trialBalances = data.accounts;
-    } catch (e) {
-      logger.error('Failed to load trial balance:', e);
-      toasts.error('Failed to load trial balance: ' + e);
-    }
-    loading = false;
-  }
+  await loadAllReports();
+  await loadBudgetsList();
+});
 
-  async function loadARIntegrityCheck() {
-    loading = true;
-    try {
-      const db = await getDatabase();
-      
-      // Get total from invoice subledger (total_amount - paid_amount)
-      const subledgerResult = await db.select<Array<{ total: number }>>(
-        `SELECT COALESCE(SUM(total_amount - paid_amount), 0) as total
+async function loadAllReports() {
+  await Promise.all([
+    loadBalanceSheet(),
+    loadIncomeStatement(),
+    loadTrialBalance(),
+    loadARIntegrityCheck(),
+    loadARAging(),
+    loadAPAging(),
+  ]);
+}
+
+async function loadBalanceSheet() {
+  loading = true;
+  try {
+    // Use optimized service layer with grouped aggregate query
+    const data = await getBalanceSheetData(asOfDate);
+    balanceSheetBalances = [...data.assets, ...data.liabilities, ...data.equity];
+  } catch (e) {
+    logger.error('Failed to load balance sheet:', e);
+    toasts.error('Failed to load balance sheet: ' + e);
+  }
+  loading = false;
+}
+
+async function loadIncomeStatement() {
+  loading = true;
+  try {
+    // Use optimized service layer with grouped aggregate query
+    const data = await getProfitAndLossData(incomeStartDate, incomeEndDate);
+    incomeStatementBalances = [...data.revenue, ...data.expenses];
+  } catch (e) {
+    logger.error('Failed to load income statement:', e);
+    toasts.error('Failed to load income statement: ' + e);
+  }
+  loading = false;
+}
+
+async function loadTrialBalance() {
+  loading = true;
+  try {
+    // Use optimized service layer with grouped aggregate query
+    const data = await getTrialBalanceData(asOfDate);
+    trialBalances = data.accounts;
+  } catch (e) {
+    logger.error('Failed to load trial balance:', e);
+    toasts.error('Failed to load trial balance: ' + e);
+  }
+  loading = false;
+}
+
+async function loadARIntegrityCheck() {
+  loading = true;
+  try {
+    const db = await getDatabase();
+
+    // Get total from invoice subledger (total_amount - paid_amount)
+    const subledgerResult = await db.select<Array<{ total: number }>>(
+      `SELECT COALESCE(SUM(total_amount - paid_amount), 0) as total
          FROM invoice
          WHERE status NOT IN ('void', 'paid')
          AND DATE(issue_date) <= ?`,
-        [asOfDate]
-      );
-      
-      const subledgerTotal = subledgerResult[0]?.total || 0;
-      
-      // Get A/R balance from general ledger
-      const accounts = await db.select<Account[]>(
-        `SELECT * FROM account WHERE code = '1100' LIMIT 1`
-      );
-      
-      if (accounts[0]) {
-        const glResult = await db.select<Array<{ debit_total: number; credit_total: number }>>(
-          `SELECT 
+      [asOfDate],
+    );
+
+    const subledgerTotal = subledgerResult[0]?.total || 0;
+
+    // Get A/R balance from general ledger
+    const accounts = await db.select<Account[]>(
+      `SELECT * FROM account WHERE code = '1100' LIMIT 1`,
+    );
+
+    if (accounts[0]) {
+      const glResult = await db.select<Array<{ debit_total: number; credit_total: number }>>(
+        `SELECT 
             COALESCE(SUM(debit_amount), 0) as debit_total,
             COALESCE(SUM(credit_amount), 0) as credit_total
           FROM journal_line jl
@@ -201,42 +220,44 @@ import { getBudgets, getBudgetVsActual, type BudgetRecord, type BudgetVsActualDa
           WHERE jl.account_id = ? 
             AND je.status = 'posted'
             AND DATE(je.entry_date) <= ?`,
-          [accounts[0].id, asOfDate]
-        );
-        
-        const debitTotal = glResult[0]?.debit_total || 0;
-        const creditTotal = glResult[0]?.credit_total || 0;
-        const glBalance = debitTotal - creditTotal;
-        
-        const difference = Math.abs(subledgerTotal - glBalance);
-        const isBalanced = difference < 0.01;
-        
-        arIntegrityCheck = {
-          subledgerTotal,
-          glBalance,
-          difference,
-          isBalanced,
-        };
-      }
-    } catch (e) {
-      logger.error('Failed to load A/R integrity check:', e);
-      toasts.error('Failed to load A/R integrity check');
-    }
-    loading = false;
-  }
+        [accounts[0].id, asOfDate],
+      );
 
-  async function loadARAging() {
-    loading = true;
-    try {
-      const db = await getDatabase();
-      
-      const invoices = await db.select<Array<{
+      const debitTotal = glResult[0]?.debit_total || 0;
+      const creditTotal = glResult[0]?.credit_total || 0;
+      const glBalance = debitTotal - creditTotal;
+
+      const difference = Math.abs(subledgerTotal - glBalance);
+      const isBalanced = difference < 0.01;
+
+      arIntegrityCheck = {
+        subledgerTotal,
+        glBalance,
+        difference,
+        isBalanced,
+      };
+    }
+  } catch (e) {
+    logger.error('Failed to load A/R integrity check:', e);
+    toasts.error('Failed to load A/R integrity check');
+  }
+  loading = false;
+}
+
+async function loadARAging() {
+  loading = true;
+  try {
+    const db = await getDatabase();
+
+    const invoices = await db.select<
+      Array<{
         contact_id: number;
         customer_name: string;
         due_date: string;
         outstanding: number;
-      }>>(
-        `SELECT 
+      }>
+    >(
+      `SELECT 
           i.contact_id,
           c.name as customer_name,
           i.due_date,
@@ -247,67 +268,68 @@ import { getBudgets, getBudgetVsActual, type BudgetRecord, type BudgetVsActualDa
           AND (i.total_amount - i.paid_amount) > 0.01
           AND DATE(i.issue_date) <= ?
         ORDER BY c.name, i.due_date`,
-        [asOfDate]
-      );
-      
-      // Group by customer and age buckets
-      const customerMap = new Map<string, AgingBucket>();
-      
-      for (const inv of invoices) {
-        const dueDate = new Date(inv.due_date);
-        const asOf = new Date(asOfDate);
-        const daysOverdue = Math.floor((asOf.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-        
-        let bucket = customerMap.get(inv.customer_name);
-        if (!bucket) {
-          bucket = {
-            customer_name: inv.customer_name,
-            current: 0,
-            days_1_30: 0,
-            days_31_60: 0,
-            days_61_90: 0,
-            days_over_90: 0,
-            total: 0,
-          };
-          customerMap.set(inv.customer_name, bucket);
-        }
-        
-        if (daysOverdue <= 0) {
-          bucket.current += inv.outstanding;
-        } else if (daysOverdue <= 30) {
-          bucket.days_1_30 += inv.outstanding;
-        } else if (daysOverdue <= 60) {
-          bucket.days_31_60 += inv.outstanding;
-        } else if (daysOverdue <= 90) {
-          bucket.days_61_90 += inv.outstanding;
-        } else {
-          bucket.days_over_90 += inv.outstanding;
-        }
-        
-        bucket.total += inv.outstanding;
-      }
-      
-      arAging = Array.from(customerMap.values())
-        .sort((a, b) => b.total - a.total); // Sort by total descending
-    } catch (e) {
-      logger.error('Failed to load A/R aging:', e);
-      toasts.error('Failed to load A/R aging report');
-    }
-    loading = false;
-  }
+      [asOfDate],
+    );
 
-  async function loadAPAging() {
-    loading = true;
-    try {
-      const db = await getDatabase();
-      
-      const bills = await db.select<Array<{
+    // Group by customer and age buckets
+    const customerMap = new Map<string, AgingBucket>();
+
+    for (const inv of invoices) {
+      const dueDate = new Date(inv.due_date);
+      const asOf = new Date(asOfDate);
+      const daysOverdue = Math.floor((asOf.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      let bucket = customerMap.get(inv.customer_name);
+      if (!bucket) {
+        bucket = {
+          customer_name: inv.customer_name,
+          current: 0,
+          days_1_30: 0,
+          days_31_60: 0,
+          days_61_90: 0,
+          days_over_90: 0,
+          total: 0,
+        };
+        customerMap.set(inv.customer_name, bucket);
+      }
+
+      if (daysOverdue <= 0) {
+        bucket.current += inv.outstanding;
+      } else if (daysOverdue <= 30) {
+        bucket.days_1_30 += inv.outstanding;
+      } else if (daysOverdue <= 60) {
+        bucket.days_31_60 += inv.outstanding;
+      } else if (daysOverdue <= 90) {
+        bucket.days_61_90 += inv.outstanding;
+      } else {
+        bucket.days_over_90 += inv.outstanding;
+      }
+
+      bucket.total += inv.outstanding;
+    }
+
+    arAging = Array.from(customerMap.values()).sort((a, b) => b.total - a.total); // Sort by total descending
+  } catch (e) {
+    logger.error('Failed to load A/R aging:', e);
+    toasts.error('Failed to load A/R aging report');
+  }
+  loading = false;
+}
+
+async function loadAPAging() {
+  loading = true;
+  try {
+    const db = await getDatabase();
+
+    const bills = await db.select<
+      Array<{
         vendor_id: number;
         vendor_name: string;
         due_date: string;
         outstanding: number;
-      }>>(
-        `SELECT 
+      }>
+    >(
+      `SELECT 
           b.vendor_id,
           c.name as vendor_name,
           b.due_date,
@@ -318,144 +340,143 @@ import { getBudgets, getBudgetVsActual, type BudgetRecord, type BudgetVsActualDa
           AND (b.total_amount - b.paid_amount) > 0.01
           AND DATE(b.bill_date) <= ?
         ORDER BY c.name, b.due_date`,
-        [asOfDate]
-      );
-      
-      // Group by vendor and age buckets
-      const vendorMap = new Map<string, APAgingBucket>();
-      
-      for (const bill of bills) {
-        const dueDate = new Date(bill.due_date);
-        const asOf = new Date(asOfDate);
-        const daysOverdue = Math.floor((asOf.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-        
-        let bucket = vendorMap.get(bill.vendor_name);
-        if (!bucket) {
-          bucket = {
-            vendor_name: bill.vendor_name,
-            current: 0,
-            days_1_30: 0,
-            days_31_60: 0,
-            days_61_90: 0,
-            days_over_90: 0,
-            total: 0,
-          };
-          vendorMap.set(bill.vendor_name, bucket);
-        }
-        
-        if (daysOverdue <= 0) {
-          bucket.current += bill.outstanding;
-        } else if (daysOverdue <= 30) {
-          bucket.days_1_30 += bill.outstanding;
-        } else if (daysOverdue <= 60) {
-          bucket.days_31_60 += bill.outstanding;
-        } else if (daysOverdue <= 90) {
-          bucket.days_61_90 += bill.outstanding;
-        } else {
-          bucket.days_over_90 += bill.outstanding;
-        }
-        
-        bucket.total += bill.outstanding;
+      [asOfDate],
+    );
+
+    // Group by vendor and age buckets
+    const vendorMap = new Map<string, APAgingBucket>();
+
+    for (const bill of bills) {
+      const dueDate = new Date(bill.due_date);
+      const asOf = new Date(asOfDate);
+      const daysOverdue = Math.floor((asOf.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      let bucket = vendorMap.get(bill.vendor_name);
+      if (!bucket) {
+        bucket = {
+          vendor_name: bill.vendor_name,
+          current: 0,
+          days_1_30: 0,
+          days_31_60: 0,
+          days_61_90: 0,
+          days_over_90: 0,
+          total: 0,
+        };
+        vendorMap.set(bill.vendor_name, bucket);
       }
-      
-      apAging = Array.from(vendorMap.values())
-        .sort((a, b) => b.total - a.total); // Sort by total descending
-    } catch (e) {
-      logger.error('Failed to load A/P aging:', e);
-      toasts.error('Failed to load A/P aging report');
+
+      if (daysOverdue <= 0) {
+        bucket.current += bill.outstanding;
+      } else if (daysOverdue <= 30) {
+        bucket.days_1_30 += bill.outstanding;
+      } else if (daysOverdue <= 60) {
+        bucket.days_31_60 += bill.outstanding;
+      } else if (daysOverdue <= 90) {
+        bucket.days_61_90 += bill.outstanding;
+      } else {
+        bucket.days_over_90 += bill.outstanding;
+      }
+
+      bucket.total += bill.outstanding;
     }
-    loading = false;
+
+    apAging = Array.from(vendorMap.values()).sort((a, b) => b.total - a.total); // Sort by total descending
+  } catch (e) {
+    logger.error('Failed to load A/P aging:', e);
+    toasts.error('Failed to load A/P aging report');
   }
+  loading = false;
+}
 
-  async function loadBudgetsList() {
-    try {
-      budgetsList = await getBudgets();
-    } catch (e) {
-      logger.error('Failed to load budgets:', e);
-      toasts.error('Failed to load budgets for budget-vs-actual report');
-    }
+async function loadBudgetsList() {
+  try {
+    budgetsList = await getBudgets();
+  } catch (e) {
+    logger.error('Failed to load budgets:', e);
+    toasts.error('Failed to load budgets for budget-vs-actual report');
   }
+}
 
-  async function loadBudgetVsActual() {
-    if (!selectedBudgetId) return;
+async function loadBudgetVsActual() {
+  if (!selectedBudgetId) return;
 
-    loading = true;
-    try {
-      budgetVsActualData = await getBudgetVsActual(
-        Number(selectedBudgetId),
-        bvaStartDate,
-        bvaEndDate
-      );
-    } catch (e) {
-      logger.error('Failed to load budget vs actual:', e);
-      toasts.error('Failed to load budget vs actual: ' + e);
-    }
-    loading = false;
+  loading = true;
+  try {
+    budgetVsActualData = await getBudgetVsActual(
+      Number(selectedBudgetId),
+      bvaStartDate,
+      bvaEndDate,
+    );
+  } catch (e) {
+    logger.error('Failed to load budget vs actual:', e);
+    toasts.error('Failed to load budget vs actual: ' + e);
   }
+  loading = false;
+}
 
-  async function loadCashFlow() {
-    loading = true;
-    try {
-      cashFlowData = await getCashFlowData(cfStartDate, cfEndDate);
-    } catch (e) {
-      logger.error('Failed to load cash flow:', e);
-      toasts.error('Failed to load cash flow: ' + e);
-    }
-    loading = false;
+async function loadCashFlow() {
+  loading = true;
+  try {
+    cashFlowData = await getCashFlowData(cfStartDate, cfEndDate);
+  } catch (e) {
+    logger.error('Failed to load cash flow:', e);
+    toasts.error('Failed to load cash flow: ' + e);
   }
+  loading = false;
+}
 
-  async function loadGeneralLedger() {
-    loading = true;
-    try {
-      const data = await getGeneralLedgerData(glStartDate, glEndDate, glAccountId);
-      generalLedgerLines = data.lines;
-      glTotalDebits = data.totalDebits;
-      glTotalCredits = data.totalCredits;
-      glStartBalance = data.startBalance;
-      glEndBalance = data.endBalance;
-    } catch (e) {
-      logger.error('Failed to load general ledger:', e);
-      toasts.error('Failed to load general ledger: ' + e);
-    }
-    loading = false;
+async function loadGeneralLedger() {
+  loading = true;
+  try {
+    const data = await getGeneralLedgerData(glStartDate, glEndDate, glAccountId);
+    generalLedgerLines = data.lines;
+    glTotalDebits = data.totalDebits;
+    glTotalCredits = data.totalCredits;
+    glStartBalance = data.startBalance;
+    glEndBalance = data.endBalance;
+  } catch (e) {
+    logger.error('Failed to load general ledger:', e);
+    toasts.error('Failed to load general ledger: ' + e);
   }
+  loading = false;
+}
 
-  // Inventory Valuation (uses imported type from reports.ts)
-  let inventoryValuation: InventoryValuationLine[] = [];
+// Inventory Valuation (uses imported type from reports.ts)
+let inventoryValuation: InventoryValuationLine[] = [];
 
-  async function loadInventoryValuation() {
-    loading = true;
-    try {
-      // Use optimized service layer with grouped aggregate queries
-      // Reduces from 2N queries to 2 queries total
-      const data = await getInventoryValuationData(asOfDate);
-      inventoryValuation = data.items;
-    } catch (e) {
-      logger.error('Failed to load inventory valuation:', e);
-      toasts.error('Failed to load inventory valuation report');
-    }
-    loading = false;
+async function loadInventoryValuation() {
+  loading = true;
+  try {
+    // Use optimized service layer with grouped aggregate queries
+    // Reduces from 2N queries to 2 queries total
+    const data = await getInventoryValuationData(asOfDate);
+    inventoryValuation = data.items;
+  } catch (e) {
+    logger.error('Failed to load inventory valuation:', e);
+    toasts.error('Failed to load inventory valuation report');
   }
+  loading = false;
+}
 
-  // Inventory Movements Report
-  interface InventoryMovementLine {
-    movement_date: string;
-    item_sku: string;
-    item_name: string;
-    movement_type: string;
-    quantity: number;
-    unit_cost: number | null;
-    notes: string | null;
-  }
-  let inventoryMovements: InventoryMovementLine[] = [];
+// Inventory Movements Report
+interface InventoryMovementLine {
+  movement_date: string;
+  item_sku: string;
+  item_name: string;
+  movement_type: string;
+  quantity: number;
+  unit_cost: number | null;
+  notes: string | null;
+}
+let inventoryMovements: InventoryMovementLine[] = [];
 
-  async function loadInventoryMovements() {
-    loading = true;
-    try {
-      const db = await getDatabase();
-      
-      const movements = await db.select<InventoryMovementLine[]>(
-        `SELECT 
+async function loadInventoryMovements() {
+  loading = true;
+  try {
+    const db = await getDatabase();
+
+    const movements = await db.select<InventoryMovementLine[]>(
+      `SELECT 
           im.movement_date,
           i.sku as item_sku,
           i.name as item_name,
@@ -468,317 +489,396 @@ import { getBudgets, getBudgetVsActual, type BudgetRecord, type BudgetVsActualDa
         WHERE im.movement_date BETWEEN ? AND ?
         ORDER BY im.movement_date DESC, im.id DESC
         LIMIT 500`,
-        [incomeStartDate, incomeEndDate]
-      );
-      
-      inventoryMovements = movements;
-    } catch (e) {
-      logger.error('Failed to load inventory movements:', e);
-      toasts.error('Failed to load inventory movements report');
+      [incomeStartDate, incomeEndDate],
+    );
+
+    inventoryMovements = movements;
+  } catch (e) {
+    logger.error('Failed to load inventory movements:', e);
+    toasts.error('Failed to load inventory movements report');
+  }
+  loading = false;
+}
+
+// Automatically reload reports when dates change
+$: if (asOfDate) {
+  loadBalanceSheet();
+  loadTrialBalance();
+  loadARIntegrityCheck();
+  loadARAging();
+  loadAPAging();
+  loadInventoryValuation();
+}
+
+$: if (incomeStartDate && incomeEndDate) {
+  loadIncomeStatement();
+  loadInventoryMovements();
+}
+
+$: if (cfStartDate && cfEndDate) {
+  loadCashFlow();
+}
+
+$: if (glStartDate && glEndDate) {
+  loadGeneralLedger();
+}
+
+$: if (selectedBudgetId && bvaStartDate && bvaEndDate) {
+  loadBudgetVsActual();
+}
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(amount);
+}
+
+// Balance Sheet totals
+$: totalAssets = balanceSheetBalances
+  .filter((b) => b.account_type === 'asset')
+  .reduce((sum, b) => sum + b.balance, 0);
+
+$: totalLiabilities = balanceSheetBalances
+  .filter((b) => b.account_type === 'liability')
+  .reduce((sum, b) => sum + b.balance, 0);
+
+$: totalEquity = balanceSheetBalances
+  .filter((b) => b.account_type === 'equity')
+  .reduce((sum, b) => sum + b.balance, 0);
+
+// Income Statement totals (from period-filtered data)
+$: totalRevenue = incomeStatementBalances
+  .filter((b) => b.account_type === 'revenue')
+  .reduce((sum, b) => sum + b.balance, 0);
+
+$: totalExpenses = incomeStatementBalances
+  .filter((b) => b.account_type === 'expense')
+  .reduce((sum, b) => sum + b.balance, 0);
+
+$: netIncome = totalRevenue - totalExpenses;
+
+// Quick date range buttons
+function setDateRange(range: string) {
+  const today = new Date();
+  let start: Date;
+  let end: Date;
+
+  switch (range) {
+    case 'this-month':
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = today;
+      break;
+    case 'last-month':
+      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      end = new Date(today.getFullYear(), today.getMonth(), 0); // Last day of previous month
+      break;
+    case 'this-quarter': {
+      const quarter = Math.floor(today.getMonth() / 3);
+      start = new Date(today.getFullYear(), quarter * 3, 1);
+      end = today;
+      break;
     }
-    loading = false;
-  }
-
-  // Automatically reload reports when dates change
-  $: if (asOfDate) {
-    loadBalanceSheet();
-    loadTrialBalance();
-    loadARIntegrityCheck();
-    loadARAging();
-    loadAPAging();
-    loadInventoryValuation();
-  }
-  
-  $: if (incomeStartDate && incomeEndDate) {
-    loadIncomeStatement();
-    loadInventoryMovements();
-  }
-  
-  $: if (cfStartDate && cfEndDate) {
-    loadCashFlow();
-  }
-  
-  $: if (glStartDate && glEndDate) {
-    loadGeneralLedger();
-  }
-
-  $: if (selectedBudgetId && bvaStartDate && bvaEndDate) {
-    loadBudgetVsActual();
-  }
-
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  }
-
-  // Balance Sheet totals
-  $: totalAssets = balanceSheetBalances
-    .filter(b => b.account_type === 'asset')
-    .reduce((sum, b) => sum + b.balance, 0);
-
-  $: totalLiabilities = balanceSheetBalances
-    .filter(b => b.account_type === 'liability')
-    .reduce((sum, b) => sum + b.balance, 0);
-
-  $: totalEquity = balanceSheetBalances
-    .filter(b => b.account_type === 'equity')
-    .reduce((sum, b) => sum + b.balance, 0);
-
-  // Income Statement totals (from period-filtered data)
-  $: totalRevenue = incomeStatementBalances
-    .filter(b => b.account_type === 'revenue')
-    .reduce((sum, b) => sum + b.balance, 0);
-
-  $: totalExpenses = incomeStatementBalances
-    .filter(b => b.account_type === 'expense')
-    .reduce((sum, b) => sum + b.balance, 0);
-
-  $: netIncome = totalRevenue - totalExpenses;
-
-  // Quick date range buttons
-  function setDateRange(range: string) {
-    const today = new Date();
-    let start: Date;
-    let end: Date;
-
-    switch (range) {
-      case 'this-month':
-        start = new Date(today.getFullYear(), today.getMonth(), 1);
-        end = today;
-        break;
-      case 'last-month':
-        start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        end = new Date(today.getFullYear(), today.getMonth(), 0); // Last day of previous month
-        break;
-      case 'this-quarter':
-        const quarter = Math.floor(today.getMonth() / 3);
-        start = new Date(today.getFullYear(), quarter * 3, 1);
-        end = today;
-        break;
-      case 'last-quarter':
-        const lastQuarter = Math.floor(today.getMonth() / 3) - 1;
-        const year = lastQuarter < 0 ? today.getFullYear() - 1 : today.getFullYear();
-        const q = lastQuarter < 0 ? 3 : lastQuarter;
-        start = new Date(year, q * 3, 1);
-        end = new Date(year, q * 3 + 3, 0); // Last day of quarter
-        break;
-      case 'ytd':
-        start = new Date(today.getFullYear(), 0, 1);
-        end = today;
-        break;
-      case 'last-year':
-        start = new Date(today.getFullYear() - 1, 0, 1);
-        end = new Date(today.getFullYear() - 1, 11, 31);
-        break;
-      default:
-        return;
+    case 'last-quarter': {
+      const lastQuarter = Math.floor(today.getMonth() / 3) - 1;
+      const year = lastQuarter < 0 ? today.getFullYear() - 1 : today.getFullYear();
+      const q = lastQuarter < 0 ? 3 : lastQuarter;
+      start = new Date(year, q * 3, 1);
+      end = new Date(year, q * 3 + 3, 0); // Last day of quarter
+      break;
     }
-
-    incomeStartDate = start.toISOString().split('T')[0];
-    incomeEndDate = end.toISOString().split('T')[0];
+    case 'ytd':
+      start = new Date(today.getFullYear(), 0, 1);
+      end = today;
+      break;
+    case 'last-year':
+      start = new Date(today.getFullYear() - 1, 0, 1);
+      end = new Date(today.getFullYear() - 1, 11, 31);
+      break;
+    default:
+      return;
   }
 
-  function exportBalanceSheet() {
-    const assets = balanceSheetBalances
-      .filter(b => b.account_type === 'asset')
-      .map(b => ({
-        Type: 'Asset',
-        Code: b.account_code,
-        Account: b.account_name,
-        Balance: formatCurrencyForCSV(b.balance),
-      }));
+  incomeStartDate = start.toISOString().split('T')[0];
+  incomeEndDate = end.toISOString().split('T')[0];
+}
 
-    const liabilities = balanceSheetBalances
-      .filter(b => b.account_type === 'liability')
-      .map(b => ({
-        Type: 'Liability',
-        Code: b.account_code,
-        Account: b.account_name,
-        Balance: formatCurrencyForCSV(b.balance),
-      }));
-
-    const equity = balanceSheetBalances
-      .filter(b => b.account_type === 'equity')
-      .map(b => ({
-        Type: 'Equity',
-        Code: b.account_code,
-        Account: b.account_name,
-        Balance: formatCurrencyForCSV(b.balance),
-      }));
-
-    // Add totals
-    const data = [
-      ...assets,
-      { Type: 'Asset', Code: '', Account: 'Total Assets', Balance: formatCurrencyForCSV(totalAssets) },
-      { Type: '', Code: '', Account: '', Balance: '' },
-      ...liabilities,
-      { Type: 'Liability', Code: '', Account: 'Total Liabilities', Balance: formatCurrencyForCSV(totalLiabilities) },
-      { Type: '', Code: '', Account: '', Balance: '' },
-      ...equity,
-      { Type: 'Equity', Code: '', Account: 'Net Income', Balance: formatCurrencyForCSV(netIncome) },
-      { Type: 'Equity', Code: '', Account: 'Total Equity', Balance: formatCurrencyForCSV(totalEquity + netIncome) },
-    ];
-
-    const csv = toCSV(data, ['Type', 'Code', 'Account', 'Balance']);
-    downloadCSV(csv, `balance-sheet-${asOfDate}.csv`);
-  }
-
-  function exportProfitLoss() {
-    const revenue = incomeStatementBalances
-      .filter(b => b.account_type === 'revenue')
-      .map(b => ({
-        Type: 'Revenue',
-        Code: b.account_code,
-        Account: b.account_name,
-        Amount: formatCurrencyForCSV(b.balance),
-      }));
-
-    const expenses = incomeStatementBalances
-      .filter(b => b.account_type === 'expense')
-      .map(b => ({
-        Type: 'Expense',
-        Code: b.account_code,
-        Account: b.account_name,
-        Amount: formatCurrencyForCSV(b.balance),
-      }));
-
-    const data = [
-      ...revenue,
-      { Type: 'Revenue', Code: '', Account: 'Total Revenue', Amount: formatCurrencyForCSV(totalRevenue) },
-      { Type: '', Code: '', Account: '', Amount: '' },
-      ...expenses,
-      { Type: 'Expense', Code: '', Account: 'Total Expenses', Amount: formatCurrencyForCSV(totalExpenses) },
-      { Type: '', Code: '', Account: '', Amount: '' },
-      { Type: '', Code: '', Account: 'Net Income', Amount: formatCurrencyForCSV(netIncome) },
-    ];
-
-    const csv = toCSV(data, ['Type', 'Code', 'Account', 'Amount']);
-    downloadCSV(csv, `profit-loss-${incomeStartDate}-to-${incomeEndDate}.csv`);
-  }
-
-  function exportTrialBalance() {
-    const data = trialBalances.map(b => ({
+function exportBalanceSheet() {
+  const assets = balanceSheetBalances
+    .filter((b) => b.account_type === 'asset')
+    .map((b) => ({
+      Type: 'Asset',
       Code: b.account_code,
       Account: b.account_name,
-      Type: b.account_type as string,
-      Debit: b.debit_total > b.credit_total ? formatCurrencyForCSV(b.balance) : '0.00',
-      Credit: b.credit_total > b.debit_total ? formatCurrencyForCSV(b.balance) : '0.00',
+      Balance: formatCurrencyForCSV(b.balance),
     }));
 
-    // Add totals
-    const totalDebits = trialBalances.reduce((sum, b) => sum + (b.debit_total > b.credit_total ? b.balance : 0), 0);
-    const totalCredits = trialBalances.reduce((sum, b) => sum + (b.credit_total > b.debit_total ? b.balance : 0), 0);
+  const liabilities = balanceSheetBalances
+    .filter((b) => b.account_type === 'liability')
+    .map((b) => ({
+      Type: 'Liability',
+      Code: b.account_code,
+      Account: b.account_name,
+      Balance: formatCurrencyForCSV(b.balance),
+    }));
 
-    data.push({
+  const equity = balanceSheetBalances
+    .filter((b) => b.account_type === 'equity')
+    .map((b) => ({
+      Type: 'Equity',
+      Code: b.account_code,
+      Account: b.account_name,
+      Balance: formatCurrencyForCSV(b.balance),
+    }));
+
+  // Add totals
+  const data = [
+    ...assets,
+    {
+      Type: 'Asset',
       Code: '',
-      Account: 'Totals',
-      Type: '',
-      Debit: formatCurrencyForCSV(totalDebits),
-      Credit: formatCurrencyForCSV(totalCredits),
-    });
+      Account: 'Total Assets',
+      Balance: formatCurrencyForCSV(totalAssets),
+    },
+    { Type: '', Code: '', Account: '', Balance: '' },
+    ...liabilities,
+    {
+      Type: 'Liability',
+      Code: '',
+      Account: 'Total Liabilities',
+      Balance: formatCurrencyForCSV(totalLiabilities),
+    },
+    { Type: '', Code: '', Account: '', Balance: '' },
+    ...equity,
+    { Type: 'Equity', Code: '', Account: 'Net Income', Balance: formatCurrencyForCSV(netIncome) },
+    {
+      Type: 'Equity',
+      Code: '',
+      Account: 'Total Equity',
+      Balance: formatCurrencyForCSV(totalEquity + netIncome),
+    },
+  ];
 
-    const csv = toCSV(data, ['Code', 'Account', 'Type', 'Debit', 'Credit']);
-    downloadCSV(csv, `trial-balance-${asOfDate}.csv`);
-  }
+  const csv = toCSV(data, ['Type', 'Code', 'Account', 'Balance']);
+  downloadCSV(csv, `balance-sheet-${asOfDate}.csv`);
+}
 
-  function exportCashFlow() {
-    if (!cashFlowData) return;
-
-    const rows: CSVRow[] = [];
-
-    rows.push({ Category: 'OPERATING ACTIVITIES', Label: '', Amount: '' });
-    for (const op of cashFlowData.operatingActivities) {
-      rows.push({
-        Category: 'Operating',
-        Label: op.label,
-        Amount: formatCurrencyForCSV(op.amount)
-      });
-    }
-    rows.push({ Category: 'Operating', Label: 'Total Operating Activities', Amount: formatCurrencyForCSV(cashFlowData.totalOperating) });
-    rows.push({});
-
-    rows.push({ Category: 'INVESTING ACTIVITIES', Label: '', Amount: '' });
-    for (const inv of cashFlowData.investingActivities) {
-      rows.push({
-        Category: 'Investing',
-        Label: inv.label,
-        Amount: formatCurrencyForCSV(inv.amount)
-      });
-    }
-    rows.push({ Category: 'Investing', Label: 'Total Investing Activities', Amount: formatCurrencyForCSV(cashFlowData.totalInvesting) });
-    rows.push({});
-
-    rows.push({ Category: 'FINANCING ACTIVITIES', Label: '', Amount: '' });
-    for (const fin of cashFlowData.financingActivities) {
-      rows.push({
-        Category: 'Financing',
-        Label: fin.label,
-        Amount: formatCurrencyForCSV(fin.amount)
-      });
-    }
-    rows.push({ Category: 'Financing', Label: 'Total Financing Activities', Amount: formatCurrencyForCSV(cashFlowData.totalFinancing) });
-    rows.push({});
-
-    rows.push({ Category: '', Label: 'Net Cash Change', Amount: formatCurrencyForCSV(cashFlowData.netCashChange) });
-    rows.push({ Category: '', Label: 'Beginning Cash Balance', Amount: formatCurrencyForCSV(cashFlowData.startCashBalance) });
-    rows.push({ Category: '', Label: 'Ending Cash Balance', Amount: formatCurrencyForCSV(cashFlowData.endCashBalance) });
-
-    const csv = toCSV(rows, ['Category', 'Label', 'Amount']);
-    downloadCSV(csv, `cash-flow-${cfStartDate}-to-${cfEndDate}.csv`);
-  }
-
-  function exportBudgetVsActual() {
-    if (!budgetVsActualData) return;
-
-    const data: CSVRow[] = budgetVsActualData.lines.map(line => ({
-      'Account Code': line.account_code,
-      'Account Name': line.account_name,
-      Type: line.account_type,
-      Budget: formatCurrencyForCSV(line.budget_amount),
-      Actual: formatCurrencyForCSV(line.actual_amount),
-      Variance: formatCurrencyForCSV(line.variance),
-      'Variance %': line.variance_pct.toFixed(2) + '%'
+function exportProfitLoss() {
+  const revenue = incomeStatementBalances
+    .filter((b) => b.account_type === 'revenue')
+    .map((b) => ({
+      Type: 'Revenue',
+      Code: b.account_code,
+      Account: b.account_name,
+      Amount: formatCurrencyForCSV(b.balance),
     }));
 
-    // Add totals
-    data.push({
-      'Account Code': '',
-      'Account Name': 'Totals',
-      Type: '',
-      Budget: formatCurrencyForCSV(budgetVsActualData.totalBudget),
-      Actual: formatCurrencyForCSV(budgetVsActualData.totalActual),
-      Variance: formatCurrencyForCSV(budgetVsActualData.totalVariance),
-      'Variance %': ''
-    });
-
-    const csv = toCSV(data, ['Account Code', 'Account Name', 'Type', 'Budget', 'Actual', 'Variance', 'Variance %']);
-    downloadCSV(csv, `budget-vs-actual-${bvaStartDate}-to-${bvaEndDate}.csv`);
-  }
-
-  function exportGeneralLedger() {
-    const data: CSVRow[] = generalLedgerLines.map(line => ({
-      Date: line.entry_date,
-      'Entry #': line.journal_entry_id,
-      'Account Code': line.account_code,
-      'Account Name': line.account_name,
-      Description: line.description,
-      Debit: formatCurrencyForCSV(line.debit_amount),
-      Credit: formatCurrencyForCSV(line.credit_amount),
-      'Running Balance': formatCurrencyForCSV(line.running_balance)
+  const expenses = incomeStatementBalances
+    .filter((b) => b.account_type === 'expense')
+    .map((b) => ({
+      Type: 'Expense',
+      Code: b.account_code,
+      Account: b.account_name,
+      Amount: formatCurrencyForCSV(b.balance),
     }));
 
-    // Add totals
-    data.push({
-      Date: '', 'Entry #': '', 'Account Code': '', 'Account Name': '',
-      Description: 'Totals', Debit: formatCurrencyForCSV(glTotalDebits),
-      Credit: formatCurrencyForCSV(glTotalCredits), 'Running Balance': ''
-    });
+  const data = [
+    ...revenue,
+    {
+      Type: 'Revenue',
+      Code: '',
+      Account: 'Total Revenue',
+      Amount: formatCurrencyForCSV(totalRevenue),
+    },
+    { Type: '', Code: '', Account: '', Amount: '' },
+    ...expenses,
+    {
+      Type: 'Expense',
+      Code: '',
+      Account: 'Total Expenses',
+      Amount: formatCurrencyForCSV(totalExpenses),
+    },
+    { Type: '', Code: '', Account: '', Amount: '' },
+    { Type: '', Code: '', Account: 'Net Income', Amount: formatCurrencyForCSV(netIncome) },
+  ];
 
-    const csv = toCSV(data, ['Date', 'Entry #', 'Account Code', 'Account Name', 'Description', 'Debit', 'Credit', 'Running Balance']);
-    downloadCSV(csv, `general-ledger-${glStartDate}-to-${glEndDate}.csv`);
+  const csv = toCSV(data, ['Type', 'Code', 'Account', 'Amount']);
+  downloadCSV(csv, `profit-loss-${incomeStartDate}-to-${incomeEndDate}.csv`);
+}
+
+function exportTrialBalance() {
+  const data = trialBalances.map((b) => ({
+    Code: b.account_code,
+    Account: b.account_name,
+    Type: b.account_type as string,
+    Debit: b.debit_total > b.credit_total ? formatCurrencyForCSV(b.balance) : '0.00',
+    Credit: b.credit_total > b.debit_total ? formatCurrencyForCSV(b.balance) : '0.00',
+  }));
+
+  // Add totals
+  const totalDebits = trialBalances.reduce(
+    (sum, b) => sum + (b.debit_total > b.credit_total ? b.balance : 0),
+    0,
+  );
+  const totalCredits = trialBalances.reduce(
+    (sum, b) => sum + (b.credit_total > b.debit_total ? b.balance : 0),
+    0,
+  );
+
+  data.push({
+    Code: '',
+    Account: 'Totals',
+    Type: '',
+    Debit: formatCurrencyForCSV(totalDebits),
+    Credit: formatCurrencyForCSV(totalCredits),
+  });
+
+  const csv = toCSV(data, ['Code', 'Account', 'Type', 'Debit', 'Credit']);
+  downloadCSV(csv, `trial-balance-${asOfDate}.csv`);
+}
+
+function exportCashFlow() {
+  if (!cashFlowData) return;
+
+  const rows: CSVRow[] = [];
+
+  rows.push({ Category: 'OPERATING ACTIVITIES', Label: '', Amount: '' });
+  for (const op of cashFlowData.operatingActivities) {
+    rows.push({
+      Category: 'Operating',
+      Label: op.label,
+      Amount: formatCurrencyForCSV(op.amount),
+    });
   }
+  rows.push({
+    Category: 'Operating',
+    Label: 'Total Operating Activities',
+    Amount: formatCurrencyForCSV(cashFlowData.totalOperating),
+  });
+  rows.push({});
+
+  rows.push({ Category: 'INVESTING ACTIVITIES', Label: '', Amount: '' });
+  for (const inv of cashFlowData.investingActivities) {
+    rows.push({
+      Category: 'Investing',
+      Label: inv.label,
+      Amount: formatCurrencyForCSV(inv.amount),
+    });
+  }
+  rows.push({
+    Category: 'Investing',
+    Label: 'Total Investing Activities',
+    Amount: formatCurrencyForCSV(cashFlowData.totalInvesting),
+  });
+  rows.push({});
+
+  rows.push({ Category: 'FINANCING ACTIVITIES', Label: '', Amount: '' });
+  for (const fin of cashFlowData.financingActivities) {
+    rows.push({
+      Category: 'Financing',
+      Label: fin.label,
+      Amount: formatCurrencyForCSV(fin.amount),
+    });
+  }
+  rows.push({
+    Category: 'Financing',
+    Label: 'Total Financing Activities',
+    Amount: formatCurrencyForCSV(cashFlowData.totalFinancing),
+  });
+  rows.push({});
+
+  rows.push({
+    Category: '',
+    Label: 'Net Cash Change',
+    Amount: formatCurrencyForCSV(cashFlowData.netCashChange),
+  });
+  rows.push({
+    Category: '',
+    Label: 'Beginning Cash Balance',
+    Amount: formatCurrencyForCSV(cashFlowData.startCashBalance),
+  });
+  rows.push({
+    Category: '',
+    Label: 'Ending Cash Balance',
+    Amount: formatCurrencyForCSV(cashFlowData.endCashBalance),
+  });
+
+  const csv = toCSV(rows, ['Category', 'Label', 'Amount']);
+  downloadCSV(csv, `cash-flow-${cfStartDate}-to-${cfEndDate}.csv`);
+}
+
+function exportBudgetVsActual() {
+  if (!budgetVsActualData) return;
+
+  const data: CSVRow[] = budgetVsActualData.lines.map((line) => ({
+    'Account Code': line.account_code,
+    'Account Name': line.account_name,
+    Type: line.account_type,
+    Budget: formatCurrencyForCSV(line.budget_amount),
+    Actual: formatCurrencyForCSV(line.actual_amount),
+    Variance: formatCurrencyForCSV(line.variance),
+    'Variance %': line.variance_pct.toFixed(2) + '%',
+  }));
+
+  // Add totals
+  data.push({
+    'Account Code': '',
+    'Account Name': 'Totals',
+    Type: '',
+    Budget: formatCurrencyForCSV(budgetVsActualData.totalBudget),
+    Actual: formatCurrencyForCSV(budgetVsActualData.totalActual),
+    Variance: formatCurrencyForCSV(budgetVsActualData.totalVariance),
+    'Variance %': '',
+  });
+
+  const csv = toCSV(data, [
+    'Account Code',
+    'Account Name',
+    'Type',
+    'Budget',
+    'Actual',
+    'Variance',
+    'Variance %',
+  ]);
+  downloadCSV(csv, `budget-vs-actual-${bvaStartDate}-to-${bvaEndDate}.csv`);
+}
+
+function exportGeneralLedger() {
+  const data: CSVRow[] = generalLedgerLines.map((line) => ({
+    Date: line.entry_date,
+    'Entry #': line.journal_entry_id,
+    'Account Code': line.account_code,
+    'Account Name': line.account_name,
+    Description: line.description,
+    Debit: formatCurrencyForCSV(line.debit_amount),
+    Credit: formatCurrencyForCSV(line.credit_amount),
+    'Running Balance': formatCurrencyForCSV(line.running_balance),
+  }));
+
+  // Add totals
+  data.push({
+    Date: '',
+    'Entry #': '',
+    'Account Code': '',
+    'Account Name': '',
+    Description: 'Totals',
+    Debit: formatCurrencyForCSV(glTotalDebits),
+    Credit: formatCurrencyForCSV(glTotalCredits),
+    'Running Balance': '',
+  });
+
+  const csv = toCSV(data, [
+    'Date',
+    'Entry #',
+    'Account Code',
+    'Account Name',
+    'Description',
+    'Debit',
+    'Credit',
+    'Running Balance',
+  ]);
+  downloadCSV(csv, `general-ledger-${glStartDate}-to-${glEndDate}.csv`);
+}
 </script>
 
 <div class="reports-view">

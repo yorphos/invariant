@@ -1,212 +1,217 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-  import Modal from './Modal.svelte';
-  import { persistenceService } from '../services/persistence';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import {
-    getAllSystemAccounts,
-    updateSystemAccount,
-    type SystemAccountRole
-  } from '../services/system-accounts';
-  import { checkForUpdate, downloadAndInstallUpdate, type UpdateMetadata, type DownloadProgress } from '../services/updater';
-  import type { Account, PolicyMode } from '../domain/types';
-  import UpdateModal from './UpdateModal.svelte';
+import { createEventDispatcher } from 'svelte';
+import Modal from './Modal.svelte';
+import { persistenceService } from '../services/persistence';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import {
+  getAllSystemAccounts,
+  updateSystemAccount,
+  type SystemAccountRole,
+} from '../services/system-accounts';
+import {
+  checkForUpdate,
+  downloadAndInstallUpdate,
+  type UpdateMetadata,
+  type DownloadProgress,
+} from '../services/updater';
+import type { Account, PolicyMode } from '../domain/types';
+import UpdateModal from './UpdateModal.svelte';
 
-  interface Props {
-    open: boolean;
-    mode: PolicyMode;
-    onclose?: () => void;
+interface Props {
+  open: boolean;
+  mode: PolicyMode;
+  onclose?: () => void;
+}
+
+let { open, mode, onclose = () => {} }: Props = $props();
+
+const dispatch = createEventDispatcher<{ modeChange: PolicyMode }>();
+
+// Mode switch confirmation state
+let showModeConfirmModal = $state(false);
+let pendingNewMode: PolicyMode | null = $state(null);
+
+// System accounts state
+let systemAccounts: Map<SystemAccountRole, Account> = $state(new Map());
+let allAccounts: Account[] = $state([]);
+let systemAccountsLoading = $state(false);
+let systemAccountsError = $state('');
+
+// Update state
+let updateAvailable: UpdateMetadata | null = $state(null);
+let showUpdateModal = $state(false);
+let downloadProgress: DownloadProgress | null = $state(null);
+let skippedVersion: string | null = $state(null);
+
+$effect(() => {
+  if (open && systemAccounts.size === 0) {
+    loadSystemAccounts();
   }
+});
 
-  let { open, mode, onclose = () => {} }: Props = $props();
+async function loadSystemAccounts() {
+  try {
+    systemAccountsLoading = true;
+    systemAccountsError = '';
+    const [sysAccts, accts] = await Promise.all([
+      getAllSystemAccounts(),
+      persistenceService.getAccounts(),
+    ]);
+    systemAccounts = sysAccts;
+    allAccounts = accts;
+  } catch (e) {
+    logger.error('Failed to load system accounts:', e);
+    toasts.error('Failed to load system accounts');
+    systemAccountsError = `Failed to load system accounts: ${e}`;
+  } finally {
+    systemAccountsLoading = false;
+  }
+}
 
-  const dispatch = createEventDispatcher<{ modeChange: PolicyMode }>();
+async function handleUpdateSystemAccount(role: SystemAccountRole, newAccountId: number) {
+  try {
+    systemAccountsLoading = true;
+    systemAccountsError = '';
+    await updateSystemAccount(role, newAccountId);
+    await loadSystemAccounts();
+  } catch (e) {
+    systemAccountsError = `Failed to update system account: ${e}`;
+  } finally {
+    systemAccountsLoading = false;
+  }
+}
 
-  // Mode switch confirmation state
-  let showModeConfirmModal = $state(false);
-  let pendingNewMode: PolicyMode | null = $state(null);
+function getSystemAccountRoleLabel(role: SystemAccountRole): string {
+  const labels: Record<SystemAccountRole, string> = {
+    accounts_receivable: 'Accounts Receivable (A/R)',
+    accounts_payable: 'Accounts Payable (A/P)',
+    sales_tax_payable: 'Sales Tax Payable',
+    retained_earnings: 'Retained Earnings',
+    current_year_earnings: 'Current Year Earnings',
+    cash_default: 'Default Cash Account',
+    checking_account: 'Checking Account',
+    customer_deposits: 'Customer Deposits (Unapplied)',
+    salary_expense: 'Salary Expense',
+    cpp_payable: 'CPP Payable',
+    ei_payable: 'EI Payable',
+    tax_withholding_payable: 'Tax Withholding Payable',
+    inventory_asset: 'Inventory Asset',
+    cogs_expense: 'Cost of Goods Sold',
+    fx_gain_loss: 'FX Gain/Loss',
+    default_revenue: 'Default Revenue',
+    default_expense: 'Default Expense',
+  };
+  return labels[role] || role;
+}
 
-  // System accounts state
-  let systemAccounts: Map<SystemAccountRole, Account> = $state(new Map());
-  let allAccounts: Account[] = $state([]);
-  let systemAccountsLoading = $state(false);
-  let systemAccountsError = $state('');
+function getExpectedAccountTypes(role: SystemAccountRole): string[] {
+  const types: Record<SystemAccountRole, string[]> = {
+    accounts_receivable: ['asset'],
+    accounts_payable: ['liability'],
+    sales_tax_payable: ['liability'],
+    retained_earnings: ['equity'],
+    current_year_earnings: ['equity'],
+    cash_default: ['asset'],
+    checking_account: ['asset'],
+    customer_deposits: ['liability'],
+    salary_expense: ['expense'],
+    cpp_payable: ['liability'],
+    ei_payable: ['liability'],
+    tax_withholding_payable: ['liability'],
+    inventory_asset: ['asset'],
+    cogs_expense: ['expense'],
+    fx_gain_loss: ['revenue', 'expense'],
+    default_revenue: ['revenue'],
+    default_expense: ['expense'],
+  };
+  return types[role] || [];
+}
 
-  // Update state
-  let updateAvailable: UpdateMetadata | null = $state(null);
-  let showUpdateModal = $state(false);
-  let downloadProgress: DownloadProgress | null = $state(null);
-  let skippedVersion: string | null = $state(null);
+function getAccountsForRole(role: SystemAccountRole): Account[] {
+  const types = getExpectedAccountTypes(role);
+  return allAccounts.filter((a) => a.is_active && types.includes(a.type));
+}
 
-  $effect(() => {
-    if (open && systemAccounts.size === 0) {
-      loadSystemAccounts();
+// Mode switching
+function requestModeSwitch() {
+  pendingNewMode = mode === 'beginner' ? 'pro' : 'beginner';
+  showModeConfirmModal = true;
+}
+
+async function confirmModeSwitch() {
+  if (!pendingNewMode) return;
+  await persistenceService.setMode(pendingNewMode);
+  mode = pendingNewMode;
+  showModeConfirmModal = false;
+  pendingNewMode = null;
+  toasts.success(`Switched to ${mode === 'pro' ? 'Pro' : 'Beginner'} Mode`);
+  dispatch('modeChange', mode);
+}
+
+function cancelModeSwitch() {
+  showModeConfirmModal = false;
+  pendingNewMode = null;
+}
+
+// Update functions
+async function handleManualUpdateCheck() {
+  try {
+    toasts.info('Checking for updates...');
+    const channel = await persistenceService.getUpdateChannel();
+    const update = await checkForUpdate(channel);
+
+    if (update) {
+      updateAvailable = update;
+      showUpdateModal = true;
+      skippedVersion = null;
+      await persistenceService.setLastUpdateCheck(new Date().toISOString());
+    } else {
+      toasts.success('You are running the latest version!');
     }
-  });
-
-  async function loadSystemAccounts() {
-    try {
-      systemAccountsLoading = true;
-      systemAccountsError = '';
-      const [sysAccts, accts] = await Promise.all([
-        getAllSystemAccounts(),
-        persistenceService.getAccounts()
-      ]);
-      systemAccounts = sysAccts;
-      allAccounts = accts;
-    } catch (e) {
-      logger.error('Failed to load system accounts:', e);
-      toasts.error('Failed to load system accounts');
-      systemAccountsError = `Failed to load system accounts: ${e}`;
-    } finally {
-      systemAccountsLoading = false;
-    }
+  } catch (e) {
+    toasts.error(`Update check failed: ${e}`);
   }
+}
 
-  async function handleUpdateSystemAccount(role: SystemAccountRole, newAccountId: number) {
-    try {
-      systemAccountsLoading = true;
-      systemAccountsError = '';
-      await updateSystemAccount(role, newAccountId);
-      await loadSystemAccounts();
-    } catch (e) {
-      systemAccountsError = `Failed to update system account: ${e}`;
-    } finally {
-      systemAccountsLoading = false;
-    }
-  }
+async function handleInstallUpdate() {
+  if (!updateAvailable) return;
 
-  function getSystemAccountRoleLabel(role: SystemAccountRole): string {
-    const labels: Record<SystemAccountRole, string> = {
-      accounts_receivable: 'Accounts Receivable (A/R)',
-      accounts_payable: 'Accounts Payable (A/P)',
-      sales_tax_payable: 'Sales Tax Payable',
-      retained_earnings: 'Retained Earnings',
-      current_year_earnings: 'Current Year Earnings',
-      cash_default: 'Default Cash Account',
-      checking_account: 'Checking Account',
-      customer_deposits: 'Customer Deposits (Unapplied)',
-      salary_expense: 'Salary Expense',
-      cpp_payable: 'CPP Payable',
-      ei_payable: 'EI Payable',
-      tax_withholding_payable: 'Tax Withholding Payable',
-      inventory_asset: 'Inventory Asset',
-      cogs_expense: 'Cost of Goods Sold',
-      fx_gain_loss: 'FX Gain/Loss',
-      default_revenue: 'Default Revenue',
-      default_expense: 'Default Expense',
-    };
-    return labels[role] || role;
-  }
-
-  function getExpectedAccountTypes(role: SystemAccountRole): string[] {
-    const types: Record<SystemAccountRole, string[]> = {
-      accounts_receivable: ['asset'],
-      accounts_payable: ['liability'],
-      sales_tax_payable: ['liability'],
-      retained_earnings: ['equity'],
-      current_year_earnings: ['equity'],
-      cash_default: ['asset'],
-      checking_account: ['asset'],
-      customer_deposits: ['liability'],
-      salary_expense: ['expense'],
-      cpp_payable: ['liability'],
-      ei_payable: ['liability'],
-      tax_withholding_payable: ['liability'],
-      inventory_asset: ['asset'],
-      cogs_expense: ['expense'],
-      fx_gain_loss: ['revenue', 'expense'],
-      default_revenue: ['revenue'],
-      default_expense: ['expense'],
-    };
-    return types[role] || [];
-  }
-
-  function getAccountsForRole(role: SystemAccountRole): Account[] {
-    const types = getExpectedAccountTypes(role);
-    return allAccounts.filter(a => a.is_active && types.includes(a.type));
-  }
-
-  // Mode switching
-  function requestModeSwitch() {
-    pendingNewMode = mode === 'beginner' ? 'pro' : 'beginner';
-    showModeConfirmModal = true;
-  }
-
-  async function confirmModeSwitch() {
-    if (!pendingNewMode) return;
-    await persistenceService.setMode(pendingNewMode);
-    mode = pendingNewMode;
-    showModeConfirmModal = false;
-    pendingNewMode = null;
-    toasts.success(`Switched to ${mode === 'pro' ? 'Pro' : 'Beginner'} Mode`);
-    dispatch('modeChange', mode);
-  }
-
-  function cancelModeSwitch() {
-    showModeConfirmModal = false;
-    pendingNewMode = null;
-  }
-
-  // Update functions
-  async function handleManualUpdateCheck() {
-    try {
-      toasts.info('Checking for updates...');
-      const channel = await persistenceService.getUpdateChannel();
-      const update = await checkForUpdate(channel);
-
-      if (update) {
-        updateAvailable = update;
-        showUpdateModal = true;
-        skippedVersion = null;
-        await persistenceService.setLastUpdateCheck(new Date().toISOString());
-      } else {
-        toasts.success('You are running the latest version!');
-      }
-    } catch (e) {
-      toasts.error(`Update check failed: ${e}`);
-    }
-  }
-
-  async function handleInstallUpdate() {
-    if (!updateAvailable) return;
-
-    try {
-      downloadProgress = { downloaded: 0, contentLength: null };
-      await downloadAndInstallUpdate((progress) => {
-        downloadProgress = progress;
-      });
-      toasts.success('Update installed! The app will restart now.');
-    } catch (e) {
-      toasts.error(`Update installation failed: ${e}`);
-      downloadProgress = null;
-    }
-  }
-
-  function handleSkipUpdate() {
-    if (updateAvailable) {
-      skippedVersion = updateAvailable.version;
-      toasts.info(`Skipped version ${updateAvailable.version} for this session`);
-    }
-    showUpdateModal = false;
-    updateAvailable = null;
+  try {
+    downloadProgress = { downloaded: 0, contentLength: null };
+    await downloadAndInstallUpdate((progress) => {
+      downloadProgress = progress;
+    });
+    toasts.success('Update installed! The app will restart now.');
+  } catch (e) {
+    toasts.error(`Update installation failed: ${e}`);
     downloadProgress = null;
   }
+}
 
-  function handleRemindLater() {
-    showUpdateModal = false;
+function handleSkipUpdate() {
+  if (updateAvailable) {
+    skippedVersion = updateAvailable.version;
+    toasts.info(`Skipped version ${updateAvailable.version} for this session`);
   }
+  showUpdateModal = false;
+  updateAvailable = null;
+  downloadProgress = null;
+}
 
-  async function handleUpdateChannelChange(newChannel: string) {
-    const channel = newChannel as 'stable' | 'beta';
-    try {
-      await persistenceService.setUpdateChannel(channel);
-      toasts.success(`Update channel changed to ${channel}`);
-    } catch (e) {
-      toasts.error(`Failed to change update channel: ${e}`);
-    }
+function handleRemindLater() {
+  showUpdateModal = false;
+}
+
+async function handleUpdateChannelChange(newChannel: string) {
+  const channel = newChannel as 'stable' | 'beta';
+  try {
+    await persistenceService.setUpdateChannel(channel);
+    toasts.success(`Update channel changed to ${channel}`);
+  } catch (e) {
+    toasts.error(`Failed to change update channel: ${e}`);
   }
+}
 </script>
 
 <Modal {open} title="Settings" size="xlarge" {onclose}>

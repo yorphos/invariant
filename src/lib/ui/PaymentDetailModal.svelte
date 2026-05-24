@@ -1,96 +1,102 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { persistenceService } from '../services/persistence';
-  import { getDatabase } from '../services/database';
-  import type { Payment, Allocation, Invoice, Contact, JournalEntry, JournalLine, Account } from '../domain/types';
-  import { toasts } from '../stores/toast';
-  import { logger } from '../utils/logger';
-  import Modal from './Modal.svelte';
-  import Button from './Button.svelte';
-  import Card from './Card.svelte';
-  import Table from './Table.svelte';
+import { onMount } from 'svelte';
+import { persistenceService } from '../services/persistence';
+import { getDatabase } from '../services/database';
+import type {
+  Payment,
+  Allocation,
+  Invoice,
+  Contact,
+  JournalEntry,
+  JournalLine,
+  Account,
+} from '../domain/types';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import Modal from './Modal.svelte';
+import Button from './Button.svelte';
+import Card from './Card.svelte';
+import Table from './Table.svelte';
 
-  export let payment: Payment;
-  export let onclose: () => void;
+export let payment: Payment;
+export let onclose: () => void;
 
-  let loading = true;
-  let allocations: Allocation[] = [];
-  let invoices: Invoice[] = [];
-  let contact: Contact | null = null;
-  let accounts: Account[] = [];
-  let journalEntry: JournalEntry | null = null;
-  let journalLines: JournalLine[] = [];
+let loading = true;
+let allocations: Allocation[] = [];
+let invoices: Invoice[] = [];
+let contact: Contact | null = null;
+let accounts: Account[] = [];
+let journalEntry: JournalEntry | null = null;
+let journalLines: JournalLine[] = [];
 
-  onMount(async () => {
-    await loadDetails();
-  });
+onMount(async () => {
+  await loadDetails();
+});
 
-  async function loadDetails() {
-    loading = true;
-    try {
-      [allocations, accounts] = await Promise.all([
-        persistenceService.getAllocations(payment.id!),
-        persistenceService.getAccounts(),
-      ]);
+async function loadDetails() {
+  loading = true;
+  try {
+    [allocations, accounts] = await Promise.all([
+      persistenceService.getAllocations(payment.id!),
+      persistenceService.getAccounts(),
+    ]);
 
-      // Get contact if exists
-      if (payment.contact_id) {
-        const contacts = await persistenceService.getContacts();
-        contact = contacts.find(c => c.id === payment.contact_id) || null;
-      }
-
-      // Get invoices for allocations
-      if (allocations.length > 0) {
-        const allInvoices = await persistenceService.getInvoices();
-        invoices = allInvoices.filter(inv => 
-          allocations.some(a => a.invoice_id === inv.id)
-        );
-      }
-
-      // Get journal entry if exists
-      if (payment.event_id) {
-        const db = await getDatabase();
-        const entries = await db.select<JournalEntry[]>(
-          'SELECT * FROM journal_entry WHERE event_id = ?',
-          [payment.event_id]
-        );
-        if (entries.length > 0) {
-          journalEntry = entries[0];
-          journalLines = await persistenceService.getJournalLines(journalEntry.id!);
-        }
-      }
-    } catch (e) {
-      logger.error('Failed to load payment details:', e);
-      toasts.error('Failed to load payment details');
+    // Get contact if exists
+    if (payment.contact_id) {
+      const contacts = await persistenceService.getContacts();
+      contact = contacts.find((c) => c.id === payment.contact_id) || null;
     }
-    loading = false;
-  }
 
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-CA', {
-      style: 'currency',
-      currency: 'CAD'
-    }).format(amount);
-  }
+    // Get invoices for allocations
+    if (allocations.length > 0) {
+      const allInvoices = await persistenceService.getInvoices();
+      invoices = allInvoices.filter((inv) => allocations.some((a) => a.invoice_id === inv.id));
+    }
 
-  function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-CA');
+    // Get journal entry if exists
+    if (payment.event_id) {
+      const db = await getDatabase();
+      const entries = await db.select<JournalEntry[]>(
+        'SELECT * FROM journal_entry WHERE event_id = ?',
+        [payment.event_id],
+      );
+      if (entries.length > 0) {
+        journalEntry = entries[0];
+        journalLines = await persistenceService.getJournalLines(journalEntry.id!);
+      }
+    }
+  } catch (e) {
+    logger.error('Failed to load payment details:', e);
+    toasts.error('Failed to load payment details');
   }
+  loading = false;
+}
 
-  function getAccountName(accountId: number): string {
-    const account = accounts.find(a => a.id === accountId);
-    return account ? `${account.code} - ${account.name}` : 'Unknown Account';
-  }
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-CA', {
+    style: 'currency',
+    currency: 'CAD',
+  }).format(amount);
+}
 
-  function getInvoiceNumber(invoiceId: number): string {
-    const invoice = invoices.find(inv => inv.id === invoiceId);
-    return invoice?.invoice_number || 'Unknown';
-  }
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-CA');
+}
 
-  function formatPaymentMethod(method: string | undefined): string {
-    if (!method) return 'N/A';
-    return method.charAt(0).toUpperCase() + method.slice(1);
-  }
+function getAccountName(accountId: number): string {
+  const account = accounts.find((a) => a.id === accountId);
+  return account ? `${account.code} - ${account.name}` : 'Unknown Account';
+}
+
+function getInvoiceNumber(invoiceId: number): string {
+  const invoice = invoices.find((inv) => inv.id === invoiceId);
+  return invoice?.invoice_number || 'Unknown';
+}
+
+function formatPaymentMethod(method: string | undefined): string {
+  if (!method) return 'N/A';
+  return method.charAt(0).toUpperCase() + method.slice(1);
+}
 </script>
 
 <Modal open={true} {onclose} size="large" title="Payment Details">

@@ -13,7 +13,7 @@ describe('Database Migrations', () => {
   });
 
   it('should have consecutive migration IDs', () => {
-    const ids = allMigrations.map(m => parseInt(m.id));
+    const ids = allMigrations.map((m) => parseInt(m.id));
     for (let i = 1; i < ids.length; i++) {
       expect(ids[i]).toBe(ids[i - 1] + 1);
     }
@@ -30,7 +30,7 @@ describe('Database Migrations', () => {
   });
 
   it('should have unique migration IDs', () => {
-    const ids = allMigrations.map(m => m.id);
+    const ids = allMigrations.map((m) => m.id);
     const uniqueIds = new Set(ids);
     expect(uniqueIds.size).toBe(ids.length);
   });
@@ -47,7 +47,7 @@ describe('Database Migrations', () => {
       'AUDIT_LOG',
       'TRANSACTION_EVENT',
       'JOURNAL_ENTRY',
-      'JOURNAL_LINE'
+      'JOURNAL_LINE',
     ];
 
     for (const table of expectedTables) {
@@ -58,7 +58,7 @@ describe('Database Migrations', () => {
   it('should have description column in settings table', () => {
     const firstMigration = allMigrations[0];
     const sql = firstMigration.up.toUpperCase();
-    
+
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS SETTINGS');
     expect(sql).toContain('DESCRIPTION');
   });
@@ -66,11 +66,11 @@ describe('Database Migrations', () => {
   it('should not reference non-existent columns', () => {
     for (const migration of allMigrations) {
       const sql = migration.up;
-      
+
       if (sql.includes('INSERT INTO settings')) {
         const settingsTableDef = allMigrations[0].up.toUpperCase();
         const hasDescriptionColumn = settingsTableDef.includes('DESCRIPTION');
-        
+
         if (sql.includes('description')) {
           expect(hasDescriptionColumn).toBe(true);
         }
@@ -102,15 +102,15 @@ describe('Database Migrations', () => {
 
     for (const migration of allMigrations) {
       const createTableRegex = /CREATE TABLE IF NOT EXISTS (\w+)/gi;
-      let match;
-      
+      let match: RegExpExecArray | null;
+
       while ((match = createTableRegex.exec(migration.up)) !== null) {
         const tableName = match[1].toUpperCase();
-        
+
         if (tableDefinitions.has(tableName)) {
           throw new Error(`Duplicate CREATE TABLE for ${tableName} in migration ${migration.id}`);
         }
-        
+
         tableDefinitions.set(tableName, migration.id);
       }
     }
@@ -131,6 +131,8 @@ describe('Database Migrations', () => {
 
     expect(sql).toContain('CHECK (TYPE IN');
     expect(sql).toContain("CHECK (STATUS IN ('DRAFT', 'POSTED', 'VOID'))");
-    expect(sql).toContain('CHECK ((DEBIT_AMOUNT > 0 AND CREDIT_AMOUNT = 0) OR (CREDIT_AMOUNT > 0 AND DEBIT_AMOUNT = 0))');
+    expect(sql).toContain(
+      'CHECK ((DEBIT_AMOUNT > 0 AND CREDIT_AMOUNT = 0) OR (CREDIT_AMOUNT > 0 AND DEBIT_AMOUNT = 0))',
+    );
   });
 });

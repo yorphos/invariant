@@ -19,7 +19,7 @@ export function getShortcutId(shortcut: Pick<Shortcut, 'key' | 'ctrl' | 'alt' | 
     shortcut.ctrl ? 'Ctrl' : null,
     shortcut.alt ? 'Alt' : null,
     shortcut.shift ? 'Shift' : null,
-    normalizeKey(shortcut.key)
+    normalizeKey(shortcut.key),
   ]
     .filter(Boolean)
     .join('+');
@@ -30,7 +30,7 @@ export function formatShortcut(shortcut: Pick<Shortcut, 'key' | 'ctrl' | 'alt' |
     shortcut.ctrl ? 'Ctrl' : null,
     shortcut.alt ? 'Alt' : null,
     shortcut.shift ? 'Shift' : null,
-    shortcut.key.length === 1 ? shortcut.key.toUpperCase() : shortcut.key
+    shortcut.key.length === 1 ? shortcut.key.toUpperCase() : shortcut.key,
   ]
     .filter(Boolean)
     .join('+');
@@ -54,13 +54,13 @@ function createKeyboardStore() {
     register: (shortcut: Shortcut) => {
       const normalizedShortcut = {
         ...shortcut,
-        key: normalizeKey(shortcut.key)
+        key: normalizeKey(shortcut.key),
       };
       const shortcutId = getShortcutId(normalizedShortcut);
 
       update((shortcuts) => [
         ...shortcuts.filter((existing) => getShortcutId(existing) !== shortcutId),
-        normalizedShortcut
+        normalizedShortcut,
       ]);
 
       return shortcutId;
@@ -68,10 +68,11 @@ function createKeyboardStore() {
     unregister: (key: string) =>
       update((shortcuts) =>
         shortcuts.filter(
-          (shortcut) => getShortcutId(shortcut) !== key && normalizeKey(shortcut.key) !== normalizeKey(key)
-        )
+          (shortcut) =>
+            getShortcutId(shortcut) !== key && normalizeKey(shortcut.key) !== normalizeKey(key),
+        ),
       ),
-    clear: () => update(() => [])
+    clear: () => update(() => []),
   };
 }
 

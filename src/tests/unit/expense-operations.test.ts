@@ -3,7 +3,7 @@ import type { ExpenseInput } from '../../lib/domain/expense-operations';
 
 /**
  * Expense Operations Tests
- * 
+ *
  * Tests for expense creation and validation
  */
 
@@ -24,7 +24,7 @@ describe('Expense Operations - Validation', () => {
   it('should reject expenses with negative amount', () => {
     const expense: ExpenseInput = {
       description: 'Office Supplies',
-      amount: -50.00,
+      amount: -50.0,
       expense_date: '2026-01-24',
       expense_account_id: 6500,
       payment_account_id: 1010,
@@ -46,7 +46,7 @@ describe('Expense Operations - Validation', () => {
   it('should accept valid expense with all required fields', () => {
     const expense: ExpenseInput = {
       description: 'Office Supplies',
-      amount: 127.50,
+      amount: 127.5,
       expense_date: '2026-01-24',
       expense_account_id: 6500,
       payment_account_id: 1010,
@@ -66,7 +66,7 @@ describe('Expense Operations - Validation', () => {
   it('should allow optional vendor_id', () => {
     const expenseWithVendor: ExpenseInput = {
       description: 'Office Supplies',
-      amount: 127.50,
+      amount: 127.5,
       expense_date: '2026-01-24',
       vendor_id: 5,
       expense_account_id: 6500,
@@ -75,7 +75,7 @@ describe('Expense Operations - Validation', () => {
 
     const expenseWithoutVendor: ExpenseInput = {
       description: 'Office Supplies',
-      amount: 127.50,
+      amount: 127.5,
       expense_date: '2026-01-24',
       expense_account_id: 6500,
       payment_account_id: 1010,
@@ -88,7 +88,7 @@ describe('Expense Operations - Validation', () => {
   it('should allow optional reference and notes', () => {
     const expense: ExpenseInput = {
       description: 'Office Supplies',
-      amount: 127.50,
+      amount: 127.5,
       expense_date: '2026-01-24',
       expense_account_id: 6500,
       payment_account_id: 1010,
@@ -129,7 +129,12 @@ describe('Expense Operations - Account Validation', () => {
   });
 
   it('should reject inactive expense accounts', () => {
-    const inactiveAccount = { id: 6500, name: 'Office Supplies', type: 'expense', is_active: false };
+    const inactiveAccount = {
+      id: 6500,
+      name: 'Office Supplies',
+      type: 'expense',
+      is_active: false,
+    };
     const activeAccount = { id: 6500, name: 'Office Supplies', type: 'expense', is_active: true };
 
     expect(inactiveAccount.is_active).toBe(false);
@@ -147,13 +152,13 @@ describe('Expense Operations - Account Validation', () => {
 
 describe('Expense Operations - Journal Entry Creation', () => {
   it('should create balanced journal entry (DR Expense, CR Cash)', () => {
-    const amount = 127.50;
-    
-    const debit = amount;  // Expense account
+    const amount = 127.5;
+
+    const debit = amount; // Expense account
     const credit = amount; // Cash/Bank account
 
     expect(debit).toBe(credit); // Must be balanced
-    expect(debit).toBe(127.50);
+    expect(debit).toBe(127.5);
   });
 
   it('should use expense date for journal entry', () => {

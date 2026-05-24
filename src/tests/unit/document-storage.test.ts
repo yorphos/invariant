@@ -35,7 +35,9 @@ vi.mock('@tauri-apps/api/path', () => ({
   appDataDir: vi.fn(() => Promise.resolve('/mock/app/data')),
 }));
 
-const { deleteDocument, garbageCollectDocuments } = await import('../../lib/services/document-storage');
+const { deleteDocument, garbageCollectDocuments } = await import(
+  '../../lib/services/document-storage'
+);
 
 describe('deleteDocument', () => {
   const mockDocument: Document = {
@@ -54,40 +56,27 @@ describe('deleteDocument', () => {
   });
 
   it('should delete file from disk when no other document references same path', async () => {
-    mockDbSelect
-      .mockResolvedValueOnce([mockDocument])
-      .mockResolvedValueOnce([{ count: 0 }]);
+    mockDbSelect.mockResolvedValueOnce([mockDocument]).mockResolvedValueOnce([{ count: 0 }]);
     mockDbExecute.mockResolvedValue({ lastInsertId: undefined, rowsAffected: 1 });
     mockRemove.mockResolvedValue(undefined);
 
     await deleteDocument(1);
 
-    expect(mockDbExecute).toHaveBeenCalledWith(
-      'DELETE FROM document WHERE id = ?',
-      [1]
-    );
+    expect(mockDbExecute).toHaveBeenCalledWith('DELETE FROM document WHERE id = ?', [1]);
     expect(mockDbSelect).toHaveBeenCalledWith(
       'SELECT COUNT(*) as count FROM document WHERE file_path = ? AND id != ?',
-      ['documents/abc123.pdf', 1]
+      ['documents/abc123.pdf', 1],
     );
-    expect(mockRemove).toHaveBeenCalledWith(
-      'documents/abc123.pdf',
-      { baseDir: 0 }
-    );
+    expect(mockRemove).toHaveBeenCalledWith('documents/abc123.pdf', { baseDir: 0 });
   });
 
   it('should NOT delete file when another doc references same path (dedup)', async () => {
-    mockDbSelect
-      .mockResolvedValueOnce([mockDocument])
-      .mockResolvedValueOnce([{ count: 1 }]);
+    mockDbSelect.mockResolvedValueOnce([mockDocument]).mockResolvedValueOnce([{ count: 1 }]);
     mockDbExecute.mockResolvedValue({ lastInsertId: undefined, rowsAffected: 1 });
 
     await deleteDocument(1);
 
-    expect(mockDbExecute).toHaveBeenCalledWith(
-      'DELETE FROM document WHERE id = ?',
-      [1]
-    );
+    expect(mockDbExecute).toHaveBeenCalledWith('DELETE FROM document WHERE id = ?', [1]);
     expect(mockRemove).not.toHaveBeenCalled();
   });
 
@@ -100,18 +89,13 @@ describe('deleteDocument', () => {
   });
 
   it('should handle file deletion failure gracefully', async () => {
-    mockDbSelect
-      .mockResolvedValueOnce([mockDocument])
-      .mockResolvedValueOnce([{ count: 0 }]);
+    mockDbSelect.mockResolvedValueOnce([mockDocument]).mockResolvedValueOnce([{ count: 0 }]);
     mockDbExecute.mockResolvedValue({ lastInsertId: undefined, rowsAffected: 1 });
     mockRemove.mockRejectedValue(new Error('Permission denied'));
 
     await expect(deleteDocument(1)).resolves.toBeUndefined();
 
-    expect(mockDbExecute).toHaveBeenCalledWith(
-      'DELETE FROM document WHERE id = ?',
-      [1]
-    );
+    expect(mockDbExecute).toHaveBeenCalledWith('DELETE FROM document WHERE id = ?', [1]);
     expect(mockRemove).toHaveBeenCalled();
   });
 });
@@ -127,9 +111,7 @@ describe('garbageCollectDocuments', () => {
       { name: 'orphan1.pdf', isFile: true },
       { name: 'orphan2.pdf', isFile: true },
     ]);
-    mockDbSelect
-      .mockResolvedValueOnce([{ count: 0 }])
-      .mockResolvedValueOnce([{ count: 0 }]);
+    mockDbSelect.mockResolvedValueOnce([{ count: 0 }]).mockResolvedValueOnce([{ count: 0 }]);
     mockRemove.mockResolvedValue(undefined);
 
     const result = await garbageCollectDocuments();
@@ -142,9 +124,7 @@ describe('garbageCollectDocuments', () => {
   });
 
   it('should NOT remove files that have matching DB records', async () => {
-    mockReadDir.mockResolvedValue([
-      { name: 'active.pdf', isFile: true },
-    ]);
+    mockReadDir.mockResolvedValue([{ name: 'active.pdf', isFile: true }]);
     mockDbSelect.mockResolvedValueOnce([{ count: 1 }]);
 
     const result = await garbageCollectDocuments();

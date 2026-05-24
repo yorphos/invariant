@@ -1,6 +1,6 @@
 /**
  * Update service
- * 
+ *
  * Frontend service for checking and installing application updates.
  * Supports stable and beta release channels.
  */
@@ -21,7 +21,7 @@ export interface DownloadProgress {
   contentLength: number | null;
 }
 
-export type DownloadEvent = 
+export type DownloadEvent =
   | { event: 'Started'; data: { contentLength: number | null } }
   | { event: 'Progress'; data: { chunkLength: number } }
   | { event: 'Finished'; data: null };
@@ -30,11 +30,13 @@ export type ReleaseChannel = 'stable' | 'beta';
 
 /**
  * Check for updates on the specified channel
- * 
+ *
  * @param channel - Release channel to check (stable or beta)
  * @returns Update metadata if an update is available, null otherwise
  */
-export async function checkForUpdate(channel: ReleaseChannel = 'stable'): Promise<UpdateMetadata | null> {
+export async function checkForUpdate(
+  channel: ReleaseChannel = 'stable',
+): Promise<UpdateMetadata | null> {
   try {
     const result = await invoke<UpdateMetadata | null>('check_for_update', { channel });
     return result;
@@ -46,15 +48,15 @@ export async function checkForUpdate(channel: ReleaseChannel = 'stable'): Promis
 
 /**
  * Download and install a pending update
- * 
+ *
  * @param onProgress - Callback to receive download progress events
  * @returns Promise that resolves when download and install is complete
  */
 export async function downloadAndInstallUpdate(
-  onProgress?: (progress: DownloadProgress) => void
+  onProgress?: (progress: DownloadProgress) => void,
 ): Promise<void> {
   let unlisten: UnlistenFn | null = null;
-  
+
   try {
     let currentProgress: DownloadProgress = {
       downloaded: 0,
@@ -65,7 +67,7 @@ export async function downloadAndInstallUpdate(
     if (onProgress) {
       unlisten = await listen<DownloadEvent>('download-and-install-update', (event) => {
         const payload = event.payload;
-        
+
         if (payload.event === 'Started') {
           currentProgress.contentLength = payload.data.contentLength;
           onProgress(currentProgress);
@@ -93,7 +95,7 @@ export async function downloadAndInstallUpdate(
 
 /**
  * Get the current application version
- * 
+ *
  * @returns The current version string
  */
 export async function getCurrentVersion(): Promise<string> {

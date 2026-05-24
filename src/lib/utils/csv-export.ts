@@ -1,6 +1,6 @@
 /**
  * CSV Export Utility
- * 
+ *
  * Provides functions to export financial data to CSV format
  */
 
@@ -24,9 +24,9 @@ export function toCSV(data: CSVRow[], headers?: string[]): string {
 
   // Create data rows
   for (const row of data) {
-    const values = cols.map(col => {
+    const values = cols.map((col) => {
       const value = row[col];
-      
+
       // Handle undefined/null
       if (value === undefined || value === null) {
         return '';
@@ -55,16 +55,16 @@ export function toCSV(data: CSVRow[], headers?: string[]): string {
 export function downloadCSV(csv: string, filename: string): void {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
-  
+
   const url = URL.createObjectURL(blob);
   link.setAttribute('href', url);
   link.setAttribute('download', filename);
   link.style.visibility = 'hidden';
-  
+
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  
+
   URL.revokeObjectURL(url);
 }
 

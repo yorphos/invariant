@@ -1,6 +1,6 @@
 /**
  * Shared SQL types for database operations
- * 
+ *
  * Provides type-safe SQL parameter and value types
  * to replace `any` usages across service files.
  */

@@ -1,96 +1,96 @@
 <script lang="ts">
-  export let label = 'Upload File';
-  export let accept = '*/*'; // MIME type filter, e.g., "image/*" or ".pdf,.jpg"
-  export let multiple = false;
-  export let disabled = false;
-  export let maxSizeMB = 10; // Maximum file size in MB
-  export let error = '';
-  
-  // Callback when files are selected
-  export let onFilesSelected: ((files: File[]) => void) | undefined = undefined;
-  
-  let fileInput: HTMLInputElement;
-  let dragOver = false;
-  let selectedFiles: File[] = [];
-  
-  const id = `file-upload-${Math.random().toString(36).substr(2, 9)}`;
-  
-  function handleFileSelect(event: Event) {
-    const input = event.target as HTMLInputElement;
-    if (input.files) {
-      processFiles(Array.from(input.files));
-    }
-  }
-  
-  function handleDrop(event: DragEvent) {
-    event.preventDefault();
-    dragOver = false;
-    
-    if (disabled) return;
-    
-    const files = event.dataTransfer?.files;
-    if (files) {
-      processFiles(Array.from(files));
-    }
-  }
-  
-  function handleDragOver(event: DragEvent) {
-    event.preventDefault();
-    if (!disabled) {
-      dragOver = true;
-    }
-  }
-  
-  function handleDragLeave() {
-    dragOver = false;
-  }
-  
-  function processFiles(files: File[]) {
-    // Filter files by size
-    const maxSize = maxSizeMB * 1024 * 1024;
-    const validFiles = files.filter(file => {
-      if (file.size > maxSize) {
-        error = `File "${file.name}" exceeds ${maxSizeMB}MB limit`;
-        return false;
-      }
-      return true;
-    });
-    
-    if (validFiles.length === 0) return;
-    
-    selectedFiles = multiple ? [...selectedFiles, ...validFiles] : validFiles;
-    error = ''; // Clear any previous errors
-    
-    if (onFilesSelected) {
-      onFilesSelected(selectedFiles);
-    }
-  }
-  
-  function removeFile(index: number) {
-    selectedFiles = selectedFiles.filter((_, i) => i !== index);
-    if (onFilesSelected) {
-      onFilesSelected(selectedFiles);
-    }
-  }
-  
-  function formatFileSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-  
-  function triggerFileInput() {
-    if (!disabled) {
-      fileInput.click();
-    }
-  }
+export let label = 'Upload File';
+export let accept = '*/*'; // MIME type filter, e.g., "image/*" or ".pdf,.jpg"
+export let multiple = false;
+export let disabled = false;
+export let maxSizeMB = 10; // Maximum file size in MB
+export let error = '';
 
-  function handleKeyDown(event: KeyboardEvent) {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      triggerFileInput();
-    }
+// Callback when files are selected
+export let onFilesSelected: ((files: File[]) => void) | undefined = undefined;
+
+let fileInput: HTMLInputElement;
+let dragOver = false;
+let selectedFiles: File[] = [];
+
+const id = `file-upload-${Math.random().toString(36).substr(2, 9)}`;
+
+function handleFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement;
+  if (input.files) {
+    processFiles(Array.from(input.files));
   }
+}
+
+function handleDrop(event: DragEvent) {
+  event.preventDefault();
+  dragOver = false;
+
+  if (disabled) return;
+
+  const files = event.dataTransfer?.files;
+  if (files) {
+    processFiles(Array.from(files));
+  }
+}
+
+function handleDragOver(event: DragEvent) {
+  event.preventDefault();
+  if (!disabled) {
+    dragOver = true;
+  }
+}
+
+function handleDragLeave() {
+  dragOver = false;
+}
+
+function processFiles(files: File[]) {
+  // Filter files by size
+  const maxSize = maxSizeMB * 1024 * 1024;
+  const validFiles = files.filter((file) => {
+    if (file.size > maxSize) {
+      error = `File "${file.name}" exceeds ${maxSizeMB}MB limit`;
+      return false;
+    }
+    return true;
+  });
+
+  if (validFiles.length === 0) return;
+
+  selectedFiles = multiple ? [...selectedFiles, ...validFiles] : validFiles;
+  error = ''; // Clear any previous errors
+
+  if (onFilesSelected) {
+    onFilesSelected(selectedFiles);
+  }
+}
+
+function removeFile(index: number) {
+  selectedFiles = selectedFiles.filter((_, i) => i !== index);
+  if (onFilesSelected) {
+    onFilesSelected(selectedFiles);
+  }
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function triggerFileInput() {
+  if (!disabled) {
+    fileInput.click();
+  }
+}
+
+function handleKeyDown(event: KeyboardEvent) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    triggerFileInput();
+  }
+}
 </script>
 
 <div class="file-upload-group">
