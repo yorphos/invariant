@@ -1,6 +1,6 @@
 use tauri::State;
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 
 // We'll store database connections in Tauri's managed state
 pub struct DbState {
@@ -20,6 +20,10 @@ pub struct TransactionResult {
     pub error: Option<String>,
 }
 
+fn handle_poison_error<T>(_e: PoisonError<T>) -> String {
+    "Internal error: state corrupted".to_string()
+}
+
 /// Execute multiple SQL statements in a transaction
 #[tauri::command]
 pub async fn execute_transaction(
@@ -29,7 +33,7 @@ pub async fn execute_transaction(
 ) -> Result<TransactionResult, String> {
     // Check if pool exists (without awaiting inside lock)
     let pool = {
-        let connections_guard = state.connections.lock().unwrap();
+        let connections_guard = state.connections.lock().map_err(handle_poison_error)?;
         connections_guard.get(&db_url).cloned()
     };
 
@@ -44,7 +48,7 @@ pub async fn execute_transaction(
         
         // Store it
         {
-            let mut connections_guard = state.connections.lock().unwrap();
+            let mut connections_guard = state.connections.lock().map_err(handle_poison_error)?;
             connections_guard.insert(db_url.clone(), new_pool.clone());
         }
         
@@ -85,7 +89,7 @@ pub async fn execute_transaction(
 
         // Execute the query
         query.execute(&mut *tx).await.map_err(|e| {
-            format!("SQL Error: {} | Query: {}", e, step.sql)
+            format!("Database operation failed: {}", e)
         })?;
     }
 
