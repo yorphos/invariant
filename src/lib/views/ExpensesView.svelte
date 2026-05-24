@@ -12,6 +12,8 @@
   import FileUpload from '../ui/FileUpload.svelte';
   import { storeDocument, attachDocument, getEntityDocuments, deleteDocument } from '../services/document-storage';
   import type { DocumentWithAttachment } from '../domain/types';
+  import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
 
   export let mode: PolicyMode;
 
@@ -59,7 +61,8 @@
 
       formDate = new Date().toISOString().split('T')[0];
     } catch (e) {
-      console.error('Failed to load data:', e);
+      logger.error('Failed to load data:', e);
+      toasts.error('Failed to load expenses');
     }
     loading = false;
   }
@@ -67,7 +70,7 @@
   async function handleSubmit() {
     try {
       if (typeof formExpenseAccountId !== 'number' || typeof formPaymentAccountId !== 'number') {
-        alert('Please select expense and payment accounts');
+        toasts.warning('Please select expense and payment accounts');
         return;
       }
 
@@ -86,7 +89,7 @@
       );
 
       if (!result.ok) {
-        alert('Failed to record expense:\n' + result.warnings.map(w => w.message).join('\n'));
+        toasts.error('Failed to record expense:\n' + result.warnings.map(w => w.message).join('\n'));
         return;
       }
 
@@ -115,8 +118,9 @@
             );
           }
         } catch (e) {
-          console.error('Failed to upload attachments:', e);
-          alert('Expense recorded but failed to upload some attachments: ' + e);
+          logger.error('Failed to upload attachments:', e);
+      toasts.warning('Expense recorded but failed to upload some attachments: ' + e);
+          toasts.error('Expense recorded but failed to upload some attachments: ' + e);
         }
       }
 
@@ -124,8 +128,8 @@
       view = 'list';
       resetForm();
     } catch (e) {
-      console.error('Failed to record expense:', e);
-      alert('Failed to record expense: ' + e);
+      logger.error('Failed to record expense:', e);
+      toasts.error('Failed to record expense: ' + e);
     }
   }
 

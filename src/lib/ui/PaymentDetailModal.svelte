@@ -3,6 +3,8 @@
   import { persistenceService } from '../services/persistence';
   import { getDatabase } from '../services/database';
   import type { Payment, Allocation, Invoice, Contact, JournalEntry, JournalLine, Account } from '../domain/types';
+  import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
   import Modal from './Modal.svelte';
   import Button from './Button.svelte';
   import Card from './Card.svelte';
@@ -58,7 +60,8 @@
         }
       }
     } catch (e) {
-      console.error('Failed to load payment details:', e);
+      logger.error('Failed to load payment details:', e);
+      toasts.error('Failed to load payment details');
     }
     loading = false;
   }

@@ -7,6 +7,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { logger } from '../utils/logger';
 
 export interface UpdateMetadata {
   version: string;
@@ -38,7 +39,7 @@ export async function checkForUpdate(channel: ReleaseChannel = 'stable'): Promis
     const result = await invoke<UpdateMetadata | null>('check_for_update', { channel });
     return result;
   } catch (error) {
-    console.error('Failed to check for updates:', error);
+    logger.error('Failed to check for updates:', error);
     throw error;
   }
 }
@@ -81,7 +82,7 @@ export async function downloadAndInstallUpdate(
     // Start the download and installation
     await invoke('download_and_install_update');
   } catch (error) {
-    console.error('Failed to download and install update:', error);
+    logger.error('Failed to download and install update:', error);
     throw error;
   } finally {
     if (unlisten) {
@@ -99,7 +100,7 @@ export async function getCurrentVersion(): Promise<string> {
   try {
     return await invoke<string>('get_current_version');
   } catch (error) {
-    console.error('Failed to get current version:', error);
+    logger.error('Failed to get current version:', error);
     return 'unknown';
   }
 }

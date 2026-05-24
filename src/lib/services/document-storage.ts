@@ -16,8 +16,10 @@ import type {
 } from '../domain/types';
 
 // Use Tauri's filesystem API for file operations
-import { BaseDirectory, writeFile, readFile, exists, mkdir } from '@tauri-apps/plugin-fs';
+import { BaseDirectory, writeFile, readFile, exists, mkdir, remove, readDir } from '@tauri-apps/plugin-fs';
 import { appDataDir } from '@tauri-apps/api/path';
+import { logger } from '../utils/logger';
+import type { SqlParams } from '../utils/sql-types';
 
 const DOCUMENTS_DIR = 'documents';
 
@@ -290,16 +292,28 @@ export async function deleteDocument(documentId: number): Promise<void> {
     throw new Error(`Document ID ${documentId} does not exist`);
   }
   
-  // Note: Attachments will be deleted via CASCADE
-  // Delete document record
+  // Check if any other document references the same file
+  // (content-hash deduplication means multiple docs can share a file)
+  const otherDocsWithSameFile = await db.select<Array<{ count: number }>>(
+    'SELECT COUNT(*) as count FROM document WHERE file_path = ? AND id != ?',
+    [doc.file_path, documentId]
+  );
+  
+  // Delete document record first (attachments cascade via FK)
   await db.execute(
     'DELETE FROM document WHERE id = ?',
     [documentId]
   );
   
-  // TODO: Delete file from disk
-  // This requires Tauri's fs plugin to support file deletion
-  // For now, we'll leave orphaned files (they're deduplicated by hash anyway)
+  // Only delete the physical file if no other document references it
+  if (otherDocsWithSameFile[0]?.count === 0) {
+    try {
+      await remove(doc.file_path, { baseDir: BaseDirectory.AppData });
+    } catch (error) {
+      logger.error(`Failed to delete file from disk: ${error}`);
+      // Don't throw - DB record is already deleted, file deletion is best-effort
+    }
+  }
 }
 
 /**
@@ -354,7 +368,7 @@ export async function updateDocument(
   const db = await getDatabase();
   
   const fields: string[] = [];
-  const values: any[] = [];
+  const values: SqlParams = [];
   
   if (updates.document_type !== undefined) {
     fields.push('document_type = ?');
@@ -411,4 +425,50 @@ export async function bulkAttachDocument(
   }
   
   return attachmentIds;
+}
+
+/**
+ * Garbage collect orphaned document files
+ * Removes files from disk that have no matching database record
+ * Returns the number of files cleaned up
+ */
+export async function garbageCollectDocuments(): Promise<{ filesRemoved: number; filesScanned: number }> {
+  const db = await getDatabase();
+  
+  // Ensure directory exists
+  await ensureDocumentDir();
+  
+  let filesRemoved = 0;
+  let filesScanned = 0;
+  
+  try {
+    const entries = await readDir(DOCUMENTS_DIR, { baseDir: BaseDirectory.AppData });
+    
+    for (const entry of entries) {
+      if (entry.name && entry.isFile) {
+        filesScanned++;
+        const filePath = `${DOCUMENTS_DIR}/${entry.name}`;
+        
+        // Check if any document record references this file
+        const matches = await db.select<Array<{ count: number }>>(
+          'SELECT COUNT(*) as count FROM document WHERE file_path = ?',
+          [filePath]
+        );
+        
+        if (matches[0]?.count === 0) {
+          // Orphaned file - remove it
+          try {
+            await remove(filePath, { baseDir: BaseDirectory.AppData });
+            filesRemoved++;
+          } catch (error) {
+            logger.error(`Failed to remove orphaned file ${entry.name}: ${error}`);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    logger.error('Failed to read documents directory:', error);
+  }
+  
+  return { filesRemoved, filesScanned };
 }

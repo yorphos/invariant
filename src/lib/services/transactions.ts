@@ -1,9 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
 import { appDataDir } from '@tauri-apps/api/path';
+import type { SqlParams } from '../utils/sql-types';
 
 export interface TransactionStep {
   sql: string;
-  params: any[];
+  params: SqlParams;
 }
 
 export interface TransactionResult {

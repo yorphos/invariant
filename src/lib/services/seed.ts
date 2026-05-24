@@ -1,5 +1,6 @@
 import { getDatabase } from './database';
 import type { AccountType } from '../domain/types';
+import { logger } from '../utils/logger';
 
 interface DefaultAccount {
   code: string;
@@ -124,13 +125,13 @@ export async function seedDefaultAccounts(): Promise<void> {
   );
 
   if (existingAccounts[0].count > 0) {
-    console.log('Accounts already exist, skipping seed');
+    logger.info('Accounts already exist, skipping seed');
     // Still try to seed system accounts in case they're missing
     await seedSystemAccounts();
     return;
   }
 
-  console.log('Seeding default chart of accounts...');
+  logger.info('Seeding default chart of accounts...');
 
   // Insert all default accounts
   for (const account of DEFAULT_CHART_OF_ACCOUNTS) {
@@ -141,7 +142,7 @@ export async function seedDefaultAccounts(): Promise<void> {
     );
   }
 
-  console.log(`Seeded ${DEFAULT_CHART_OF_ACCOUNTS.length} default accounts`);
+  logger.info(`Seeded ${DEFAULT_CHART_OF_ACCOUNTS.length} default accounts`);
 
   // Now seed system account mappings (accounts exist now)
   await seedSystemAccounts();
@@ -160,7 +161,7 @@ async function seedSystemAccounts(): Promise<void> {
   );
 
   if (tableExists.length === 0) {
-    console.log('system_account table does not exist yet, skipping system account seed');
+    logger.info('system_account table does not exist yet, skipping system account seed');
     return;
   }
 
@@ -170,11 +171,11 @@ async function seedSystemAccounts(): Promise<void> {
   );
 
   if (existingMappings[0].count >= SYSTEM_ACCOUNT_MAPPINGS.length) {
-    console.log('System accounts already seeded, skipping');
+    logger.info('System accounts already seeded, skipping');
     return;
   }
 
-  console.log('Seeding system account mappings...');
+  logger.info('Seeding system account mappings...');
 
   let seededCount = 0;
   for (const mapping of SYSTEM_ACCOUNT_MAPPINGS) {
@@ -185,7 +186,7 @@ async function seedSystemAccounts(): Promise<void> {
     );
 
     if (account.length === 0) {
-      console.warn(`Account ${mapping.code} not found for system role ${mapping.role}`);
+      logger.warn(`Account ${mapping.code} not found for system role ${mapping.role}`);
       continue;
     }
 
@@ -198,5 +199,5 @@ async function seedSystemAccounts(): Promise<void> {
     seededCount++;
   }
 
-  console.log(`Seeded ${seededCount} system account mappings`);
+  logger.info(`Seeded ${seededCount} system account mappings`);
 }

@@ -5,6 +5,8 @@
   import { voidInvoice } from '../domain/invoice-operations';
   import { generateInvoicePDF } from '../utils/pdf-generator';
   import type { Invoice, InvoiceLine, Contact, Allocation, Payment, JournalEntry, JournalLine, Account, PolicyMode } from '../domain/types';
+  import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
   import Modal from './Modal.svelte';
   import Button from './Button.svelte';
   import Card from './Card.svelte';
@@ -67,7 +69,8 @@
         }
       }
     } catch (e) {
-      console.error('Failed to load invoice details:', e);
+      logger.error('Failed to load invoice details:', e);
+      toasts.error('Failed to load invoice details');
     }
     loading = false;
   }
@@ -90,7 +93,7 @@
 
   async function handleVoid() {
     if (!voidReason.trim()) {
-      alert('Please provide a reason for voiding this invoice');
+      toasts.warning('Please provide a reason for voiding this invoice');
       return;
     }
 
@@ -99,15 +102,16 @@
       const result = await voidInvoice(invoice.id!, voidReason, { mode });
       
       if (!result.ok) {
-        alert('Failed to void invoice:\n' + result.warnings.map(w => w.message).join('\n'));
+        toasts.error('Failed to void invoice:\n' + result.warnings.map(w => w.message).join('\n'));
         return;
       }
 
       if (onVoid) onVoid();
       onclose();
     } catch (e) {
-      console.error('Failed to void invoice:', e);
-      alert('Failed to void invoice: ' + e);
+      logger.error('Failed to void invoice:', e);
+      toasts.error('Failed to void invoice: ' + e);
+      toasts.error('Failed to void invoice: ' + e);
     } finally {
       voidLoading = false;
     }
@@ -119,7 +123,7 @@
 
   async function handleDownloadPDF() {
     if (!contact) {
-      alert('Cannot generate PDF: customer information not found');
+      toasts.error('Cannot generate PDF: customer information not found');
       return;
     }
 
@@ -139,8 +143,9 @@
       // Download the PDF
       pdf.save(`${invoice.invoice_number}.pdf`);
     } catch (e) {
-      console.error('Failed to generate PDF:', e);
-      alert('Failed to generate PDF: ' + e);
+      logger.error('Failed to generate PDF:', e);
+      toasts.error('Failed to generate PDF: ' + e);
+      toasts.error('Failed to generate PDF: ' + e);
     } finally {
       pdfDownloading = false;
     }

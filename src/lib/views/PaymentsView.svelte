@@ -5,6 +5,8 @@
   import { arMatchingEngine } from '../domain/ar-matching';
   import type { Payment, Invoice, Contact, PolicyMode } from '../domain/types';
   import type { AllocationSuggestion } from '../domain/ar-matching';
+  import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
   import Button from '../ui/Button.svelte';
   import Input from '../ui/Input.svelte';
   import Select from '../ui/Select.svelte';
@@ -72,7 +74,8 @@
 
       formPaymentDate = new Date().toISOString().split('T')[0];
     } catch (e) {
-      console.error('Failed to load data:', e);
+      logger.error('Failed to load data:', e);
+      toasts.error('Failed to load payments');
     }
     loading = false;
   }
@@ -107,7 +110,7 @@
       );
 
       if (!result.ok) {
-        alert('Failed to create payment:\n' + result.warnings.map(w => w.message).join('\n'));
+        toasts.error('Failed to create payment:\n' + result.warnings.map(w => w.message).join('\n'));
         return;
       }
 
@@ -115,8 +118,8 @@
       view = 'list';
       resetForm();
     } catch (e) {
-      console.error('Failed to create payment:', e);
-      alert('Failed to create payment: ' + e);
+      logger.error('Failed to create payment:', e);
+      toasts.error('Failed to create payment: ' + e);
     }
   }
 

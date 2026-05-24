@@ -2,7 +2,9 @@
   import { onMount } from 'svelte';
   import { persistenceService } from '../services/persistence';
   import { 
-    importCSVBankStatement, 
+    importCSVBankStatement,
+    parseCSVBankStatement,
+    checkDuplicateTransactions,
     getAccountImports, 
     getImportTransactions,
     getCategorizationRules,
@@ -14,6 +16,9 @@
     type CategorizationRule
   } from '../services/bank-import';
   import type { Account, BankTransactionType } from '../domain/types';
+  import { confirmAction } from '../utils/confirm-action';
+  import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
   import Button from '../ui/Button.svelte';
   import Input from '../ui/Input.svelte';
   import Select from '../ui/Select.svelte';
@@ -21,7 +26,7 @@
   import Table from '../ui/Table.svelte';
   import Modal from '../ui/Modal.svelte';
 
-  type ViewState = 'list' | 'import' | 'transactions' | 'rules';
+  type ViewState = 'list' | 'import' | 'preview' | 'transactions' | 'rules';
 
   let currentView: ViewState = 'list';
   let loading = false;
@@ -38,6 +43,16 @@
   let importFileName = '';
   let importing = false;
   let importResult: { importId: number; transactionCount: number; autoMatchedCount: number } | null = null;
+
+  // Preview state
+  let parsedTransactions: Partial<BankStatementTransaction>[] = [];
+  let previewInfo: { startDate?: string; endDate?: string; openingBalance?: number; closingBalance?: number } | null = null;
+  let duplicateWarnings: Awaited<ReturnType<typeof checkDuplicateTransactions>> = [];
+  let checkingDuplicates = false;
+
+  // Import progress state
+  let importProgress = '';
+  let importSummary: { imported: number; duplicatesSkipped: number; errors: number } | null = null;
 
   // Rule form state
   let showRuleModal = false;
@@ -74,8 +89,8 @@
       
       categorizationRules = await getCategorizationRules();
     } catch (e) {
-      console.error('Failed to load data:', e);
-      alert('Failed to load data: ' + e);
+      logger.error('Failed to load data:', e);
+      toasts.error('Failed to load data: ' + e);
     }
     loading = false;
   }
@@ -87,8 +102,8 @@
     try {
       imports = await getAccountImports(selectedAccountId);
     } catch (e) {
-      console.error('Failed to load imports:', e);
-      alert('Failed to load imports: ' + e);
+      logger.error('Failed to load imports:', e);
+      toasts.error('Failed to load imports: ' + e);
     }
     loading = false;
   }
@@ -102,46 +117,123 @@
     importFileName = file.name;
     
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       csvFileText = e.target?.result as string;
+      
+      // Auto-parse CSV and show preview
+      if (csvFileText && selectedAccountId > 0) {
+        await showPreview();
+      }
     };
     reader.readAsText(file);
   }
 
-  async function handleImport() {
+  async function showPreview() {
     if (selectedAccountId === 0) {
-      alert('Please select a bank account');
+      toasts.warning('Please select a bank account first');
       return;
     }
     
     if (!csvFileText) {
-      alert('Please select a CSV file');
+      toasts.warning('Please select a CSV file');
+      return;
+    }
+    
+    try {
+      const result = parseCSVBankStatement(csvFileText);
+      parsedTransactions = result.transactions;
+      previewInfo = { startDate: result.startDate, endDate: result.endDate, openingBalance: result.openingBalance, closingBalance: result.closingBalance };
+      
+      // Check for duplicates
+      checkingDuplicates = true;
+      duplicateWarnings = await checkDuplicateTransactions(parsedTransactions, selectedAccountId);
+      checkingDuplicates = false;
+      
+      currentView = 'preview';
+    } catch (e) {
+      logger.error('Failed to parse CSV:', e);
+      toasts.error('Failed to parse CSV: ' + e);
+    }
+  }
+
+  async function handleConfirmImport() {
+    if (selectedAccountId === 0) {
+      toasts.warning('Please select a bank account');
+      return;
+    }
+    
+    if (parsedTransactions.length === 0) {
+      toasts.warning('No transactions to import');
       return;
     }
     
     importing = true;
+    importProgress = '';
+    importSummary = null;
+    
+    let imported = 0;
+    let duplicatesSkipped = 0;
+    let errors = 0;
+    
     try {
+      const duplicateIndices = new Set(duplicateWarnings.map(d => d.transactionIndex));
+      
+      // Separate non-duplicate transactions
+      const newTransactions = parsedTransactions.filter((_, i) => !duplicateIndices.has(i));
+      duplicatesSkipped = parsedTransactions.length - newTransactions.length;
+      
+      if (newTransactions.length === 0) {
+        importSummary = { imported: 0, duplicatesSkipped, errors: 0 };
+        toasts.warning('All transactions appear to be duplicates. Nothing to import.');
+        importing = false;
+        return;
+      }
+      
+      // Show progress for batch import
+      importProgress = `Importing ${newTransactions.length} of ${parsedTransactions.length} transactions...`;
+      
       const result = await importCSVBankStatement(
         selectedAccountId,
         importFileName,
         csvFileText,
-        'user' // TODO: Get from auth context
+        'bank-import-user'
       );
       
+      imported = result.transactionCount;
       importResult = result;
       await loadImports();
       
-      alert(`Import successful!\n${result.transactionCount} transactions imported.\n${result.autoMatchedCount} auto-matched.`);
+      importSummary = { imported, duplicatesSkipped, errors };
+      importProgress = '';
+      
+      toasts.success(
+        `Import complete: ${imported} imported` +
+        (duplicatesSkipped > 0 ? `, ${duplicatesSkipped} duplicates skipped` : '') +
+        (errors > 0 ? `, ${errors} errors` : '')
+      );
       
       // Reset form
+      parsedTransactions = [];
+      duplicateWarnings = [];
       csvFileText = '';
       importFileName = '';
+      importSummary = null;
       currentView = 'list';
     } catch (e) {
-      console.error('Import failed:', e);
-      alert('Import failed: ' + e);
+      logger.error('Import failed:', e);
+      toasts.error('Import failed: ' + e);
+      importProgress = '';
     }
     importing = false;
+  }
+
+  function handleCancelPreview() {
+    parsedTransactions = [];
+    duplicateWarnings = [];
+    previewInfo = null;
+    csvFileText = '';
+    importFileName = '';
+    currentView = 'import';
   }
 
   async function viewImportTransactions(importRecord: BankStatementImport) {
@@ -151,8 +243,8 @@
       importTransactions = await getImportTransactions(importRecord.id!);
       currentView = 'transactions';
     } catch (e) {
-      console.error('Failed to load transactions:', e);
-      alert('Failed to load transactions: ' + e);
+      logger.error('Failed to load transactions:', e);
+      toasts.error('Failed to load transactions: ' + e);
     }
     loading = false;
   }
@@ -196,7 +288,7 @@
 
   async function saveRule() {
     if (!ruleForm.rule_name) {
-      alert('Please provide a rule name');
+      toasts.warning('Please provide a rule name');
       return;
     }
     
@@ -211,22 +303,23 @@
       categorizationRules = await getCategorizationRules();
       showRuleModal = false;
     } catch (e) {
-      console.error('Failed to save rule:', e);
-      alert('Failed to save rule: ' + e);
+      logger.error('Failed to save rule:', e);
+      toasts.error('Failed to save rule: ' + e);
     }
     loading = false;
   }
 
   async function deleteRule(ruleId: number) {
-    if (!confirm('Are you sure you want to delete this rule?')) return;
+    const confirmed = await confirmAction('Delete Rule', 'Are you sure you want to delete this rule?');
+    if (!confirmed) return;
     
     loading = true;
     try {
       await deleteCategorizationRule(ruleId);
       categorizationRules = await getCategorizationRules();
     } catch (e) {
-      console.error('Failed to delete rule:', e);
-      alert('Failed to delete rule: ' + e);
+      logger.error('Failed to delete rule:', e);
+      toasts.error('Failed to delete rule: ' + e);
     }
     loading = false;
   }
@@ -367,16 +460,141 @@
 
         <div class="button-group">
           <Button
-            onclick={handleImport}
-            disabled={importing || selectedAccountId === 0 || !csvFileText}
+            onclick={showPreview}
+            disabled={loading || selectedAccountId === 0 || !csvFileText}
           >
-            {importing ? 'Importing...' : 'Import'}
+            Preview Import
           </Button>
           <Button variant="secondary" onclick={() => currentView = 'list'}>
             Cancel
           </Button>
         </div>
       </div>
+    </Card>
+  {/if}
+
+  {#if currentView === 'preview'}
+    <Card title="Preview Import - {importFileName}">
+      {#if previewInfo}
+        <div class="import-stats">
+          <div class="stat">
+            <span class="label">Date Range:</span>
+            <span class="value">
+              {previewInfo.startDate ? formatDate(previewInfo.startDate) : 'N/A'} - 
+              {previewInfo.endDate ? formatDate(previewInfo.endDate) : 'N/A'}
+            </span>
+          </div>
+          <div class="stat">
+            <span class="label">Total Transactions:</span>
+            <span class="value">{parsedTransactions.length}</span>
+          </div>
+          {#if previewInfo.openingBalance !== undefined}
+            <div class="stat">
+              <span class="label">Opening Balance:</span>
+              <span class="value">{formatAmount(previewInfo.openingBalance)}</span>
+            </div>
+          {/if}
+          {#if previewInfo.closingBalance !== undefined}
+            <div class="stat">
+              <span class="label">Closing Balance:</span>
+              <span class="value">{formatAmount(previewInfo.closingBalance)}</span>
+            </div>
+          {/if}
+        </div>
+      {/if}
+
+      {#if checkingDuplicates}
+        <p class="checking-duplicates">Checking for duplicate transactions...</p>
+      {:else if duplicateWarnings.length > 0}
+        <div class="duplicate-warnings">
+          <h3>Duplicate Warning</h3>
+          <p class="duplicate-hint">
+            {duplicateWarnings.length} transaction(s) appear to be duplicates of existing journal entries.
+            They will be skipped during import.
+          </p>
+          <Table headers={['Date', 'Description', 'Amount', 'Match Confidence', 'Existing Entry']}>
+            {#each duplicateWarnings as dup}
+              <tr>
+                <td>{formatDate(parsedTransactions[dup.transactionIndex]?.transaction_date || '')}</td>
+                <td>{parsedTransactions[dup.transactionIndex]?.description || ''}</td>
+                <td>{formatAmount(parsedTransactions[dup.transactionIndex]?.amount || 0)}</td>
+                <td><span class="badge badge-warning">{(dup.confidence * 100).toFixed(0)}%</span></td>
+                <td>{formatDate(dup.existingEntryDate)} - {dup.existingDescription}</td>
+              </tr>
+            {/each}
+          </Table>
+        </div>
+      {:else}
+        <p class="no-duplicates">No duplicate transactions detected.</p>
+      {/if}
+
+      {#if importProgress}
+        <div class="import-progress">
+          <p>{importProgress}</p>
+        </div>
+      {/if}
+
+      {#if importSummary}
+        <div class="import-summary">
+          <h3>Import Summary</h3>
+          <div class="import-stats">
+            <div class="stat">
+              <span class="label">Imported:</span>
+              <span class="value">{importSummary.imported}</span>
+            </div>
+            {#if importSummary.duplicatesSkipped > 0}
+              <div class="stat">
+                <span class="label">Duplicates Skipped:</span>
+                <span class="value">{importSummary.duplicatesSkipped}</span>
+              </div>
+            {/if}
+            {#if importSummary.errors > 0}
+              <div class="stat">
+                <span class="label">Errors:</span>
+                <span class="value">{importSummary.errors}</span>
+              </div>
+            {/if}
+          </div>
+        </div>
+      {:else}
+        <div class="preview-table">
+          <Table headers={['Date', 'Description', 'Amount', 'Type', 'Account']}>
+            {#each parsedTransactions as txn, i}
+              <tr class:duplicate-row={duplicateWarnings.some(d => d.transactionIndex === i)}>
+                <td>{formatDate(txn.transaction_date || '')}</td>
+                <td>{txn.description || ''}</td>
+                <td>{formatAmount(txn.amount || 0)}</td>
+                <td>
+                  {#if duplicateWarnings.some(d => d.transactionIndex === i)}
+                    <span class="badge badge-warning">Duplicate</span>
+                  {:else}
+                    {txn.transaction_type || (txn.amount && txn.amount < 0 ? 'debit' : 'credit')}
+                  {/if}
+                </td>
+                <td>
+                  {#if txn.suggested_account_id}
+                    {accounts.find(a => a.id === txn.suggested_account_id)?.name || '-'}
+                  {:else}
+                    <span class="muted">Pending</span>
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          </Table>
+        </div>
+
+        <div class="button-group">
+          <Button
+            onclick={handleConfirmImport}
+            disabled={importing || parsedTransactions.length === 0}
+          >
+            {importing ? 'Importing...' : 'Import'}
+          </Button>
+          <Button variant="secondary" onclick={handleCancelPreview} disabled={importing}>
+            Cancel
+          </Button>
+        </div>
+      {/if}
     </Card>
   {/if}
 
@@ -757,5 +975,80 @@
   .badge-secondary {
     background-color: #e5e7eb;
     color: #374151;
+  }
+
+  .duplicate-warnings {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 0.375rem;
+  }
+
+  .duplicate-warnings h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #92400e;
+    margin: 0 0 0.5rem 0;
+  }
+
+  .duplicate-hint {
+    font-size: 0.875rem;
+    color: #92400e;
+    margin-bottom: 0.75rem;
+  }
+
+  .checking-duplicates {
+    text-align: center;
+    padding: 2rem;
+    color: #6b7280;
+    font-style: italic;
+  }
+
+  .no-duplicates {
+    text-align: center;
+    padding: 1rem;
+    color: #065f46;
+    font-weight: 500;
+  }
+
+  .preview-table {
+    margin-bottom: 1rem;
+  }
+
+  .preview-table :global(.duplicate-row) {
+    opacity: 0.6;
+    text-decoration: line-through;
+  }
+
+  .muted {
+    color: #9ca3af;
+    font-style: italic;
+  }
+
+  .import-progress {
+    text-align: center;
+    padding: 1.5rem;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+  }
+
+  .import-progress p {
+    font-size: 0.875rem;
+    color: #1e40af;
+    font-weight: 500;
+  }
+
+  .import-summary {
+    margin-bottom: 1rem;
+  }
+
+  .import-summary h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #065f46;
+    margin: 0 0 0.75rem 0;
   }
 </style>

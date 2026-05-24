@@ -6,6 +6,8 @@
  */
 
 import { getDatabase } from './database';
+import { logger } from '../utils/logger';
+import type { SqlParams } from '../utils/sql-types';
 import type {
   BankStatementImport,
   BankStatementTransaction,
@@ -487,6 +489,106 @@ export async function autoMatchTransactions(
 }
 
 /**
+ * Check parsed transactions for potential duplicates against existing journal entries.
+ * Matches by date (±3 days), amount, and description similarity.
+ * Returns an array of potential duplicates with match confidence for each input transaction.
+ */
+export async function checkDuplicateTransactions(
+  transactions: Partial<BankStatementTransaction>[],
+  accountId: number
+): Promise<{
+  transactionIndex: number;
+  duplicateOf: number;
+  confidence: number;
+  existingEntryDate: string;
+  existingDescription: string;
+}[]> {
+  const db = await getDatabase();
+  const duplicates: {
+    transactionIndex: number;
+    duplicateOf: number;
+    confidence: number;
+    existingEntryDate: string;
+    existingDescription: string;
+  }[] = [];
+
+  for (let i = 0; i < transactions.length; i++) {
+    const txn = transactions[i];
+    if (!txn.transaction_date || txn.amount === undefined) continue;
+
+    const amount = Math.abs(txn.amount);
+    const txnDate = new Date(txn.transaction_date);
+    const dateStart = new Date(txnDate);
+    dateStart.setDate(dateStart.getDate() - 3);
+    const dateEnd = new Date(txnDate);
+    dateEnd.setDate(dateEnd.getDate() + 3);
+
+    const potentialMatches = await db.select<Array<{
+      journal_entry_id: number;
+      entry_date: string;
+      description: string;
+      debit_amount: number;
+      credit_amount: number;
+    }>>(
+      `SELECT 
+         je.id as journal_entry_id,
+         je.entry_date,
+         je.description,
+         jl.debit_amount,
+         jl.credit_amount
+       FROM journal_entry je
+       JOIN journal_line jl ON je.id = jl.journal_entry_id
+       WHERE je.status = 'posted'
+         AND jl.account_id = ?
+         AND DATE(je.entry_date) BETWEEN DATE(?) AND DATE(?)
+       ORDER BY ABS(JULIANDAY(je.entry_date) - JULIANDAY(?)) ASC`,
+      [accountId, dateStart.toISOString().split('T')[0], dateEnd.toISOString().split('T')[0], txn.transaction_date]
+    );
+
+    let bestMatch: typeof potentialMatches[0] | null = null;
+    let bestScore = 0;
+
+    for (const match of potentialMatches) {
+      // Check amount match
+      const amountMatch = txn.amount < 0
+        ? Math.abs(txn.amount) === match.credit_amount
+        : Math.abs(txn.amount) === match.debit_amount;
+
+      if (!amountMatch) continue;
+
+      // Check description similarity
+      const descSimilarity = calculateStringSimilarity(
+        (txn.description || '').toLowerCase(),
+        match.description.toLowerCase()
+      );
+
+      // Date proximity bonus (same day = higher confidence)
+      const sameDay = txn.transaction_date === match.entry_date;
+      const score = sameDay
+        ? 0.8 + (descSimilarity * 0.2)
+        : 0.6 + (descSimilarity * 0.3);
+
+      if (score > bestScore && score > 0.6) {
+        bestScore = score;
+        bestMatch = match;
+      }
+    }
+
+    if (bestMatch && bestScore > 0.6) {
+      duplicates.push({
+        transactionIndex: i,
+        duplicateOf: bestMatch.journal_entry_id,
+        confidence: Math.round(bestScore * 100) / 100,
+        existingEntryDate: bestMatch.entry_date,
+        existingDescription: bestMatch.description
+      });
+    }
+  }
+
+  return duplicates;
+}
+
+/**
  * Calculate string similarity (simple Jaccard similarity on words)
  */
 function calculateStringSimilarity(str1: string, str2: string): number {
@@ -592,7 +694,7 @@ export async function updateCategorizationRule(
   const db = await getDatabase();
   
   const fields: string[] = [];
-  const values: any[] = [];
+  const values: SqlParams = [];
   
   if (updates.rule_name !== undefined) {
     fields.push('rule_name = ?');
@@ -828,7 +930,7 @@ export async function importBankTransactionAsJournalEntry(
     };
     
   } catch (error) {
-    console.error('Bank transaction import error:', error);
+    logger.error('Bank transaction import error:', error);
     
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {

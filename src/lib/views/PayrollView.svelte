@@ -12,6 +12,9 @@
     type EmployeePayInput 
   } from '../domain/payroll-operations';
   import type { PayrollRun, PayrollLine, Account, PolicyMode } from '../domain/types';
+  import { confirmAction } from '../utils/confirm-action';
+  import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
   import Button from '../ui/Button.svelte';
   import Input from '../ui/Input.svelte';
   import Select from '../ui/Select.svelte';
@@ -150,8 +153,8 @@
       if (taxAccount) taxPayableAccountId = taxAccount.id!;
 
     } catch (e) {
-      console.error('Failed to load data:', e);
-      alert(`Error loading data: ${e instanceof Error ? e.message : String(e)}`);
+      logger.error('Failed to load data:', e);
+      toasts.error(`Error loading data: ${e instanceof Error ? e.message : String(e)}`);
     }
     loading = false;
   }
@@ -170,7 +173,7 @@
     try {
       // Validation
       if (formEmployees.length === 0 || !formEmployees.some(e => e.employee_name)) {
-        alert('Please add at least one employee');
+        toasts.warning('Please add at least one employee');
         return;
       }
 
@@ -184,7 +187,7 @@
         }));
 
       if (employees.length === 0) {
-        alert('Please enter valid employee data (name and gross pay)');
+        toasts.warning('Please enter valid employee data (name and gross pay)');
         return;
       }
 
@@ -199,7 +202,7 @@
         { mode }
       );
 
-      alert(`Payroll run created successfully! ID: ${result.payroll_run_id}\n\nStatus: Draft\nYou can now review and approve it.`);
+      toasts.success(`Payroll run created successfully! ID: ${result.payroll_run_id}\n\nStatus: Draft\nYou can now review and approve it.`);
 
       // Reset form
       formEmployees = [{ employee_name: '', employee_id: '', gross_pay: '', other_deductions: '' }];
@@ -207,8 +210,8 @@
       await loadData();
 
     } catch (e) {
-      console.error('Failed to create payroll run:', e);
-      alert(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      logger.error('Failed to create payroll run:', e);
+      toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -224,7 +227,8 @@
         [run.id]
       );
     } catch (e) {
-      console.error('Failed to load payroll lines:', e);
+      logger.error('Failed to load payroll lines:', e);
+      toasts.error('Failed to load payroll lines');
     }
   }
 
@@ -236,7 +240,7 @@
 
   async function handleApproveRun(run: PayrollRun) {
     if (run.status !== 'draft') {
-      alert('Only draft payroll runs can be approved');
+      toasts.warning('Only draft payroll runs can be approved');
       return;
     }
 
@@ -244,11 +248,12 @@
     if (typeof cashAccountId !== 'number' || typeof salaryExpenseAccountId !== 'number' ||
         typeof cppPayableAccountId !== 'number' || typeof eiPayableAccountId !== 'number' ||
         typeof taxPayableAccountId !== 'number') {
-      alert('Please select all required accounts before approving');
+      toasts.warning('Please select all required accounts before approving');
       return;
     }
 
-    const confirmed = confirm(
+    const confirmed = await confirmAction(
+      'Approve Payroll Run',
       `Approve payroll run ${run.run_number}?\n\n` +
       `This will:\n` +
       `- Create a journal entry\n` +
@@ -272,23 +277,24 @@
       );
 
       if (result.ok) {
-        alert(`Payroll run approved! Journal Entry #${result.journal_entry_id}`);
+        toasts.success(`Payroll run approved! Journal Entry #${result.journal_entry_id}`);
         closeDetailModal();
         await loadData();
       }
     } catch (e) {
-      console.error('Failed to approve payroll run:', e);
-      alert(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      logger.error('Failed to approve payroll run:', e);
+      toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
   async function handleVoidRun(run: PayrollRun) {
     if (run.status === 'void') {
-      alert('Payroll run is already voided');
+      toasts.warning('Payroll run is already voided');
       return;
     }
 
-    const confirmed = confirm(
+    const confirmed = await confirmAction(
+      'Void Payroll Run',
       `Void payroll run ${run.run_number}?\n\n` +
       `This action will mark the run as void.` +
       (run.status === 'approved' ? '\nA reversal journal entry will be created.' : '') +
@@ -301,13 +307,13 @@
       const result = await voidPayrollRun(run.id!, { mode });
 
       if (result.ok) {
-        alert('Payroll run voided successfully');
+        toasts.success('Payroll run voided successfully');
         closeDetailModal();
         await loadData();
       }
     } catch (e) {
-      console.error('Failed to void payroll run:', e);
-      alert(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      logger.error('Failed to void payroll run:', e);
+      toasts.error(`Error: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 

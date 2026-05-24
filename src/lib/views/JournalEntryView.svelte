@@ -3,6 +3,8 @@
   import { persistenceService } from '../services/persistence';
   import { postingEngine } from '../domain/posting-engine';
   import type { PolicyMode, Account, JournalEntry, JournalLine } from '../domain/types';
+  import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
   import Button from '../ui/Button.svelte';
   import Card from '../ui/Card.svelte';
   import Input from '../ui/Input.svelte';
@@ -73,7 +75,8 @@
       journalEntries = entriesWithLines;
       accounts = accountsResult;
     } catch (e) {
-      console.error('Failed to load journal entries:', e);
+      logger.error('Failed to load journal entries:', e);
+      toasts.error('Failed to load journal entries');
     }
     loading = false;
   }
@@ -205,7 +208,8 @@
       resetForm();
       view = 'list';
     } catch (e) {
-      console.error('Failed to create journal entry:', e);
+      logger.error('Failed to create journal entry:', e);
+      toasts.error('Failed to create journal entry: ' + e);
       validationErrors = [`Failed to create journal entry: ${e}`];
     }
 

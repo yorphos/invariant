@@ -5,9 +5,13 @@
  */
 
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { copyFile, readFile, remove } from '@tauri-apps/plugin-fs';
+import { copyFile, readFile, remove, writeFile } from '@tauri-apps/plugin-fs';
 import { appDataDir } from '@tauri-apps/api/path';
 import { getDatabase, reinitializeDatabase } from './database';
+import { confirmAction } from '../utils/confirm-action';
+import { toasts } from '../stores/toast';
+import { logger } from '../utils/logger';
+import { version as APP_VERSION } from '../../../package.json';
 
 /**
  * Get the path to the database file
@@ -50,7 +54,7 @@ export async function backupDatabase(): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('Failed to backup database:', error);
+    logger.error('Failed to backup database:', error);
     await getDatabase();
     throw new Error(`Backup failed: ${error}`);
   }
@@ -65,7 +69,8 @@ export async function restoreDatabase(): Promise<boolean> {
   try {
     await reinitializeDatabase();
     // Show confirmation dialog
-    const confirmed = confirm(
+    const confirmed = await confirmAction(
+      'Restore Database',
       'WARNING: Restoring from backup will replace your current database. ' +
       'Make sure you have backed up your current data first. ' +
       'Continue with restore?'
@@ -107,11 +112,11 @@ export async function restoreDatabase(): Promise<boolean> {
 
     await getDatabase();
 
-    alert('Database restored successfully. Please restart the application.');
+    toasts.success('Database restored successfully. Please restart the application.');
     
     return true;
   } catch (error) {
-    console.error('Failed to restore database:', error);
+    logger.error('Failed to restore database:', error);
     await getDatabase();
     throw new Error(`Restore failed: ${error}`);
   }
@@ -121,6 +126,8 @@ export async function restoreDatabase(): Promise<boolean> {
  * Export database as SQL dump (for human-readable backup)
  */
 export async function exportDatabaseSQL(): Promise<boolean> {
+  const db = await getDatabase();
+
   try {
     const date = new Date().toISOString().split('T')[0];
     const defaultFilename = `invariant-export-${date}.sql`;
@@ -139,13 +146,61 @@ export async function exportDatabaseSQL(): Promise<boolean> {
       return false; // User cancelled
     }
 
-    // This would require implementing a SQL dump function
-    // For now, just copy the database file
-    alert('SQL export not yet implemented. Please use binary backup instead.');
-    
-    return false;
+    // Build SQL dump
+    const lines: string[] = [];
+    lines.push('-- Invariant Accounting Database Export');
+    lines.push(`-- Generated: ${new Date().toISOString()}`);
+    lines.push(`-- App Version: ${APP_VERSION}`);
+    lines.push('-- Export Format: SQL Dump');
+    lines.push('');
+    lines.push('PRAGMA foreign_keys = OFF;');
+    lines.push('');
+
+    // Get all user tables (skip schema tables)
+    const tables = await db.select<Array<{ name: string; sql: string }>>(
+      "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE '_migrations' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    );
+
+    for (const table of tables) {
+      // CREATE TABLE statement
+      if (table.sql) {
+        lines.push(`-- Table: ${table.name}`);
+        lines.push(`${table.sql};`);
+        lines.push('');
+      }
+
+      // Get all rows
+      const rows = await db.select<Array<Record<string, unknown>>>(`SELECT * FROM "${table.name}"`);
+
+      if (rows.length > 0) {
+        const columns = Object.keys(rows[0]);
+        const colList = columns.map(c => `"${c}"`).join(', ');
+
+        for (const row of rows) {
+          const values = columns.map(col => {
+            const val = row[col];
+            if (val === null) return 'NULL';
+            if (typeof val === 'number') return String(val);
+            return `'${String(val).replace(/'/g, "''")}'`;
+          });
+          lines.push(`INSERT INTO "${table.name}" (${colList}) VALUES (${values.join(', ')});`);
+        }
+        lines.push('');
+      }
+    }
+
+    lines.push('PRAGMA foreign_keys = ON;');
+    lines.push('');
+    lines.push('-- Export complete');
+
+    // Write to file
+    const content = new TextEncoder().encode(lines.join('\n'));
+    await writeFile(savePath, content);
+
+    toasts.success('Database exported successfully as SQL.');
+    return true;
   } catch (error) {
-    console.error('Failed to export database:', error);
+    logger.error('Failed to export database:', error);
     throw new Error(`Export failed: ${error}`);
   }
 }
@@ -189,10 +244,10 @@ export async function resetDatabase(confirmationText: string): Promise<boolean> 
     // Delete the database file
     try {
       await remove(dbPath);
-      console.log('Database file deleted successfully');
+      logger.info('Database file deleted successfully');
     } catch (e) {
       // File might not exist if this is a fresh install
-      console.log('Database file not found or already deleted:', e);
+      logger.warn('Database file not found or already deleted:', e);
     }
     
     // Also delete WAL and SHM files if they exist (SQLite journal files)
@@ -210,10 +265,10 @@ export async function resetDatabase(confirmationText: string): Promise<boolean> 
     // Re-initialize the database (this will create fresh schema and seed data)
     await getDatabase();
     
-    console.log('Database reset to factory state successfully');
+    logger.info('Database reset to factory state successfully');
     return true;
   } catch (error) {
-    console.error('Failed to reset database:', error);
+    logger.error('Failed to reset database:', error);
     // Try to recover by getting the database again
     try {
       await getDatabase();

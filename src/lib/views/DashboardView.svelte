@@ -3,6 +3,8 @@
   import { persistenceService } from '../services/persistence';
   import { getDatabase } from '../services/database';
   import type { Invoice, Payment, PolicyMode } from '../domain/types';
+  import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
   import Card from '../ui/Card.svelte';
 
   export let mode: PolicyMode;
@@ -65,7 +67,8 @@
       stats.totalExpenses = expenseAccounts[0]?.total || 0;
 
     } catch (e) {
-      console.error('Failed to load dashboard:', e);
+      logger.error('Failed to load dashboard:', e);
+      toasts.error('Failed to load dashboard data');
     }
     loading = false;
   }

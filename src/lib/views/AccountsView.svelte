@@ -5,6 +5,8 @@
   import { seedDefaultAccounts } from '../services/seed';
   import type { Account, PolicyMode, AccountType } from '../domain/types';
   import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
+  import { confirmAction } from '../utils/confirm-action';
   import Button from '../ui/Button.svelte';
   import Input from '../ui/Input.svelte';
   import Select from '../ui/Select.svelte';
@@ -45,7 +47,8 @@
         showInitModal = true;
       }
     } catch (e) {
-      console.error('Failed to load accounts:', e);
+      logger.error('Failed to load accounts:', e);
+      toasts.error('Failed to load accounts');
     }
     loading = false;
   }
@@ -57,7 +60,7 @@
       showInitModal = false;
       toasts.success('Chart of Accounts initialized successfully with default accounts!');
     } catch (e) {
-      console.error('Failed to initialize accounts:', e);
+      logger.error('Failed to initialize accounts:', e);
       toasts.error('Failed to initialize accounts: ' + e);
     }
   }
@@ -111,7 +114,8 @@
         const roles = systemAccountRoles.get(editingAccount.id);
         if (roles && roles.length > 0 && formCode !== editingAccount.code) {
           const roleNames = roles.map(r => formatRoleName(r)).join(', ');
-          const confirmed = confirm(
+          const confirmed = await confirmAction(
+            'System Account Warning',
             `Warning: This account is configured as a system account for: ${roleNames}\n\n` +
             `Changing the account code is allowed, but make sure this is intentional.\n\n` +
             `The system account mapping will remain intact (it uses the account ID, not the code).`
@@ -139,7 +143,7 @@
       await loadAccounts();
       closeModal();
     } catch (e) {
-      console.error('Failed to save account:', e);
+      logger.error('Failed to save account:', e);
       toasts.error('Failed to save account: ' + e);
     }
   }
@@ -164,7 +168,7 @@
       });
       await loadAccounts();
     } catch (e) {
-      console.error('Failed to update account status:', e);
+      logger.error('Failed to update account status:', e);
       toasts.error('Failed to update account status: ' + e);
     }
   }

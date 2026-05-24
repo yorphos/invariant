@@ -10,6 +10,7 @@
   import Modal from '../ui/Modal.svelte';
   import Table from '../ui/Table.svelte';
   import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
 
   export let mode: PolicyMode;
 
@@ -87,7 +88,7 @@
       formIssueDate = new Date().toISOString().split('T')[0];
       refundDate = new Date().toISOString().split('T')[0];
     } catch (e) {
-      console.error('Failed to load data:', e);
+      logger.error('Failed to load data:', e);
       toasts.error('Failed to load credit notes data');
     }
     loading = false;
@@ -148,7 +149,7 @@
         toasts.error(result.warnings[0]?.message || 'Failed to create credit note');
       }
     } catch (e) {
-      console.error('Create credit note error:', e);
+      logger.error('Create credit note error:', e);
       toasts.error('Failed to create credit note');
     }
   }
@@ -180,7 +181,7 @@
         toasts.error(result.warnings[0]?.message || 'Failed to apply credit note');
       }
     } catch (e) {
-      console.error('Apply credit note error:', e);
+      logger.error('Apply credit note error:', e);
       toasts.error('Failed to apply credit note');
     }
   }
@@ -213,7 +214,7 @@
         toasts.error(result.warnings[0]?.message || 'Failed to process refund');
       }
       } catch (e) {
-      console.error('Refund error:', e);
+      logger.error('Refund error:', e);
       toasts.error('Failed to process refund');
     }
   }
@@ -238,7 +239,7 @@
         toasts.error(result.warnings[0]?.message || 'Failed to void credit note');
       }
     } catch (e) {
-      console.error('Void credit note error:', e);
+      logger.error('Void credit note error:', e);
       toasts.error('Failed to void credit note');
     }
   }
@@ -517,13 +518,14 @@
           />
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Reason for Void</label>
+            <label for="voidReason" class="block text-sm font-medium text-gray-700 mb-1">Reason for Void</label>
             <textarea
+              id="voidReason"
               class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               rows="3"
               bind:value={voidReason}
               placeholder="Enter reason for voiding this credit note..."
-            />
+            ></textarea>
           </div>
 
           <div class="flex gap-2 justify-end">
@@ -545,17 +547,17 @@
      <div class="space-y-4">
        <div class="grid grid-cols-2 gap-4">
          <div>
-           <label class="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+            <span class="block text-sm font-medium text-gray-700 mb-1">Customer</span>
            <p class="text-gray-900">{contacts.find(c => c.id === selectedCreditNote!.contact_id)?.name || '-'}</p>
          </div>
          <div>
-           <label class="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
+            <span class="block text-sm font-medium text-gray-700 mb-1">Issue Date</span>
            <p class="text-gray-900">{selectedCreditNote!.issue_date}</p>
          </div>
        </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+         <span class="block text-sm font-medium text-gray-700 mb-1">Status</span>
         <span class={`px-2 py-1 rounded text-xs font-medium ${getStatusBadge(selectedCreditNote.status)}`}>
           {getCreditNoteStatus(selectedCreditNote.status)}
         </span>
@@ -563,22 +565,22 @@
 
       <div class="grid grid-cols-3 gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Total Amount</label>
+           <span class="block text-sm font-medium text-gray-700 mb-1">Total Amount</span>
           <p class="text-gray-900 font-semibold">${selectedCreditNote.total_amount.toFixed(2)}</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Applied Amount</label>
+           <span class="block text-sm font-medium text-gray-700 mb-1">Applied Amount</span>
           <p class="text-gray-900">${selectedCreditNote.applied_amount.toFixed(2)}</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Available</label>
+           <span class="block text-sm font-medium text-gray-700 mb-1">Available</span>
           <p class="text-gray-900 font-semibold">${(selectedCreditNote.total_amount - selectedCreditNote.applied_amount).toFixed(2)}</p>
         </div>
       </div>
 
       {#if selectedCreditNote.notes}
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+           <span class="block text-sm font-medium text-gray-700 mb-1">Notes</span>
           <p class="text-gray-900">{selectedCreditNote.notes}</p>
         </div>
       {/if}

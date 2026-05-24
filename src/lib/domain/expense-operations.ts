@@ -1,5 +1,6 @@
 import { persistenceService } from '../services/persistence';
 import { assertPeriodOpen } from '../services/period-guard';
+import { logger } from '../utils/logger';
 import type { PolicyContext } from '../domain/types';
 
 export interface ExpenseInput {
@@ -100,13 +101,13 @@ export async function createExpense(
       warnings: [],
     };
   } catch (error) {
-    console.error('Expense creation error:', error);
+    logger.error('Expense creation error:', error);
     
     // Provide more detailed error information
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {
       errorMessage = error.message;
-      console.error('Error stack:', error.stack);
+      logger.error('Error stack:', error.stack);
       
       // Check for specific SQLite errors
       if (errorMessage.includes('1811')) {
