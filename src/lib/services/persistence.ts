@@ -65,7 +65,7 @@ export class PersistenceService {
   async setSetting(key: string, value: string): Promise<void> {
     const db = await getDatabase();
     await db.execute(
-      'INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime("now"))',
+      `INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))`,
       [key, value],
     );
   }
@@ -178,7 +178,7 @@ export class PersistenceService {
     }
 
     if (fields.length > 0) {
-      fields.push('updated_at = datetime("now")');
+      fields.push(`updated_at = datetime('now')`);
       await db.execute(`UPDATE account SET ${fields.join(', ')} WHERE id = ?`, [...values, id]);
       invalidateAccountsCache();
     }
@@ -455,7 +455,7 @@ export class PersistenceService {
     }
 
     if (fields.length > 0) {
-      fields.push('updated_at = datetime("now")');
+      fields.push(`updated_at = datetime('now')`);
       await db.execute(`UPDATE contact SET ${fields.join(', ')} WHERE id = ?`, [...values, id]);
     }
   }
@@ -704,7 +704,7 @@ export class PersistenceService {
     }
 
     if (fields.length > 0) {
-      fields.push('updated_at = datetime("now")');
+      fields.push(`updated_at = datetime('now')`);
       await db.execute(`UPDATE payment SET ${fields.join(', ')} WHERE id = ?`, [...values, id]);
     }
   }
