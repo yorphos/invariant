@@ -116,13 +116,6 @@
     );
   }
 
-  $: if (sortColumn) {
-    processedItems = [...processedItems].sort((a, b) => {
-      const direction = sortDirection === 'asc' ? 1 : -1;
-      return compareValues(a[sortColumn], b[sortColumn]) * direction;
-    });
-  }
-
   $: totalPages = pageSize > 0 ? Math.max(1, Math.ceil(processedItems.length / pageSize)) : 1;
 
   $: if (currentPage < 1) {

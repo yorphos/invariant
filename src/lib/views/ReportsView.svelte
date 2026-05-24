@@ -9,6 +9,7 @@ import { getBudgets, getBudgetVsActual, type BudgetRecord, type BudgetVsActualDa
   import { logger } from '../utils/logger';
   import Card from '../ui/Card.svelte';
   import Input from '../ui/Input.svelte';
+  import Select from '../ui/Select.svelte';
   import Table from '../ui/Table.svelte';
   import Button from '../ui/Button.svelte';
   import { toCSV, downloadCSV, formatCurrencyForCSV } from '../utils/csv-export';
