@@ -17,20 +17,20 @@
 
 <style>
   .card {
-    background: white;
+    background: var(--color-bg-secondary, white);
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px var(--color-shadow, rgba(0,0,0,0.1));
     margin-bottom: 24px;
   }
 
   .card-header {
     padding: 20px 24px;
-    border-bottom: 1px solid #ecf0f1;
+    border-bottom: 1px solid var(--color-border-light, #ecf0f1);
   }
 
   .card-header h3 {
     margin: 0;
-    color: #2c3e50;
+    color: var(--color-text-primary, #2c3e50);
     font-size: 18px;
     font-weight: 600;
   }

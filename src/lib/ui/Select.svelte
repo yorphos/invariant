@@ -54,40 +54,41 @@
   label {
     font-size: 14px;
     font-weight: 500;
-    color: #2c3e50;
+    color: var(--color-text-primary, #2c3e50);
   }
 
   .required {
-    color: #e74c3c;
+    color: var(--color-danger, #e74c3c);
   }
 
   select {
     padding: 10px 12px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--color-border, #ddd);
     border-radius: 6px;
     font-size: 14px;
     font-family: inherit;
-    background: white;
+    color: var(--color-text-primary, #2c3e50);
+    background: var(--color-bg-secondary, #ffffff);
     cursor: pointer;
     transition: border-color 0.2s;
   }
 
   select:focus {
     outline: none;
-    border-color: #3498db;
+    border-color: var(--color-accent, #3498db);
   }
 
   select:disabled {
-    background: #f5f5f5;
+    background: var(--color-bg-primary, #f5f5f5);
     cursor: not-allowed;
   }
 
   select.error {
-    border-color: #e74c3c;
+    border-color: var(--color-danger, #e74c3c);
   }
 
   .error-message {
     font-size: 13px;
-    color: #e74c3c;
+    color: var(--color-danger, #e74c3c);
   }
 </style>
