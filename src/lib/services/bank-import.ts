@@ -761,7 +761,7 @@ export async function updateCategorizationRule(
     return; // Nothing to update
   }
 
-  fields.push('updated_at = datetime("now")');
+  fields.push(`updated_at = datetime('now')`);
   values.push(ruleId);
 
   await db.execute(`UPDATE categorization_rule SET ${fields.join(', ')} WHERE id = ?`, values);
