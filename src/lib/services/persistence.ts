@@ -1,5 +1,6 @@
 import { getDatabase } from './database';
 import { getCurrentVersion as getCurrentVersionTauri } from './updater';
+import type { SqlParams } from '../utils/sql-types';
 import type {
   Account,
   JournalEntry,
@@ -156,7 +157,7 @@ export class PersistenceService {
   async updateAccount(id: number, account: Partial<Omit<Account, 'id' | 'created_at' | 'updated_at'>>): Promise<void> {
     const db = await getDatabase();
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: SqlParams = [];
 
     if (account.code !== undefined) {
       fields.push('code = ?');
@@ -414,7 +415,7 @@ export class PersistenceService {
     }
     
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: SqlParams = [];
 
     if (contact.type !== undefined) {
       fields.push('type = ?');
@@ -639,7 +640,7 @@ export class PersistenceService {
   async updatePayment(id: number, payment: Partial<Omit<Payment, 'id' | 'created_at' | 'updated_at'>>): Promise<void> {
     const db = await getDatabase();
     const fields: string[] = [];
-    const values: any[] = [];
+    const values: SqlParams = [];
 
     if (payment.payment_number !== undefined) {
       fields.push('payment_number = ?');

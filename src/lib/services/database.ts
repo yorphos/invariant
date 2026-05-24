@@ -1,6 +1,7 @@
 import Database from '@tauri-apps/plugin-sql';
 import { appDataDir } from '@tauri-apps/api/path';
 import { seedDefaultAccounts } from './seed';
+import { logger } from '../utils/logger';
 
 let dbPromise: Promise<Database> | null = null;
 
@@ -26,7 +27,7 @@ export async function getDatabase(): Promise<Database> {
       await db.select<Array<{ count: number }>>('SELECT 1 as count');
       return db;
     } catch (error) {
-      console.warn('Database connection lost, reinitializing...', error);
+      logger.warn('Database connection lost, reinitializing...', error);
 
       try {
         const db = await existingPromise;
@@ -103,7 +104,7 @@ async function runMigrations(db: Database): Promise<void> {
   // Apply pending migrations in order
   for (const migration of migrations.allMigrations) {
     if (!appliedIds.has(migration.id)) {
-      console.log(`Applying migration ${migration.id}: ${migration.name}`);
+      logger.info(`Applying migration ${migration.id}: ${migration.name}`);
       
       // Execute migration
       await db.execute(migration.up);
@@ -114,7 +115,7 @@ async function runMigrations(db: Database): Promise<void> {
         [migration.id, migration.name]
       );
       
-      console.log(`Migration ${migration.id} applied successfully`);
+      logger.info(`Migration ${migration.id} applied successfully`);
     }
   }
 }

@@ -11,6 +11,7 @@
 import { getDatabase } from './database';
 import { getSystemAccountId } from './system-accounts';
 import { persistenceService } from './persistence';
+import { logger } from '../utils/logger';
 import type { PolicyContext } from '../domain/types';
 
 export interface FiscalYear {
@@ -375,7 +376,7 @@ export async function closeFiscalYear(
       warnings: [],
     };
   } catch (error) {
-    console.error('Fiscal year close error:', error);
+    logger.error('Fiscal year close error:', error);
     
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {
@@ -459,7 +460,7 @@ export async function reopenFiscalYear(
       ],
     };
   } catch (error) {
-    console.error('Fiscal year reopen error:', error);
+    logger.error('Fiscal year reopen error:', error);
     
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {
