@@ -2,6 +2,7 @@ import { persistenceService } from '../services/persistence';
 import { getDatabase } from '../services/database';
 import { getSystemAccount } from '../services/system-accounts';
 import { calculateTax, getTaxRate } from '../services/tax';
+import { assertPeriodOpen } from '../services/period-guard';
 import type {
   CreditNote,
   CreditNoteLine,
@@ -115,6 +116,8 @@ export async function createCreditNote(
         throw new Error(`Account "${account.name}" must be a revenue account for credit note line items`);
       }
     }
+
+    await assertPeriodOpen(creditNoteData.issue_date);
 
     const eventId = await persistenceService.createTransactionEvent({
       event_type: 'credit_note_created',
@@ -256,6 +259,10 @@ export async function applyCreditNote(
       );
     }
 
+    const applicationDate = new Date().toISOString().split('T')[0];
+
+    await assertPeriodOpen(applicationDate);
+
     const db = await getDatabase();
     const arAccount = await getSystemAccount('accounts_receivable');
 
@@ -291,7 +298,7 @@ export async function applyCreditNote(
     await persistenceService.createJournalEntry(
       {
         event_id: eventId,
-        entry_date: new Date().toISOString().split('T')[0],
+        entry_date: applicationDate,
         description: `Apply Credit Note ${creditNote.credit_note_number} to Invoice ${invoice.invoice_number}`,
         reference: `${creditNote.credit_note_number} -> ${invoice.invoice_number}`,
         status: 'posted',
@@ -366,6 +373,8 @@ export async function refundCreditNote(
         `Cannot refund $${amount.toFixed(2)}. Only $${availableAmount.toFixed(2)} available on credit note.`
       );
     }
+
+    await assertPeriodOpen(refundDate);
 
     const db = await getDatabase();
     const cashAccount = await getSystemAccount('cash_default');
@@ -467,6 +476,8 @@ export async function voidCreditNote(
       throw new Error('Cannot void a credit note that has been applied. You must reverse the applications first.');
     }
 
+    const voidDate = new Date().toISOString().split('T')[0];
+
     const db = await getDatabase();
     const creditNoteLines = await db.select<CreditNoteLine[]>(
       'SELECT * FROM credit_note_line WHERE credit_note_id = ? ORDER BY line_number',
@@ -491,6 +502,8 @@ export async function voidCreditNote(
         taxAccount = accounts.find(a => a.id === taxRate.account_id);
       }
     }
+
+    await assertPeriodOpen(voidDate);
 
     const journalLines = [
       {
@@ -524,7 +537,7 @@ export async function voidCreditNote(
     await persistenceService.createJournalEntry(
       {
         event_id: eventId,
-        entry_date: new Date().toISOString().split('T')[0],
+        entry_date: voidDate,
         description: `VOID: Credit Note ${creditNote.credit_note_number} - ${reason}`,
         reference: creditNote.credit_note_number,
         status: 'posted',

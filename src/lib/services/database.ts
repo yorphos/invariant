@@ -2,7 +2,7 @@ import Database from '@tauri-apps/plugin-sql';
 import { appDataDir } from '@tauri-apps/api/path';
 import { seedDefaultAccounts } from './seed';
 
-let dbInstance: Database | null = null;
+let dbPromise: Promise<Database> | null = null;
 
 export interface Migration {
   id: string;
@@ -10,24 +10,74 @@ export interface Migration {
   up: string;
 }
 
-export async function getDatabase(): Promise<Database> {
-  if (dbInstance) {
-    return dbInstance;
-  }
-
-  const appDataPath = await appDataDir();
-  dbInstance = await Database.load(`sqlite:${appDataPath}/invariant.db`);
-  
-  await initializeMigrations();
-  await runMigrations();
-  await seedDefaultData();
-  
-  return dbInstance;
+/**
+ * Check if the database connection has been initialized.
+ */
+export function isDatabaseReady(): boolean {
+  return dbPromise !== null;
 }
 
-async function initializeMigrations(): Promise<void> {
-  const db = dbInstance!;
-  
+export async function getDatabase(): Promise<Database> {
+  if (dbPromise) {
+    const existingPromise = dbPromise;
+
+    try {
+      const db = await existingPromise;
+      await db.select<Array<{ count: number }>>('SELECT 1 as count');
+      return db;
+    } catch (error) {
+      console.warn('Database connection lost, reinitializing...', error);
+
+      try {
+        const db = await existingPromise;
+        await db.close();
+      } catch {
+        // Ignore close failures while resetting the connection state.
+      }
+
+      dbPromise = null;
+    }
+  }
+
+  let nextPromise: Promise<Database>;
+
+  nextPromise = initializeDatabase().catch((error) => {
+    if (dbPromise === nextPromise) {
+      dbPromise = null;
+    }
+
+    throw error;
+  });
+
+  dbPromise = nextPromise;
+  return nextPromise;
+}
+
+async function initializeDatabase(): Promise<Database> {
+  const appDataPath = await appDataDir();
+  const db = await Database.load(`sqlite:${appDataPath}/invariant.db`);
+  const readyPromise = Promise.resolve(db);
+
+  try {
+    await initializeMigrations(db);
+    await runMigrations(db);
+
+    dbPromise = readyPromise;
+
+    await seedDefaultData(db);
+
+    return db;
+  } catch (error) {
+    if (dbPromise === readyPromise) {
+      dbPromise = null;
+    }
+
+    await db.close().catch(() => undefined);
+    throw error;
+  }
+}
+
+async function initializeMigrations(db: Database): Promise<void> {
   await db.execute(`
     CREATE TABLE IF NOT EXISTS _migrations (
       id TEXT PRIMARY KEY,
@@ -37,9 +87,7 @@ async function initializeMigrations(): Promise<void> {
   `);
 }
 
-async function runMigrations(): Promise<void> {
-  const db = dbInstance!;
-  
+async function runMigrations(db: Database): Promise<void> {
   // Enable foreign keys
   await db.execute('PRAGMA foreign_keys = ON');
   
@@ -71,13 +119,27 @@ async function runMigrations(): Promise<void> {
   }
 }
 
-async function seedDefaultData(): Promise<void> {
+async function seedDefaultData(_db: Database): Promise<void> {
   await seedDefaultAccounts();
 }
 
-export async function closeDatabase(): Promise<void> {
-  if (dbInstance) {
-    await dbInstance.close();
-    dbInstance = null;
+/**
+ * Reinitialize the database connection on next access.
+ */
+export async function reinitializeDatabase(): Promise<void> {
+  if (!dbPromise) {
+    return;
+  }
+
+  const existingPromise = dbPromise;
+  dbPromise = null;
+
+  try {
+    const db = await existingPromise;
+    await db.close();
+  } catch {
+    // Ignore close failures; the next getDatabase call will rebuild the connection.
   }
 }
+
+export const closeDatabase = reinitializeDatabase;

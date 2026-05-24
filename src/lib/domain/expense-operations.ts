@@ -1,4 +1,5 @@
 import { persistenceService } from '../services/persistence';
+import { assertPeriodOpen } from '../services/period-guard';
 import type { PolicyContext } from '../domain/types';
 
 export interface ExpenseInput {
@@ -54,6 +55,8 @@ export async function createExpense(
     if (!paymentAccount.is_active) {
       throw new Error(`Payment account "${paymentAccount.name}" is inactive`);
     }
+
+    await assertPeriodOpen(expenseData.expense_date);
 
     // Create transaction event
     const eventId = await persistenceService.createTransactionEvent({

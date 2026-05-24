@@ -17,6 +17,7 @@
 
 import { persistenceService } from '../services/persistence';
 import { getDatabase } from '../services/database';
+import { assertPeriodOpen } from '../services/period-guard';
 import type { 
   Item, 
   InventoryMovement, 
@@ -166,6 +167,8 @@ export async function recordPurchase(
   if (!item.inventory_account_id) {
     throw new Error(`Item "${item.name}" does not have an inventory account configured`);
   }
+
+  await assertPeriodOpen(purchaseData.purchase_date);
   
   const totalCost = purchaseData.quantity * purchaseData.unit_cost;
   
@@ -293,6 +296,8 @@ export async function recordSale(
       message: `Insufficient inventory: requested ${saleData.quantity}, available ${cogsCalc.quantity_sold}. Proceeding with available quantity.`
     });
   }
+
+  await assertPeriodOpen(saleData.sale_date);
   
   // Create transaction event
   const eventResult = await db.execute(
@@ -426,6 +431,8 @@ export async function recordAdjustment(
     );
     adjustmentAmount = cogsCalc.cogs_amount;
   }
+
+  await assertPeriodOpen(adjustmentData.adjustment_date);
   
   // Create transaction event
   const eventResult = await db.execute(

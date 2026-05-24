@@ -2,6 +2,7 @@ import { persistenceService } from '../services/persistence';
 import { calculateTax } from '../services/tax';
 import { getSystemAccount } from '../services/system-accounts';
 import { getDatabase } from '../services/database';
+import { assertPeriodOpen } from '../services/period-guard';
 import type { Bill, BillLine, VendorPayment, PolicyContext } from '../domain/types';
 
 export interface BillInput {
@@ -139,6 +140,8 @@ export async function createBill(
         throw new Error(`Account "${account.name}" must be an expense account for bill line items`);
       }
     }
+
+    await assertPeriodOpen(billData.bill_date);
 
     // Create transaction event
     const eventId = await persistenceService.createTransactionEvent({
@@ -298,6 +301,8 @@ export async function voidBill(
       throw new Error('Cannot void a bill with payments applied. Please reverse payments first.');
     }
 
+    const voidDate = new Date().toISOString().split('T')[0];
+
     // Get bill lines
     const billLines = await db.select<BillLine[]>(
       'SELECT * FROM bill_line WHERE bill_id = ? ORDER BY line_number',
@@ -314,6 +319,8 @@ export async function voidBill(
       const taxInfo = await calculateTax(0, bill.tax_code_id, bill.bill_date);
       taxAccount = accounts.find(a => a.id === taxInfo.accountId) || null;
     }
+
+    await assertPeriodOpen(voidDate);
 
     // Create transaction event for void
     const eventId = await persistenceService.createTransactionEvent({
@@ -361,7 +368,7 @@ export async function voidBill(
     const journalEntryId = await persistenceService.createJournalEntry(
       {
         event_id: eventId,
-        entry_date: new Date().toISOString().split('T')[0], // Today's date for void
+        entry_date: voidDate, // Today's date for void
         description: `VOID: Bill ${bill.bill_number} - ${reason}`,
         reference: bill.bill_number,
         status: 'posted',
@@ -470,7 +477,9 @@ export async function createVendorPayment(
         );
       }
     }
-    
+
+    await assertPeriodOpen(paymentData.payment_date);
+
     // Get required accounts
     const apAccount = await getSystemAccount('accounts_payable');
     const cashAccount = await getSystemAccount('cash_default');

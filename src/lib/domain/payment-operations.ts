@@ -1,4 +1,5 @@
 import { persistenceService } from '../services/persistence';
+import { assertPeriodOpen } from '../services/period-guard';
 import { getSystemAccount, tryGetSystemAccount } from '../services/system-accounts';
 import type { PaymentMethod, PolicyContext } from '../domain/types';
 
@@ -120,6 +121,8 @@ export async function createPayment(
         `Cannot allocate $${totalAllocated.toFixed(2)} when payment is only $${paymentData.amount.toFixed(2)}`
       );
     }
+
+    await assertPeriodOpen(paymentData.payment_date);
 
     // Calculate allocated amount (might be less than payment amount)
     const allocatedAmount = totalAllocated;

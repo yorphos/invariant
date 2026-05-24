@@ -24,6 +24,7 @@
  */
 
 import { getDatabase } from '../services/database';
+import { assertPeriodOpen } from '../services/period-guard';
 import type { 
   PayrollRun, 
   PayrollLine, 
@@ -396,6 +397,8 @@ export async function approvePayrollRun(
     totalEIEmployer += Math.round(line.ei_amount * TAX_RATES_2026.ei.employer_multiplier * 100) / 100;
   }
 
+  await assertPeriodOpen(run.pay_date);
+
   // Create transaction event
   const eventResult = await db.execute(
     `INSERT INTO transaction_event (event_type, description, reference, created_at)
@@ -551,6 +554,8 @@ export async function voidPayrollRun(
 
   // If approved, need to create reversal entry
   if (run.status === 'approved' && run.event_id) {
+    await assertPeriodOpen(run.pay_date);
+
     // Create reversal transaction event
     const eventResult = await db.execute(
       `INSERT INTO transaction_event (event_type, description, reference, created_at)

@@ -7,7 +7,7 @@
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { copyFile, readFile, remove } from '@tauri-apps/plugin-fs';
 import { appDataDir } from '@tauri-apps/api/path';
-import { closeDatabase, getDatabase } from './database';
+import { getDatabase, reinitializeDatabase } from './database';
 
 /**
  * Get the path to the database file
@@ -22,7 +22,7 @@ async function getDatabasePath(): Promise<string> {
  */
 export async function backupDatabase(): Promise<boolean> {
   try {
-    await closeDatabase();
+    await reinitializeDatabase();
     const dbPath = await getDatabasePath();
     
     // Get current date for default filename
@@ -63,7 +63,7 @@ export async function backupDatabase(): Promise<boolean> {
  */
 export async function restoreDatabase(): Promise<boolean> {
   try {
-    await closeDatabase();
+    await reinitializeDatabase();
     // Show confirmation dialog
     const confirmed = confirm(
       'WARNING: Restoring from backup will replace your current database. ' +
@@ -182,7 +182,7 @@ export async function resetDatabase(confirmationText: string): Promise<boolean> 
 
   try {
     // Close the database connection
-    await closeDatabase();
+    await reinitializeDatabase();
     
     const dbPath = await getDatabasePath();
     

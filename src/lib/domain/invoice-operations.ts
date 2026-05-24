@@ -2,6 +2,7 @@ import { persistenceService } from '../services/persistence';
 import { getDatabase } from '../services/database';
 import { PostingEngine } from '../domain/posting-engine';
 import { calculateTax, getTaxRate } from '../services/tax';
+import { assertPeriodOpen } from '../services/period-guard';
 import { getSystemAccount } from '../services/system-accounts';
 import type { Invoice, InvoiceLine, PolicyContext } from '../domain/types';
 
@@ -137,6 +138,8 @@ export async function createInvoice(
         throw new Error(`Account "${account.name}" must be a revenue account for invoice line items`);
       }
     }
+
+    await assertPeriodOpen(invoiceData.issue_date);
 
     // Create transaction event
     const eventId = await persistenceService.createTransactionEvent({
@@ -277,6 +280,8 @@ export async function voidInvoice(
     if (invoice.paid_amount > 0) {
       throw new Error('Cannot void an invoice with payments applied. Please reverse payments first.');
     }
+
+    const voidDate = new Date().toISOString().split('T')[0];
     
     // Get required accounts
     const accounts = await persistenceService.getAccounts();
@@ -297,6 +302,8 @@ export async function voidInvoice(
       'SELECT * FROM invoice_line WHERE invoice_id = ? ORDER BY line_number',
       [invoiceId]
     );
+
+    await assertPeriodOpen(voidDate);
     
     // Create transaction event for void
     const eventId = await persistenceService.createTransactionEvent({
@@ -347,7 +354,7 @@ export async function voidInvoice(
     const journalEntryId = await persistenceService.createJournalEntry(
       {
         event_id: eventId,
-        entry_date: new Date().toISOString().split('T')[0], // Today's date for void
+        entry_date: voidDate, // Today's date for void
         description: `VOID: Invoice ${invoice.invoice_number} - ${reason}`,
         reference: invoice.invoice_number,
         status: 'posted',
