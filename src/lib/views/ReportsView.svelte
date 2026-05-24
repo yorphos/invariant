@@ -1,14 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getDatabase } from '../services/database';
-  import { getBalanceSheetData, getProfitAndLossData, getTrialBalanceData, getInventoryValuationData } from '../services/reports';
-  import type { AccountBalance, InventoryValuationLine } from '../services/reports';
+  import { getBalanceSheetData, getProfitAndLossData, getTrialBalanceData, getInventoryValuationData, getCashFlowData, getGeneralLedgerData } from '../services/reports';
+import { getBudgets, getBudgetVsActual, type BudgetRecord, type BudgetVsActualData } from '../services/budget';
+  import type { AccountBalance, InventoryValuationLine, CashFlowData, GeneralLedgerLine } from '../services/reports';
   import type { Account } from '../domain/types';
+  import { toasts } from '../stores/toast';
+  import { logger } from '../utils/logger';
   import Card from '../ui/Card.svelte';
   import Input from '../ui/Input.svelte';
   import Table from '../ui/Table.svelte';
   import Button from '../ui/Button.svelte';
   import { toCSV, downloadCSV, formatCurrencyForCSV } from '../utils/csv-export';
+  import type { CSVRow } from '../utils/csv-export';
 
   let loading = false;
   
@@ -45,6 +49,32 @@
   }
   let arAging: AgingBucket[] = [];
   
+  // Budget vs Actual
+  let budgetsList: BudgetRecord[] = [];
+  let selectedBudgetId: number | '' = '';
+  let bvaStartDate = '';
+  let bvaEndDate = '';
+  let budgetVsActualData: BudgetVsActualData | null = null;
+
+  // Report type selector: 'all' shows all reports, otherwise specific report
+  let reportType: 'all' | 'cash-flow' | 'general-ledger' | 'budget-vs-actual' = 'all';
+  
+  // Cash Flow
+  let cashFlowData: CashFlowData | null = null;
+  let cfStartDate = '';
+  let cfEndDate = '';
+  
+  // General Ledger
+  let generalLedgerLines: GeneralLedgerLine[] = [];
+  let glStartDate = '';
+  let glEndDate = '';
+  let glAccountId: number | undefined = undefined;
+  let glAccounts: Account[] = [];
+  let glTotalDebits = 0;
+  let glTotalCredits = 0;
+  let glStartBalance = 0;
+  let glEndBalance = 0;
+  
   // A/P Aging
   interface APAgingBucket {
     vendor_name: string;
@@ -66,7 +96,27 @@
     incomeStartDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
     incomeEndDate = today.toISOString().split('T')[0];
     
+    // Default to current month for cash flow and GL
+    cfStartDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    cfEndDate = today.toISOString().split('T')[0];
+    glStartDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0]; // YTD
+    glEndDate = today.toISOString().split('T')[0];
+    
+    // Load accounts for GL filter
+    try {
+      const db = await getDatabase();
+      glAccounts = await db.select<Account[]>('SELECT * FROM account WHERE is_active = 1 ORDER BY code');
+    } catch (e) {
+      logger.error('Failed to load accounts:', e);
+      toasts.error('Failed to load accounts for reports');
+    }
+
+    // Set default dates for budget vs actual
+    bvaStartDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0]; // YTD
+    bvaEndDate = today.toISOString().split('T')[0];
+
     await loadAllReports();
+    await loadBudgetsList();
   });
 
   async function loadAllReports() {
@@ -87,8 +137,8 @@
       const data = await getBalanceSheetData(asOfDate);
       balanceSheetBalances = [...data.assets, ...data.liabilities, ...data.equity];
     } catch (e) {
-      console.error('Failed to load balance sheet:', e);
-      alert('Failed to load balance sheet: ' + e);
+      logger.error('Failed to load balance sheet:', e);
+      toasts.error('Failed to load balance sheet: ' + e);
     }
     loading = false;
   }
@@ -100,8 +150,8 @@
       const data = await getProfitAndLossData(incomeStartDate, incomeEndDate);
       incomeStatementBalances = [...data.revenue, ...data.expenses];
     } catch (e) {
-      console.error('Failed to load income statement:', e);
-      alert('Failed to load income statement: ' + e);
+      logger.error('Failed to load income statement:', e);
+      toasts.error('Failed to load income statement: ' + e);
     }
     loading = false;
   }
@@ -113,8 +163,8 @@
       const data = await getTrialBalanceData(asOfDate);
       trialBalances = data.accounts;
     } catch (e) {
-      console.error('Failed to load trial balance:', e);
-      alert('Failed to load trial balance: ' + e);
+      logger.error('Failed to load trial balance:', e);
+      toasts.error('Failed to load trial balance: ' + e);
     }
     loading = false;
   }
@@ -168,7 +218,8 @@
         };
       }
     } catch (e) {
-      console.error('Failed to load A/R integrity check:', e);
+      logger.error('Failed to load A/R integrity check:', e);
+      toasts.error('Failed to load A/R integrity check');
     }
     loading = false;
   }
@@ -238,7 +289,8 @@
       arAging = Array.from(customerMap.values())
         .sort((a, b) => b.total - a.total); // Sort by total descending
     } catch (e) {
-      console.error('Failed to load A/R aging:', e);
+      logger.error('Failed to load A/R aging:', e);
+      toasts.error('Failed to load A/R aging report');
     }
     loading = false;
   }
@@ -308,7 +360,61 @@
       apAging = Array.from(vendorMap.values())
         .sort((a, b) => b.total - a.total); // Sort by total descending
     } catch (e) {
-      console.error('Failed to load A/P aging:', e);
+      logger.error('Failed to load A/P aging:', e);
+      toasts.error('Failed to load A/P aging report');
+    }
+    loading = false;
+  }
+
+  async function loadBudgetsList() {
+    try {
+      budgetsList = await getBudgets();
+    } catch (e) {
+      logger.error('Failed to load budgets:', e);
+      toasts.error('Failed to load budgets for budget-vs-actual report');
+    }
+  }
+
+  async function loadBudgetVsActual() {
+    if (!selectedBudgetId) return;
+
+    loading = true;
+    try {
+      budgetVsActualData = await getBudgetVsActual(
+        Number(selectedBudgetId),
+        bvaStartDate,
+        bvaEndDate
+      );
+    } catch (e) {
+      logger.error('Failed to load budget vs actual:', e);
+      toasts.error('Failed to load budget vs actual: ' + e);
+    }
+    loading = false;
+  }
+
+  async function loadCashFlow() {
+    loading = true;
+    try {
+      cashFlowData = await getCashFlowData(cfStartDate, cfEndDate);
+    } catch (e) {
+      logger.error('Failed to load cash flow:', e);
+      toasts.error('Failed to load cash flow: ' + e);
+    }
+    loading = false;
+  }
+
+  async function loadGeneralLedger() {
+    loading = true;
+    try {
+      const data = await getGeneralLedgerData(glStartDate, glEndDate, glAccountId);
+      generalLedgerLines = data.lines;
+      glTotalDebits = data.totalDebits;
+      glTotalCredits = data.totalCredits;
+      glStartBalance = data.startBalance;
+      glEndBalance = data.endBalance;
+    } catch (e) {
+      logger.error('Failed to load general ledger:', e);
+      toasts.error('Failed to load general ledger: ' + e);
     }
     loading = false;
   }
@@ -324,7 +430,8 @@
       const data = await getInventoryValuationData(asOfDate);
       inventoryValuation = data.items;
     } catch (e) {
-      console.error('Failed to load inventory valuation:', e);
+      logger.error('Failed to load inventory valuation:', e);
+      toasts.error('Failed to load inventory valuation report');
     }
     loading = false;
   }
@@ -365,7 +472,8 @@
       
       inventoryMovements = movements;
     } catch (e) {
-      console.error('Failed to load inventory movements:', e);
+      logger.error('Failed to load inventory movements:', e);
+      toasts.error('Failed to load inventory movements report');
     }
     loading = false;
   }
@@ -383,6 +491,18 @@
   $: if (incomeStartDate && incomeEndDate) {
     loadIncomeStatement();
     loadInventoryMovements();
+  }
+  
+  $: if (cfStartDate && cfEndDate) {
+    loadCashFlow();
+  }
+  
+  $: if (glStartDate && glEndDate) {
+    loadGeneralLedger();
+  }
+
+  $: if (selectedBudgetId && bvaStartDate && bvaEndDate) {
+    loadBudgetVsActual();
   }
 
   function formatCurrency(amount: number): string {
@@ -561,17 +681,124 @@
     const csv = toCSV(data, ['Code', 'Account', 'Type', 'Debit', 'Credit']);
     downloadCSV(csv, `trial-balance-${asOfDate}.csv`);
   }
+
+  function exportCashFlow() {
+    if (!cashFlowData) return;
+
+    const rows: CSVRow[] = [];
+
+    rows.push({ Category: 'OPERATING ACTIVITIES', Label: '', Amount: '' });
+    for (const op of cashFlowData.operatingActivities) {
+      rows.push({
+        Category: 'Operating',
+        Label: op.label,
+        Amount: formatCurrencyForCSV(op.amount)
+      });
+    }
+    rows.push({ Category: 'Operating', Label: 'Total Operating Activities', Amount: formatCurrencyForCSV(cashFlowData.totalOperating) });
+    rows.push({});
+
+    rows.push({ Category: 'INVESTING ACTIVITIES', Label: '', Amount: '' });
+    for (const inv of cashFlowData.investingActivities) {
+      rows.push({
+        Category: 'Investing',
+        Label: inv.label,
+        Amount: formatCurrencyForCSV(inv.amount)
+      });
+    }
+    rows.push({ Category: 'Investing', Label: 'Total Investing Activities', Amount: formatCurrencyForCSV(cashFlowData.totalInvesting) });
+    rows.push({});
+
+    rows.push({ Category: 'FINANCING ACTIVITIES', Label: '', Amount: '' });
+    for (const fin of cashFlowData.financingActivities) {
+      rows.push({
+        Category: 'Financing',
+        Label: fin.label,
+        Amount: formatCurrencyForCSV(fin.amount)
+      });
+    }
+    rows.push({ Category: 'Financing', Label: 'Total Financing Activities', Amount: formatCurrencyForCSV(cashFlowData.totalFinancing) });
+    rows.push({});
+
+    rows.push({ Category: '', Label: 'Net Cash Change', Amount: formatCurrencyForCSV(cashFlowData.netCashChange) });
+    rows.push({ Category: '', Label: 'Beginning Cash Balance', Amount: formatCurrencyForCSV(cashFlowData.startCashBalance) });
+    rows.push({ Category: '', Label: 'Ending Cash Balance', Amount: formatCurrencyForCSV(cashFlowData.endCashBalance) });
+
+    const csv = toCSV(rows, ['Category', 'Label', 'Amount']);
+    downloadCSV(csv, `cash-flow-${cfStartDate}-to-${cfEndDate}.csv`);
+  }
+
+  function exportBudgetVsActual() {
+    if (!budgetVsActualData) return;
+
+    const data: CSVRow[] = budgetVsActualData.lines.map(line => ({
+      'Account Code': line.account_code,
+      'Account Name': line.account_name,
+      Type: line.account_type,
+      Budget: formatCurrencyForCSV(line.budget_amount),
+      Actual: formatCurrencyForCSV(line.actual_amount),
+      Variance: formatCurrencyForCSV(line.variance),
+      'Variance %': line.variance_pct.toFixed(2) + '%'
+    }));
+
+    // Add totals
+    data.push({
+      'Account Code': '',
+      'Account Name': 'Totals',
+      Type: '',
+      Budget: formatCurrencyForCSV(budgetVsActualData.totalBudget),
+      Actual: formatCurrencyForCSV(budgetVsActualData.totalActual),
+      Variance: formatCurrencyForCSV(budgetVsActualData.totalVariance),
+      'Variance %': ''
+    });
+
+    const csv = toCSV(data, ['Account Code', 'Account Name', 'Type', 'Budget', 'Actual', 'Variance', 'Variance %']);
+    downloadCSV(csv, `budget-vs-actual-${bvaStartDate}-to-${bvaEndDate}.csv`);
+  }
+
+  function exportGeneralLedger() {
+    const data: CSVRow[] = generalLedgerLines.map(line => ({
+      Date: line.entry_date,
+      'Entry #': line.journal_entry_id,
+      'Account Code': line.account_code,
+      'Account Name': line.account_name,
+      Description: line.description,
+      Debit: formatCurrencyForCSV(line.debit_amount),
+      Credit: formatCurrencyForCSV(line.credit_amount),
+      'Running Balance': formatCurrencyForCSV(line.running_balance)
+    }));
+
+    // Add totals
+    data.push({
+      Date: '', 'Entry #': '', 'Account Code': '', 'Account Name': '',
+      Description: 'Totals', Debit: formatCurrencyForCSV(glTotalDebits),
+      Credit: formatCurrencyForCSV(glTotalCredits), 'Running Balance': ''
+    });
+
+    const csv = toCSV(data, ['Date', 'Entry #', 'Account Code', 'Account Name', 'Description', 'Debit', 'Credit', 'Running Balance']);
+    downloadCSV(csv, `general-ledger-${glStartDate}-to-${glEndDate}.csv`);
+  }
 </script>
 
 <div class="reports-view">
   <div class="header">
     <h2>Financial Reports</h2>
-    <div class="date-selector">
-      <Input
-        type="date"
-        label="Balance Sheet Date"
-        bind:value={asOfDate}
-      />
+    <div class="header-controls">
+      <div class="report-selector">
+        <select bind:value={reportType}>
+          <option value="all">All Reports</option>
+          <option value="cash-flow">Cash Flow Statement</option>
+          <option value="general-ledger">General Ledger Detail</option>
+          <option value="budget-vs-actual">Budget vs Actual</option>
+        </select>
+      </div>
+      <div class="date-selector">
+        <Input
+          type="date"
+          label="Balance Sheet Date"
+          bind:value={asOfDate}
+        />
+      </div>
     </div>
   </div>
 
@@ -579,6 +806,275 @@
     <Card>
       <p>Loading reports...</p>
     </Card>
+  {:else if reportType === 'cash-flow'}
+    <!-- Cash Flow Statement -->
+    <Card title="Cash Flow Statement" padding={false}>
+      <div class="report-header">
+        <div>
+          <h3>Period: {new Date(cfStartDate).toLocaleDateString('en-CA')} to {new Date(cfEndDate).toLocaleDateString('en-CA')}</h3>
+          <div class="date-range-controls">
+            <div class="date-inputs">
+              <Input
+                type="date"
+                label="Start Date"
+                bind:value={cfStartDate}
+              />
+              <Input
+                type="date"
+                label="End Date"
+                bind:value={cfEndDate}
+              />
+            </div>
+          </div>
+        </div>
+        <Button variant="secondary" onclick={exportCashFlow}>Export CSV</Button>
+      </div>
+
+      {#if !cashFlowData}
+        <div class="section">
+          <p>Loading cash flow data...</p>
+        </div>
+      {:else}
+        <div class="cash-flow">
+          <div class="section">
+            <h4>Operating Activities</h4>
+            <Table headers={['Item', 'Amount']}>
+              {#each cashFlowData.operatingActivities as item}
+                <tr>
+                  <td>{item.label}</td>
+                  <td class="amount">{formatCurrency(item.amount)}</td>
+                </tr>
+              {/each}
+              <tr class="total-row">
+                <td><strong>Total Operating Activities</strong></td>
+                <td class="amount"><strong>{formatCurrency(cashFlowData.totalOperating)}</strong></td>
+              </tr>
+            </Table>
+          </div>
+
+          <div class="section">
+            <h4>Investing Activities</h4>
+            <Table headers={['Item', 'Amount']}>
+              {#each cashFlowData.investingActivities as item}
+                <tr>
+                  <td>{item.label}</td>
+                  <td class="amount">{formatCurrency(item.amount)}</td>
+                </tr>
+              {/each}
+              <tr class="total-row">
+                <td><strong>Total Investing Activities</strong></td>
+                <td class="amount"><strong>{formatCurrency(cashFlowData.totalInvesting)}</strong></td>
+              </tr>
+            </Table>
+          </div>
+
+          <div class="section">
+            <h4>Financing Activities</h4>
+            <Table headers={['Item', 'Amount']}>
+              {#each cashFlowData.financingActivities as item}
+                <tr>
+                  <td>{item.label}</td>
+                  <td class="amount">{formatCurrency(item.amount)}</td>
+                </tr>
+              {/each}
+              <tr class="total-row">
+                <td><strong>Total Financing Activities</strong></td>
+                <td class="amount"><strong>{formatCurrency(cashFlowData.totalFinancing)}</strong></td>
+              </tr>
+            </Table>
+          </div>
+
+          <div class="cash-flow-summary">
+            <div class="summary-grid">
+              <div class="summary-item">
+                <span>Net Cash Change</span>
+                <strong class:positive={cashFlowData.netCashChange >= 0} class:negative={cashFlowData.netCashChange < 0}>
+                  {formatCurrency(cashFlowData.netCashChange)}
+                </strong>
+              </div>
+              <div class="summary-item">
+                <span>Beginning Cash Balance</span>
+                <strong>{formatCurrency(cashFlowData.startCashBalance)}</strong>
+              </div>
+              <div class="summary-item highlight">
+                <span>Ending Cash Balance</span>
+                <strong>{formatCurrency(cashFlowData.endCashBalance)}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      {/if}
+    </Card>
+
+  {:else if reportType === 'general-ledger'}
+    <!-- General Ledger Detail -->
+    <Card title="General Ledger Detail" padding={false}>
+      <div class="report-header">
+        <div>
+          <h3>Period: {new Date(glStartDate).toLocaleDateString('en-CA')} to {new Date(glEndDate).toLocaleDateString('en-CA')}</h3>
+          <div class="date-range-controls">
+            <div class="date-inputs">
+              <Input
+                type="date"
+                label="Start Date"
+                bind:value={glStartDate}
+              />
+              <Input
+                type="date"
+                label="End Date"
+                bind:value={glEndDate}
+              />
+            </div>
+            <div class="account-filter">
+              <select bind:value={glAccountId}>
+                <option value={undefined}>All Accounts</option>
+                {#each glAccounts as account}
+                  <option value={account.id}>{account.code} - {account.name}</option>
+                {/each}
+              </select>
+            </div>
+          </div>
+        </div>
+        <Button variant="secondary" onclick={exportGeneralLedger}>Export CSV</Button>
+      </div>
+
+      {#if generalLedgerLines.length === 0}
+        <div class="section">
+          <p>No journal entries found for the selected period.</p>
+        </div>
+      {:else}
+        <div class="gl-detail-summary">
+          <div class="gl-balance-info">
+            <span>Opening Balance: {formatCurrency(glStartBalance)}</span>
+            <span>Total Debits: {formatCurrency(glTotalDebits)}</span>
+            <span>Total Credits: {formatCurrency(glTotalCredits)}</span>
+            <span>Closing Balance: {formatCurrency(glEndBalance)}</span>
+          </div>
+        </div>
+        <div class="gl-table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Entry #</th>
+                <th>Account</th>
+                <th>Description</th>
+                <th class="amount">Debit</th>
+                <th class="amount">Credit</th>
+                <th class="amount">Running Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each generalLedgerLines as line}
+                <tr>
+                  <td>{line.entry_date}</td>
+                  <td>{line.journal_entry_id}</td>
+                  <td>{line.account_code} - {line.account_name}</td>
+                  <td>{line.description}</td>
+                  <td class="amount">{line.debit_amount > 0 ? formatCurrency(line.debit_amount) : '-'}</td>
+                  <td class="amount">{line.credit_amount > 0 ? formatCurrency(line.credit_amount) : '-'}</td>
+                  <td class="amount">{formatCurrency(line.running_balance)}</td>
+                </tr>
+              {/each}
+              <tr class="total-row">
+                <td colspan="4"><strong>Totals</strong></td>
+                <td class="amount"><strong>{formatCurrency(glTotalDebits)}</strong></td>
+                <td class="amount"><strong>{formatCurrency(glTotalCredits)}</strong></td>
+                <td class="amount"><strong>{formatCurrency(glEndBalance)}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      {/if}
+    </Card>
+
+  {:else if reportType === 'budget-vs-actual'}
+    <!-- Budget vs Actual -->
+    <Card title="Budget vs Actual" padding={false}>
+      <div class="report-header">
+        <div>
+          <h3>Budget vs Actual Comparison</h3>
+          <div class="date-range-controls">
+            <div class="date-inputs">
+              <Select
+                label="Budget"
+                bind:value={selectedBudgetId}
+                options={budgetsList.map(b => ({ value: b.id, label: `${b.name} (FY ${b.fiscal_year})` }))}
+              />
+              <Input
+                type="date"
+                label="Actuals Start"
+                bind:value={bvaStartDate}
+              />
+              <Input
+                type="date"
+                label="Actuals End"
+                bind:value={bvaEndDate}
+              />
+            </div>
+          </div>
+        </div>
+        <Button variant="secondary" onclick={exportBudgetVsActual}>Export CSV</Button>
+      </div>
+
+      {#if !budgetVsActualData}
+        <div class="section">
+          <p>Select a budget and date range to compare.</p>
+        </div>
+      {:else if budgetVsActualData.lines.length === 0}
+        <div class="section">
+          <p>No budget lines found for the selected budget.</p>
+        </div>
+      {:else}
+        <div class="section">
+          <div class="bva-info">
+            <strong>{budgetVsActualData.budgetName}</strong>
+            <span>FY {budgetVsActualData.fiscalYear}</span>
+            <span>{budgetVsActualData.periodType}</span>
+          </div>
+          <div class="bva-table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th class="amount">Budget</th>
+                  <th class="amount">Actual</th>
+                  <th class="amount">Variance</th>
+                  <th class="amount">Variance %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each budgetVsActualData.lines as line}
+                  <tr>
+                    <td>{line.account_code} - {line.account_name}</td>
+                    <td class="amount">{formatCurrency(line.budget_amount)}</td>
+                    <td class="amount">{formatCurrency(line.actual_amount)}</td>
+                    <td class="amount" class:positive={line.variance > 0} class:negative={line.variance < 0}>
+                      {formatCurrency(line.variance)}
+                    </td>
+                    <td class="amount" class:positive={line.variance > 0} class:negative={line.variance < 0}>
+                      {line.variance_pct.toFixed(2)}%
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+              <tfoot>
+                <tr class="total-row">
+                  <td><strong>Total</strong></td>
+                  <td class="amount"><strong>{formatCurrency(budgetVsActualData.totalBudget)}</strong></td>
+                  <td class="amount"><strong>{formatCurrency(budgetVsActualData.totalActual)}</strong></td>
+                  <td class="amount" class:positive={budgetVsActualData.totalVariance > 0} class:negative={budgetVsActualData.totalVariance < 0}>
+                    <strong>{formatCurrency(budgetVsActualData.totalVariance)}</strong>
+                  </td>
+                  <td class="amount"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      {/if}
+    </Card>
+
   {:else}
     <!-- Balance Sheet -->
     <Card title="Balance Sheet" padding={false}>
@@ -1281,5 +1777,174 @@
   .movement-type-transfer {
     color: #2196f3;
     font-weight: 600;
+  }
+
+  .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .report-selector select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #2c3e50;
+    background: white;
+    cursor: pointer;
+  }
+
+  .report-selector select:focus {
+    outline: none;
+    border-color: #3498db;
+  }
+
+  .cash-flow-summary {
+    padding: 24px;
+    border-top: 2px solid #2c3e50;
+  }
+
+  .summary-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  .summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #f8f9fa;
+    border-radius: 6px;
+  }
+
+  .summary-item.highlight {
+    background: #d5f4e6;
+    border: 2px solid #27ae60;
+    font-size: 16px;
+  }
+
+  .summary-item span {
+    color: #555;
+  }
+
+  .positive {
+    color: #27ae60;
+  }
+
+  .gl-detail-summary {
+    padding: 16px 24px;
+    border-bottom: 1px solid #ecf0f1;
+  }
+
+  .gl-balance-info {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .gl-balance-info span {
+    padding: 8px 16px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #555;
+  }
+
+  .gl-table-wrapper {
+    overflow-x: auto;
+  }
+
+  .gl-table-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .gl-table-wrapper th {
+    background: #2c3e50;
+    color: white;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .gl-table-wrapper td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #ecf0f1;
+    font-size: 13px;
+  }
+
+  .gl-table-wrapper .total-row {
+    background: #f8f9fa;
+    border-top: 3px double #2c3e50;
+  }
+
+  .account-filter select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #2c3e50;
+    background: white;
+    cursor: pointer;
+    min-width: 250px;
+  }
+
+  .account-filter select:focus {
+    outline: none;
+    border-color: #3498db;
+  }
+
+  .bva-info {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+  }
+
+  .bva-info strong {
+    color: #2c3e50;
+  }
+
+  .bva-info span {
+    color: #7f8c8d;
+    font-size: 13px;
+  }
+
+  .bva-table-wrapper {
+    overflow-x: auto;
+  }
+
+  .bva-table-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .bva-table-wrapper th,
+  .bva-table-wrapper td {
+    padding: 8px 12px;
+    border: 1px solid #ecf0f1;
+    text-align: left;
+  }
+
+  .bva-table-wrapper thead th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #2c3e50;
+  }
+
+  td.positive {
+    color: #27ae60;
+  }
+
+  td.negative {
+    color: #e74c3c;
   }
 </style>
