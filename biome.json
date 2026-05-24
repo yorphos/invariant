@@ -21,7 +21,7 @@
       "recommended": true,
       "suspicious": {
         "noExplicitAny": "warn",
-        "noConsoleLog": "off"
+        "noConsoleLog": "warn"
       },
       "style": {
         "noNonNullAssertion": "warn"
