@@ -23,6 +23,7 @@
   import Modal from './lib/ui/Modal.svelte';
   import UpdateModal from './lib/ui/UpdateModal.svelte';
   import { toasts } from './lib/stores/toast';
+  import { themeStore } from './lib/stores/theme';
   import { backupDatabase, restoreDatabase, resetDatabase, RESET_CONFIRMATION_TEXT, isResetConfirmationValid } from './lib/services/backup';
   import { 
     getFiscalYears, 
@@ -77,6 +78,8 @@
   let skippedVersion: string | null = null; // Session-only skip tracking
 
   onMount(async () => {
+    themeStore.init();
+
     try {
       await getDatabase();
       mode = await persistenceService.getMode();
