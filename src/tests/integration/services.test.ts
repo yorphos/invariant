@@ -600,28 +600,98 @@ describe('Integration - Service Layer Operations', () => {
         db.prepare("SELECT id FROM account WHERE code = '4000'").get() as { id: number }
       ).id;
 
-      await expect(
-        createInvoice(
+      const result = await createInvoice(
+        {
+          invoice_number: 'INV-ZERO',
+          contact_id: contactId,
+          issue_date: '2026-06-01',
+          due_date: '2026-07-01',
+          tax_code_id: 1,
+        },
+        [
           {
-            invoice_number: 'INV-ZERO',
-            contact_id: contactId,
-            issue_date: '2026-06-01',
-            due_date: '2026-07-01',
-            tax_code_id: 1,
+            line_number: 1,
+            description: 'Zero qty',
+            quantity: 0,
+            unit_price: 100.0,
+            amount: 0,
+            account_id: revenueId,
           },
-          [
-            {
-              line_number: 1,
-              description: 'Zero qty',
-              quantity: 0,
-              unit_price: 100.0,
-              amount: 0,
-              account_id: revenueId,
-            },
-          ],
-          defaultContext,
-        ),
-      ).rejects.toThrow(/quantity greater than 0/i);
+        ],
+        defaultContext,
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.warnings[0].message).toMatch(/quantity greater than 0/i);
+    });
+
+    it('should reject invoice without tax code', async () => {
+      const { createInvoice } = await import('../../lib/domain/invoice-operations');
+
+      const contactId = (
+        db.prepare("SELECT id FROM contact WHERE name = 'Test Customer'").get() as { id: number }
+      ).id;
+      const revenueId = (
+        db.prepare("SELECT id FROM account WHERE code = '4000'").get() as { id: number }
+      ).id;
+
+      const result = await createInvoice(
+        {
+          invoice_number: 'INV-NOTAX',
+          contact_id: contactId,
+          issue_date: '2026-06-01',
+          due_date: '2026-07-01',
+        },
+        [
+          {
+            line_number: 1,
+            description: 'No tax code',
+            quantity: 1,
+            unit_price: 100.0,
+            amount: 100.0,
+            account_id: revenueId,
+          },
+        ],
+        defaultContext,
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.warnings[0].message).toMatch(/tax code is required/i);
+    });
+
+    it('should reject invoice with due date before issue date', async () => {
+      const { createInvoice } = await import('../../lib/domain/invoice-operations');
+
+      const contactId = (
+        db.prepare("SELECT id FROM contact WHERE name = 'Test Customer'").get() as { id: number }
+      ).id;
+      const revenueId = (
+        db.prepare("SELECT id FROM account WHERE code = '4000'").get() as { id: number }
+      ).id;
+
+      const result = await createInvoice(
+        {
+          invoice_number: 'INV-DATE',
+          contact_id: contactId,
+          issue_date: '2026-07-01',
+          due_date: '2026-06-01',
+          tax_code_id: 1,
+        },
+        [
+          {
+            line_number: 1,
+            description: 'Date issue',
+            quantity: 1,
+            unit_price: 100.0,
+            amount: 100.0,
+            account_id: revenueId,
+          },
+        ],
+        defaultContext,
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.warnings[0].message).toMatch(/due date must be on or after/i);
     });
 
     it('should reject invoice without tax code', async () => {
@@ -873,18 +943,19 @@ describe('Integration - Service Layer Operations', () => {
     it('should reject payment with zero amount', async () => {
       const { createPayment } = await import('../../lib/domain/payment-operations');
 
-      await expect(
-        createPayment(
-          {
-            payment_number: 'PMT-ZERO',
-            payment_date: '2026-06-01',
-            amount: 0,
-            payment_method: 'cash' as PaymentMethod,
-          },
-          [],
-          defaultContext,
-        ),
-      ).rejects.toThrow(/amount must be greater than 0/i);
+      const result = await createPayment(
+        {
+          payment_number: 'PMT-ZERO',
+          payment_date: '2026-06-01',
+          amount: 0,
+          payment_method: 'cash' as PaymentMethod,
+        },
+        [],
+        defaultContext,
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.warnings[0].message).toMatch(/amount must be greater than 0/i);
     });
   });
 
@@ -962,18 +1033,19 @@ describe('Integration - Service Layer Operations', () => {
         db.prepare("SELECT id FROM account WHERE code = '4000'").get() as { id: number }
       ).id;
 
-      await expect(
-        createExpense(
-          {
-            description: 'Wrong account',
-            amount: 100.0,
-            expense_date: '2026-06-01',
-            expense_account_id: revenueId,
-            payment_account_id: cashId,
-          },
-          defaultContext,
-        ),
-      ).rejects.toThrow(/must be an expense account/i);
+      const result = await createExpense(
+        {
+          description: 'Wrong account',
+          amount: 100.0,
+          expense_date: '2026-06-01',
+          expense_account_id: revenueId,
+          payment_account_id: cashId,
+        },
+        defaultContext,
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.warnings[0].message).toMatch(/must be an expense account/i);
     });
 
     it('should reject expense with zero amount', async () => {
@@ -986,18 +1058,19 @@ describe('Integration - Service Layer Operations', () => {
         db.prepare("SELECT id FROM account WHERE code = '5100'").get() as { id: number }
       ).id;
 
-      await expect(
-        createExpense(
-          {
-            description: 'Zero amount',
-            amount: 0,
-            expense_date: '2026-06-01',
-            expense_account_id: expenseId,
-            payment_account_id: cashId,
-          },
-          defaultContext,
-        ),
-      ).rejects.toThrow(/amount must be greater than 0/i);
+      const result = await createExpense(
+        {
+          description: 'Zero amount',
+          amount: 0,
+          expense_date: '2026-06-01',
+          expense_account_id: expenseId,
+          payment_account_id: cashId,
+        },
+        defaultContext,
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.warnings[0].message).toMatch(/amount must be greater than 0/i);
     });
   });
 
