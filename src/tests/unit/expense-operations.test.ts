@@ -211,7 +211,7 @@ describe('Expense Operations - Edge Cases', () => {
     const leapYearDate = '2024-02-29';
     const date = new Date(leapYearDate);
 
-    expect(date.getMonth()).toBe(1); // February (0-indexed)
-    expect(date.getDate()).toBe(29);
+    expect(date.getUTCMonth()).toBe(1); // February (0-indexed)
+    expect(date.getUTCDate()).toBe(29);
   });
 });
