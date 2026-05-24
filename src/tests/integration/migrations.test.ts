@@ -36,10 +36,10 @@ describe('Integration - Database Migrations', () => {
       expect(migrations.every((m) => m.id && m.name && m.applied_at)).toBe(true);
     });
 
-    it('should have exactly 18 migrations applied', () => {
+    it('should have exactly 19 migrations applied', () => {
       const migrations = getAppliedMigrations();
 
-      expect(migrations.length).toBe(18);
+      expect(migrations.length).toBe(19);
     });
 
     it('should apply migrations in correct order', () => {

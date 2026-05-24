@@ -2,15 +2,59 @@ import Database from 'better-sqlite3';
 import { allMigrations } from '../../../migrations/index';
 import type { Migration } from '../../lib/services/database';
 
-let testDbInstance: Database.Database | null = null;
+/**
+ * Database adapter that wraps better-sqlite3 to expose the Tauri plugin-sql API
+ * (execute/select) so service-layer tests can use the real persistence layer.
+ */
+export type TestDatabase = Database.Database & {
+  execute(sql: string, bindings?: unknown[]): Promise<{ lastInsertId?: number; rowsAffected: number }>;
+  select<T = Record<string, unknown>>(sql: string, bindings?: unknown[]): Promise<T[]>;
+};
 
-export async function getTestDatabase(): Promise<Database.Database> {
+let testDbInstance: TestDatabase | null = null;
+
+function wrapBetterSqlite3(raw: Database.Database): TestDatabase {
+  return new Proxy(raw, {
+    get(target, prop, receiver) {
+      // Async adapter for Tauri plugin-sql's execute()
+      if (prop === 'execute') {
+        return (sql: string, bindings?: unknown[]) => {
+          try {
+            const stmt = target.prepare(sql);
+            const info = bindings ? stmt.run(...bindings) : stmt.run();
+            return {
+              lastInsertId: info.lastInsertRowid as number | undefined,
+              rowsAffected: info.changes,
+            };
+          } catch (err: unknown) {
+            if (err instanceof Error) {
+              // better-sqlite3 throws SqliteError which should propagate naturally
+              throw err;
+            }
+            throw err;
+          }
+        };
+      }
+      // Async adapter for Tauri plugin-sql's select()
+      if (prop === 'select') {
+        return (sql: string, bindings?: unknown[]) => {
+          const stmt = target.prepare(sql);
+          return bindings ? stmt.all(...bindings) : stmt.all();
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  }) as TestDatabase;
+}
+
+export async function getTestDatabase(): Promise<TestDatabase> {
   if (testDbInstance) {
     return testDbInstance;
   }
 
-  testDbInstance = new Database(':memory:');
-  testDbInstance.pragma('foreign_keys = ON');
+  const raw = new Database(':memory:');
+  raw.pragma('foreign_keys = ON');
+  testDbInstance = wrapBetterSqlite3(raw);
   await initializeMigrations();
   await runMigrations();
   await seedDefaultData();
