@@ -11,6 +11,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2026-05-24
+
+### Added
+- **Budgeting Module** — Full budget CRUD with monthly/quarterly/yearly periods, budget vs. actual reporting
+- **Cash Flow Statement** — Operating, investing, financing activities with cash account balance tracking
+- **General Ledger Detail** — Drill-down report with running balance, account filter, and CSV export
+- **Bank Import Review** — Pre-import preview, duplicate detection with confidence scoring, progress feedback
+- **SQL Database Export** — Full SQL dump with CREATE TABLE + INSERT statements for disaster recovery
+- **Confirm Action Modal** — Promise-based confirm dialog using Svelte 5 mount API, replacing native confirm()
+
+### Changed
+- **Centralized Logger** — Replaced 115+ scattered console.* calls with structured logger (DEV-only debug/info)
+- **App.svelte decomposition** — Extracted Sidebar, SettingsPanel, BackupPanel, PeriodClosePanel (1989→408 lines)
+- **Native dialogs removed** — All alert()/confirm() calls replaced with toast notifications and confirm modal
+- **Type safety** — Added SqlValue/SqlParams types, removed any[] across 5 service/domain files
+- **Dependencies updated** — Svelte 5.48→5.55, Tauri API 2.9→2.11, Vitest 4.0→4.1, and 13 other packages
+- **Biome 2.x migration** — Updated config for new CLI, enabled stricter lint rules
+
+### Fixed
+- **Document cleanup** — Physical files now deleted from disk when last document reference is removed
+- **Document garbage collection** — New garbageCollectDocuments() for orphaned file cleanup
+- **Accessibility** — Fixed all 9 Svelte a11y warnings in CreditNotesView (label/control associations)
+- **SQL quoting** — Fixed double-quoted string literals using datetime('now') and similar patterns
+- **Integration test adapter** — better-sqlite3 wrapper for Tauri SQL plugin API compatibility
+
+### Security
+- **XSS sanitizer** — Updater release notes now escape HTML instead of using {@html} (P1)
+
 ## [0.4.2]
 
 ### Added
