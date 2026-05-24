@@ -44,7 +44,7 @@
       <div class="release-notes">
         <h4>What's New:</h4>
         <div class="notes-content">
-          {@html updateInfo.body.replace(/\n/g, '<br>')}
+          {updateInfo.body}
         </div>
       </div>
     {/if}
@@ -128,6 +128,7 @@
     font-size: 14px;
     line-height: 1.6;
     color: #374151;
+    white-space: pre-wrap;
   }
 
   .download-progress {
