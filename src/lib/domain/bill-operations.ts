@@ -3,6 +3,7 @@ import { calculateTax } from '../services/tax';
 import { getSystemAccount } from '../services/system-accounts';
 import { getDatabase } from '../services/database';
 import { assertPeriodOpen } from '../services/period-guard';
+import { logger } from '../utils/logger';
 import type { Bill, BillLine, VendorPayment, PolicyContext } from '../domain/types';
 
 export interface BillInput {
@@ -252,7 +253,7 @@ export async function createBill(
     };
 
   } catch (error) {
-    console.error('Bill creation error:', error);
+    logger.error('Bill creation error:', error);
     return {
       ok: false,
       warnings: [
@@ -390,7 +391,7 @@ export async function voidBill(
     };
 
   } catch (error) {
-    console.error('Bill void error:', error);
+    logger.error('Bill void error:', error);
     return {
       ok: false,
       warnings: [
@@ -558,7 +559,7 @@ export async function createVendorPayment(
     };
     
   } catch (error) {
-    console.error('Vendor payment creation error:', error);
+    logger.error('Vendor payment creation error:', error);
     return {
       ok: false,
       warnings: [

@@ -4,6 +4,7 @@ import { PostingEngine } from '../domain/posting-engine';
 import { calculateTax, getTaxRate } from '../services/tax';
 import { assertPeriodOpen } from '../services/period-guard';
 import { getSystemAccount } from '../services/system-accounts';
+import { logger } from '../utils/logger';
 import type { Invoice, InvoiceLine, PolicyContext } from '../domain/types';
 
 const postingEngine = new PostingEngine();
@@ -221,13 +222,13 @@ export async function createInvoice(
       warnings: [],
     };
   } catch (error) {
-    console.error('Invoice creation error:', error);
+    logger.error('Invoice creation error:', error);
     
     // Provide more detailed error information
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {
       errorMessage = error.message;
-      console.error('Error stack:', error.stack);
+      logger.error('Error stack:', error.stack);
       
       // Check for specific SQLite errors
       if (errorMessage.includes('1811')) {
@@ -376,7 +377,7 @@ export async function voidInvoice(
       warnings: [],
     };
   } catch (error) {
-    console.error('Invoice void error:', error);
+    logger.error('Invoice void error:', error);
     
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {
@@ -467,7 +468,7 @@ export async function editInvoice(
       void_result: voidResult,
     };
   } catch (error) {
-    console.error('Invoice edit error:', error);
+    logger.error('Invoice edit error:', error);
     
     let errorMessage = 'Unknown error occurred';
     if (error instanceof Error) {

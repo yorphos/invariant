@@ -20,6 +20,7 @@
  */
 
 import { getDatabase } from '../services/database';
+import type { SqlParams } from '../utils/sql-types';
 import type { Currency, ExchangeRate, FXGainLoss, MultiCurrencyTransaction } from './types';
 
 export interface CurrencyInput {
@@ -320,7 +321,7 @@ export async function getFXGainLossHistory(
   const db = await getDatabase();
 
   let sql = `SELECT * FROM fx_gain_loss WHERE 1=1`;
-  const params: any[] = [];
+  const params: SqlParams = [];
 
   if (accountId) {
     sql += ` AND account_id = ?`;
